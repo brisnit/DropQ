@@ -36,6 +36,9 @@
 
 html {
   scroll-behavior: smooth;
+  /* Lock out horizontal jitter from decorative bleed/rotations on mobile.
+     `clip` (not `hidden`) so it doesn't break position: sticky headers. */
+  overflow-x: clip;
 }
 
 body {
@@ -44,6 +47,9 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  overflow-x: clip;
+  width: 100%;
+  max-width: 100%;
 }
 
 ::selection {
