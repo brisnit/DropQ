@@ -76,7 +76,7 @@ export default async function PaymentsPage({
       {/* Connection card */}
       {!stripeEnabled ? (
         <div className="bg-paper border border-line rounded-card p-6">
-          <Badge className="bg-teal-tint text-[#235c65] mb-3">Demo mode</Badge>
+          <Badge className="bg-grey-tint text-[#3f434b] mb-3">Demo mode</Badge>
           <h2 className="font-semibold text-lg">Payments aren&apos;t configured yet</h2>
           <p className="text-muted mt-2 max-w-xl">
             This DropQ instance has no Stripe keys, so checkout runs in demo mode (orders
@@ -107,7 +107,7 @@ export default async function PaymentsPage({
         </div>
       ) : connected && !chargesEnabled ? (
         <div className="bg-paper border border-line rounded-card p-6">
-          <Badge className="bg-teal-tint text-[#235c65] mb-2">Setup incomplete</Badge>
+          <Badge className="bg-grey-tint text-[#3f434b] mb-2">Setup incomplete</Badge>
           <h2 className="font-semibold text-lg">Finish connecting your account</h2>
           <p className="text-muted mt-1 max-w-xl">
             {detailsSubmitted

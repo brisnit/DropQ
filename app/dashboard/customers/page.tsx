@@ -100,7 +100,7 @@ export default async function CustomersPage() {
                   <div className="min-w-0 col-span-2 sm:col-span-1">
                     <div className="flex items-center gap-2">
                       <span className="font-medium truncate">{c.name}</span>
-                      {c.orders > 1 && <Badge className="bg-teal-tint text-[#235c65]">Regular</Badge>}
+                      {c.orders > 1 && <Badge className="bg-grey-tint text-[#3f434b]">Regular</Badge>}
                     </div>
                     <p className="text-xs text-muted truncate">{c.email}</p>
                   </div>

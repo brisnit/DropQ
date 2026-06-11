@@ -2,7 +2,7 @@
 
 /* ---------------------------------------------------------------------------
    DropQ Design System — modern, premium, food-forward.
-   Purple-led brand: grape primary, warm paper, teal + sage as accents.
+   Purple-led brand: grape primary, warm paper, grey + sage as accents.
 --------------------------------------------------------------------------- */
 @theme {
   --color-cream: #faf7fb;
@@ -14,9 +14,9 @@
   --color-brand: #6d28d9;
   --color-brand-dark: #5b21b6;
   --color-brand-tint: #ece4fb;
-  --color-teal: #3a8895;
-  --color-teal-tint: #e1edee;
-  --color-teal-dark: #235c65;
+  --color-grey: #6b7280;
+  --color-grey-tint: #edeef1;
+  --color-grey-dark: #3f434b;
   --color-sage: #3f7d5b;
   --color-sage-tint: #e2efe7;
   --color-berry: #8a2d52;

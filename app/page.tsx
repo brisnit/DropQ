@@ -147,7 +147,7 @@ export default function Home() {
       {/* HERO */}
       <Section className="pt-16 pb-20 sm:pt-24 grid lg:grid-cols-2 gap-14 items-center">
         <div className="animate-in">
-          <Badge className="bg-teal-tint text-[#235c65] mb-5">
+          <Badge className="bg-grey-tint text-[#3f434b] mb-5">
             The operating system for food businesses
           </Badge>
           <h1 className="font-display text-[2.6rem] sm:text-6xl leading-[1.02] font-semibold tracking-tight">
@@ -225,7 +225,7 @@ export default function Home() {
       <div className="bg-ink text-cream">
         <Section id="how" className="py-20 sm:py-28">
           <div className="max-w-2xl">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">
               How it works
             </span>
             <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-3">
@@ -236,7 +236,7 @@ export default function Home() {
             {STEPS.map((s) => (
               <div key={s.n} className="relative">
                 <div className="text-3xl">{s.emoji}</div>
-                <div className="font-display text-sm text-teal mt-4">{s.n}</div>
+                <div className="font-display text-sm text-grey mt-4">{s.n}</div>
                 <h3 className="font-semibold text-lg mt-1">{s.title}</h3>
                 <p className="text-sm text-cream/70 mt-2">{s.body}</p>
               </div>
@@ -334,7 +334,7 @@ export default function Home() {
       {/* TESTIMONIAL */}
       <Section id="stories" className="py-20 sm:py-28">
         <Card className="p-8 sm:p-14 text-center max-w-3xl mx-auto">
-          <div className="text-teal text-2xl">★★★★★</div>
+          <div className="text-grey text-2xl">★★★★★</div>
           <blockquote className="font-display text-2xl sm:text-3xl font-medium leading-snug mt-5">
             “DropQ turned my weekend hobby into a real business. I sold out my
             first drop in 11 minutes and finally have a customer list I own.”
@@ -353,7 +353,7 @@ export default function Home() {
       <div className="bg-ink text-cream">
         <Section id="pricing" className="py-20 sm:py-28">
           <div className="max-w-2xl">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-teal">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">
               Pricing
             </span>
             <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-3">
@@ -375,12 +375,12 @@ export default function Home() {
                 key={String(name)}
                 className={`rounded-card p-6 ${
                   featured
-                    ? "bg-brand text-white ring-2 ring-teal"
+                    ? "bg-brand text-white ring-2 ring-grey"
                     : "bg-cream/5 border border-cream/15"
                 }`}
               >
                 {featured ? (
-                  <Badge className="bg-teal text-white mb-3">Most popular</Badge>
+                  <Badge className="bg-grey text-white mb-3">Most popular</Badge>
                 ) : null}
                 <h3 className="font-semibold text-lg">{String(name)}</h3>
                 <div className="mt-2 mb-5">
@@ -390,7 +390,7 @@ export default function Home() {
                 <ul className="space-y-2 text-sm">
                   {(feats as string[]).map((ft) => (
                     <li key={ft} className="flex gap-2">
-                      <span className={featured ? "text-white" : "text-teal"}>✓</span>
+                      <span className={featured ? "text-white" : "text-grey"}>✓</span>
                       <span className={featured ? "text-white/90" : "text-cream/75"}>{ft}</span>
                     </li>
                   ))}

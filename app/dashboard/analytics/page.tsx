@@ -118,7 +118,7 @@ export default async function AnalyticsPage() {
       {/* AI teaser */}
       <div className="mt-6 rounded-card p-6 bg-ink text-cream flex flex-wrap items-center justify-between gap-4">
         <div className="max-w-xl">
-          <span className="text-xs font-semibold uppercase tracking-wider text-teal">Coming soon</span>
+          <span className="text-xs font-semibold uppercase tracking-wider text-grey">Coming soon</span>
           <h3 className="font-display text-xl font-semibold mt-1">AI demand forecasting</h3>
           <p className="text-cream/70 mt-1 text-sm">
             DropQ will predict how much of each item to make next week based on your sell-out

@@ -46,7 +46,7 @@ export default async function DropOrderPage({
 
       <div className="max-w-4xl mx-auto px-5 py-8">
         {canceled && (
-          <div className="mb-5 rounded-xl bg-teal-tint text-[#235c65] px-4 py-3 text-sm">
+          <div className="mb-5 rounded-xl bg-grey-tint text-[#3f434b] px-4 py-3 text-sm">
             Checkout canceled — your cart is still here whenever you're ready.
           </div>
         )}
