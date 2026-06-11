@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   DropQ Design System — modern, premium, food-forward.
+   Purple-led brand: grape primary, warm paper, teal + sage as accents.
+--------------------------------------------------------------------------- */
+@theme {
+  --color-cream: #faf7fb;
+  --color-paper: #ffffff;
+  --color-ink: #1b1726;
+  --color-ink-soft: #3f3a4d;
+  --color-muted: #726c80;
+
+  --color-brand: #6d28d9;
+  --color-brand-dark: #5b21b6;
+  --color-brand-tint: #ece4fb;
+  --color-teal: #3a8895;
+  --color-teal-tint: #e1edee;
+  --color-teal-dark: #235c65;
+  --color-sage: #3f7d5b;
+  --color-sage-tint: #e2efe7;
+  --color-berry: #8a2d52;
+
+  --color-line: #e9e3f2;
+  --color-line-strong: #d8cfe8;
+
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+
+  --radius-card: 1.25rem;
+  --radius-pill: 999px;
+
+  --shadow-soft: 0 1px 2px rgba(27, 23, 38, 0.04), 0 8px 24px -12px rgba(27, 23, 38, 0.16);
+  --shadow-lift: 0 2px 4px rgba(27, 23, 38, 0.06), 0 24px 48px -20px rgba(27, 23, 38, 0.28);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-brand);
+  color: #fff;
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(to right, rgba(27, 23, 38, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(27, 23, 38, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.hero-glow {
+  background:
+    radial-gradient(60% 50% at 75% 18%, rgba(124, 58, 237, 0.22), transparent 60%),
+    radial-gradient(52% 46% at 12% 82%, rgba(168, 85, 247, 0.18), transparent 60%);
+}
+
+@keyframes float-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-in { animation: float-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
+}
+.live-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+
+/* Hide number input spinners for cleaner qty steppers */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }

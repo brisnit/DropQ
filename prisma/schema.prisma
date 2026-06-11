@@ -1,0 +1,97 @@
+// DropQ MVP — the operating system for modern food businesses.
+// Core loop: Seller -> Drop -> Products -> (buyer) Orders -> OrderItems
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Seller {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  storeName    String
+  slug         String   @unique
+  tagline      String?
+  bio          String?
+  location     String?
+  accent       String   @default("#6D28D9") // brand accent for storefront
+  createdAt    DateTime @default(now())
+
+  // Stripe Connect (payouts)
+  stripeAccountId      String? @unique
+  stripeChargesEnabled Boolean @default(false)
+
+  drops  Drop[]
+  orders Order[]
+}
+
+model Drop {
+  id          String    @id @default(cuid())
+  sellerId    String
+  seller      Seller    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  status      String    @default("draft") // draft | live | closed
+  fulfillment String    @default("pickup") // pickup | delivery | shipping
+  pickupInfo  String?
+  opensAt     DateTime?
+  closesAt    DateTime?
+  createdAt   DateTime  @default(now())
+
+  products Product[]
+  orders   Order[]
+}
+
+model Product {
+  id          String  @id @default(cuid())
+  dropId      String
+  drop        Drop    @relation(fields: [dropId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  priceCents  Int
+  emoji       String  @default("🍪") // fallback visual when no photo uploaded
+  imageUrl    String? // uploaded product photo (served from /uploads)
+  inventory   Int     @default(0) // total units made available
+  sold        Int     @default(0)
+  sortOrder   Int     @default(0)
+
+  orderItems OrderItem[]
+}
+
+model Order {
+  id         String   @id @default(cuid())
+  dropId     String
+  drop       Drop     @relation(fields: [dropId], references: [id], onDelete: Cascade)
+  sellerId   String
+  seller     Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  buyerName  String
+  buyerEmail String
+  buyerPhone String?
+  note       String?
+  totalCents Int
+  feeCents   Int      @default(0) // DropQ platform fee taken from this order
+  status     String   @default("new") // pending | new | ready | fulfilled | canceled
+  // Stripe
+  stripeSessionId       String? @unique
+  stripePaymentIntentId String?
+  createdAt  DateTime @default(now())
+
+  items OrderItem[]
+}
+
+model OrderItem {
+  id         String  @id @default(cuid())
+  orderId    String
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product @relation(fields: [productId], references: [id])
+  name       String
+  priceCents Int
+  quantity   Int
+}
