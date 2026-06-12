@@ -1,0 +1,75 @@
+import "server-only";
+
+const RESEND_URL = "https://api.resend.com/emails";
+
+type Mail = { to: string; subject: string; html: string };
+
+/**
+ * Send an email via Resend if RESEND_API_KEY is set; otherwise log it to the
+ * server console (dev mode) so flows work with zero paid services.
+ */
+export async function sendEmail({ to, subject, html }: Mail): Promise<void> {
+  const key = process.env.RESEND_API_KEY;
+  const from = process.env.EMAIL_FROM || "DropQ <onboarding@resend.dev>";
+
+  if (!key) {
+    const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    console.log(
+      `\n──────── 📧 EMAIL (dev mode — set RESEND_API_KEY to send for real) ────────\n` +
+        `To:      ${to}\nSubject: ${subject}\n${text}\n` +
+        `────────────────────────────────────────────────────────────────────────\n`
+    );
+    return;
+  }
+
+  try {
+    const res = await fetch(RESEND_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to, subject, html }),
+    });
+    if (!res.ok) console.error("Resend email failed:", res.status, await res.text());
+  } catch (e) {
+    console.error("Resend email error:", e);
+  }
+}
+
+function layout(heading: string, body: string, cta: { href: string; label: string }) {
+  return `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#faf7fb;padding:32px">
+    <div style="max-width:480px;margin:0 auto;background:#fff;border:1px solid #e9e3f2;border-radius:18px;overflow:hidden">
+      <div style="background:#6d28d9;padding:20px 24px;color:#fff;font-size:20px;font-weight:700">DropQ</div>
+      <div style="padding:28px 24px;color:#1b1726">
+        <h1 style="font-size:20px;margin:0 0 12px">${heading}</h1>
+        <p style="font-size:15px;line-height:1.55;color:#3f3a4d;margin:0 0 22px">${body}</p>
+        <a href="${cta.href}" style="display:inline-block;background:#6d28d9;color:#fff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:12px">${cta.label}</a>
+        <p style="font-size:12px;color:#726c80;margin:22px 0 0">If the button doesn't work, copy this link:<br><span style="color:#6d28d9;word-break:break-all">${cta.href}</span></p>
+      </div>
+    </div>
+    <p style="text-align:center;color:#726c80;font-size:12px;margin-top:16px">DropQ — the operating system for modern food businesses</p>
+  </div>`;
+}
+
+export function verificationEmail(to: string, link: string): Mail {
+  return {
+    to,
+    subject: "Verify your email for DropQ",
+    html: layout(
+      "Confirm your email",
+      "Welcome to DropQ! Confirm your email address to secure your account and start selling.",
+      { href: link, label: "Verify email" }
+    ),
+  };
+}
+
+export function resetEmail(to: string, link: string): Mail {
+  return {
+    to,
+    subject: "Reset your DropQ password",
+    html: layout(
+      "Reset your password",
+      "We received a request to reset your password. This link expires in 1 hour. If you didn't ask for this, you can safely ignore this email.",
+      { href: link, label: "Reset password" }
+    ),
+  };
+}

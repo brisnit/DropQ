@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { requireSeller } from "@/lib/auth";
 import { logoutAction } from "@/lib/actions/auth";
 import { Logo } from "@/components/logo";
 import { DashboardNav } from "@/components/dashboard-nav";
+import { VerifyBanner } from "@/components/verify-banner";
 import { LinkButton } from "@/components/ui";
 
 export default async function DashboardLayout({
@@ -49,6 +51,9 @@ export default async function DashboardLayout({
 
       {/* Main */}
       <main className="min-w-0">
+        <Suspense fallback={null}>
+          <VerifyBanner verified={seller.emailVerified} />
+        </Suspense>
         <div className="md:hidden flex items-center justify-between px-5 py-3 border-b border-line">
           <span className="font-display font-semibold">{seller.storeName}</span>
           <LinkButton href="/dashboard/drops/new" size="sm">

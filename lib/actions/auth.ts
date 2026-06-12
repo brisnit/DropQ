@@ -1,5 +1,6 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import {
@@ -7,16 +8,33 @@ import {
   destroySession,
   hashPassword,
   verifyPassword,
+  requireSeller,
 } from "@/lib/auth";
 import { slugify } from "@/lib/format";
+import { createToken, consumeToken } from "@/lib/tokens";
+import { sendEmail, verificationEmail, resetEmail } from "@/lib/email";
 
 export type AuthState = { error?: string };
+export type ResetState = { error?: string; sent?: boolean; done?: boolean };
+
+async function baseUrl(): Promise<string> {
+  const h = await headers();
+  const host = process.env.APP_URL?.replace(/\/$/, "") ?? null;
+  if (host) return host;
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  return `${proto}://${h.get("host") ?? "localhost:3000"}`;
+}
+
+async function sendVerification(sellerId: string, email: string) {
+  const token = await createToken(sellerId, "verify");
+  const link = `${await baseUrl()}/verify?token=${token}`;
+  await sendEmail(verificationEmail(email, link));
+}
 
 async function uniqueSlug(base: string): Promise<string> {
   const root = slugify(base) || "store";
   let candidate = root;
   let n = 2;
-  // eslint-disable-next-line no-constant-condition
   while (await prisma.seller.findUnique({ where: { slug: candidate } })) {
     candidate = `${root}-${n++}`;
   }
@@ -49,6 +67,7 @@ export async function signupAction(
     },
   });
 
+  await sendVerification(seller.id, seller.email);
   await createSession(seller.id);
   redirect("/dashboard");
 }
@@ -72,4 +91,54 @@ export async function loginAction(
 export async function logoutAction(): Promise<void> {
   await destroySession();
   redirect("/");
+}
+
+/** Resend the verification email to the logged-in seller. */
+export async function resendVerificationAction(): Promise<void> {
+  const seller = await requireSeller();
+  if (!seller.emailVerified) {
+    await sendVerification(seller.id, seller.email);
+  }
+  redirect("/dashboard?verifysent=1");
+}
+
+/** Forgot-password: email a reset link. Never reveals whether an account exists. */
+export async function requestPasswordResetAction(
+  _prev: ResetState,
+  formData: FormData
+): Promise<ResetState> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+    return { error: "Enter a valid email." };
+
+  const seller = await prisma.seller.findUnique({ where: { email } });
+  if (seller) {
+    const token = await createToken(seller.id, "reset");
+    const link = `${await baseUrl()}/reset?token=${token}`;
+    await sendEmail(resetEmail(seller.email, link));
+  }
+  // Same response regardless, to avoid user enumeration.
+  return { sent: true };
+}
+
+/** Complete a password reset using a token from the email link. */
+export async function resetPasswordAction(
+  _prev: ResetState,
+  formData: FormData
+): Promise<ResetState> {
+  const token = String(formData.get("token") ?? "");
+  const password = String(formData.get("password") ?? "");
+  if (password.length < 8)
+    return { error: "Password must be at least 8 characters." };
+
+  const sellerId = await consumeToken(token, "reset");
+  if (!sellerId)
+    return { error: "This reset link is invalid or has expired. Request a new one." };
+
+  await prisma.seller.update({
+    where: { id: sellerId },
+    data: { passwordHash: await hashPassword(password) },
+  });
+
+  redirect("/login?reset=1");
 }

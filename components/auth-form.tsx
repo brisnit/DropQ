@@ -52,6 +52,14 @@ export function AuthForm({
         />
       </Field>
 
+      {!isSignup && (
+        <div className="-mt-2 text-right">
+          <Link href="/forgot" className="text-sm text-brand font-medium hover:underline">
+            Forgot password?
+          </Link>
+        </div>
+      )}
+
       {state.error && (
         <p className="text-sm text-brand-dark bg-brand-tint rounded-lg px-3 py-2">
           {state.error}

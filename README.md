@@ -149,7 +149,11 @@ Relevant code: [lib/stripe.ts](lib/stripe.ts), [lib/checkout.ts](lib/checkout.ts
 [app/dashboard/payments/](app/dashboard/payments/).
 
 ## Notes / next steps
-- Auth is intentionally minimal (no email verification / password reset yet).
+- **Auth** is email/password with signed httpOnly cookie sessions, plus **email
+  verification** and **password reset**. Emails send via **Resend** (free tier) when
+  `RESEND_API_KEY` is set; otherwise links print to the server console (dev mode), so
+  the flows work with no paid services. Set `EMAIL_FROM` to a verified Resend domain
+  for production. (Sessions aren't invalidated on password reset yet.)
 - Uploaded images are stored on the local filesystem (`public/uploads`); swap
   `lib/upload.ts` for S3/Cloudinary before deploying to a serverless host.
 - Natural extensions: refunds, SMS "drop is live" blasts, scheduled drop

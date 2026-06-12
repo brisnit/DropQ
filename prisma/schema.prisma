@@ -21,6 +21,7 @@ model Seller {
   bio          String?
   location     String?
   accent       String   @default("#6D28D9") // brand accent for storefront
+  emailVerified Boolean @default(false)
   createdAt    DateTime @default(now())
 
   // Stripe Connect (payouts)
@@ -29,6 +30,20 @@ model Seller {
 
   drops  Drop[]
   orders Order[]
+  tokens Token[]
+}
+
+// Single-use, expiring tokens for email verification and password reset.
+model Token {
+  id        String   @id @default(cuid())
+  sellerId  String
+  seller    Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  type      String   // "verify" | "reset"
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([sellerId])
 }
 
 model Drop {
