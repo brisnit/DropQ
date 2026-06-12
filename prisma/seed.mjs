@@ -1,13 +1,17 @@
-// Seed a believable demo so the app is alive on first run.
-// Run: node --env-file=.env prisma/seed.mjs
+// Optional: seed a read-only SHOWCASE storefront so the marketing site's
+// "See a live store" link works. This is NOT a usable login — the account is
+// created with a random password and is never advertised. Real users sign up
+// at /signup to create their own store.
+// Run: npm run db:seed   (or: node --env-file=.env prisma/seed.mjs)
 import prismaPkg from "../app/generated/prisma/index.js";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 
 const { PrismaClient } = prismaPkg;
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("Seeding DropQ demo data…");
+  console.log("Seeding DropQ showcase storefront…");
 
   // Clean slate (order matters for FK constraints)
   await prisma.orderItem.deleteMany();
@@ -16,11 +20,12 @@ async function main() {
   await prisma.drop.deleteMany();
   await prisma.seller.deleteMany();
 
-  const passwordHash = await bcrypt.hash("demo1234", 10);
+  // Random, unguessable password — this showcase store cannot be logged into.
+  const passwordHash = await bcrypt.hash(randomBytes(24).toString("hex"), 10);
 
   const seller = await prisma.seller.create({
     data: {
-      email: "demo@dropq.com",
+      email: "showcase@dropq.example",
       passwordHash,
       storeName: "Marble & Crumb",
       slug: "marble-crumb",
@@ -146,8 +151,8 @@ async function main() {
     });
   }
 
-  console.log("✓ Seeded seller:  demo@dropq.com / demo1234");
-  console.log("✓ Storefront:     /s/marble-crumb");
+  console.log("✓ Showcase storefront ready (no login): /s/marble-crumb");
+  console.log("→ Create your own account at /signup");
 }
 
 main()

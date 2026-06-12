@@ -23,23 +23,25 @@ npm run dev
 Open the app at **http://localhost:3000** (or the next free port — watch the
 terminal; in this workspace it came up on **:3001** because 3000 was taken).
 
-### Demo login
-- **Email:** `demo@dropq.com`
-- **Password:** `demo1234`
-- **Live storefront:** `/s/marble-crumb`
+### Accounts
+There is **no demo login**. Create a real account at **`/signup`** (email +
+password). The optional seed creates a read-only **showcase storefront** at
+`/s/marble-crumb` for the marketing "See a live store" link — it has a random
+password and cannot be logged into.
 
 ---
 
 ## Try the full loop in 60 seconds
 
-1. **Visit the homepage `/`** → click **“See a live store”** (or go to `/s/marble-crumb`).
-2. **Open the live drop**, tap **Add** on a couple of items, fill name + email,
-   **Place order** → you land on a confirmation page. (No real payment is taken.)
-3. **Log in** with the demo account → the **dashboard Overview** tells you what to
-   do next, your new order appears under **Orders**, inventory ticks up on the
-   **drop page**, and the buyer shows up under **Customers**.
-4. **Create your own:** Dashboard → **+ New drop** → add items → **Publish** →
-   copy the share link → order from it in an incognito window.
+1. **Sign up** at `/signup` to create your store, then **+ New drop** → add a few
+   items → **Publish** → copy the share link.
+2. **Open your storefront** (incognito window), tap **Add** on a couple of items,
+   fill name + email, **Place order** → confirmation page. (In demo mode no real
+   payment is taken; with Stripe connected it's a real checkout.)
+3. Back in the **dashboard**: the new order appears under **Orders**, inventory
+   ticks up on the **drop page**, and the buyer shows up under **Customers**.
+4. Browse a ready-made example anytime at **`/s/marble-crumb`** (run
+   `npm run db:seed` once to create it locally).
 
 ---
 

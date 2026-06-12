@@ -14,10 +14,6 @@ export default async function LoginPage() {
       subtitle="Log in to manage your drops, orders, and customers."
     >
       <AuthForm mode="login" action={loginAction} />
-      <p className="mt-6 text-xs text-muted text-center bg-cream border border-line rounded-lg px-3 py-2">
-        Demo account → <span className="font-medium text-ink">demo@dropq.com</span> /{" "}
-        <span className="font-medium text-ink">demo1234</span>
-      </p>
     </AuthShell>
   );
 }
