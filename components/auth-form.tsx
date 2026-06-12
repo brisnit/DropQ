@@ -68,25 +68,23 @@ export function AuthForm({
 
       <SubmitButton label={isSignup ? "Create my store" : "Log in"} />
 
-      {isSignup ? (
-        <p className="text-sm text-muted text-center pt-1">
-          Already selling?{" "}
-          <Link href="/login" className="text-brand font-medium hover:underline">
-            Log in
-          </Link>
-        </p>
-      ) : (
-        <div className="pt-5 mt-2 border-t border-line text-center">
-          <p className="text-sm text-muted mt-4 mb-2.5">New to DropQ?</p>
-          <Link
-            href="/signup"
-            className="flex items-center justify-center w-full gap-2 rounded-xl border-2 border-brand text-brand font-semibold text-[0.95rem] px-5 py-3 hover:bg-brand hover:text-white transition-colors"
-          >
-            Start your store — it&apos;s free
-            <span aria-hidden>→</span>
-          </Link>
-        </div>
-      )}
+      <p className="text-base text-muted text-center pt-1">
+        {isSignup ? (
+          <>
+            Already selling?{" "}
+            <Link href="/login" className="text-brand font-medium hover:underline">
+              Log in
+            </Link>
+          </>
+        ) : (
+          <>
+            New to DropQ?{" "}
+            <Link href="/signup" className="text-brand font-semibold hover:underline">
+              Start your store
+            </Link>
+          </>
+        )}
+      </p>
     </form>
   );
 }
