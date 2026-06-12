@@ -6,22 +6,43 @@ a window), shares one link, and buyers order from a public storefront while the
 seller watches orders and inventory update in real time.
 
 Built with **Next.js 16 (App Router) · React 19 · TypeScript · Tailwind v4 ·
-Prisma · SQLite**. Runs locally with one command — no cloud accounts or API keys.
+Prisma · Postgres**, with Vercel Blob for image uploads, Stripe Connect for
+payments, and Resend for email. Designed to deploy on Vercel.
 
 ---
 
-## Quick start
+## Quick start (local)
+
+Uses **Postgres** (same as production). Easiest local DB is a free
+[Neon](https://neon.tech) project — copy its connection string into `.env` as both
+`DATABASE_URL` and `DATABASE_URL_UNPOOLED`. Then:
 
 ```bash
+cp .env.example .env                    # then fill in DATABASE_URL(+UNPOOLED), SESSION_SECRET
 npm install
-npx prisma generate
-npx prisma db push                      # creates the SQLite db
-node --env-file=.env prisma/seed.mjs    # seeds a demo bakery + drop + orders
+npx prisma db push                      # creates tables
+node --env-file=.env prisma/seed.mjs    # optional: seeds the showcase storefront
 npm run dev
 ```
 
-Open the app at **http://localhost:3000** (or the next free port — watch the
-terminal; in this workspace it came up on **:3001** because 3000 was taken).
+Open the app at **http://localhost:3000**. With no `BLOB_READ_WRITE_TOKEN` set,
+image uploads are written to `/public/uploads` locally.
+
+## Deploy to Vercel
+
+1. **Database** — Vercel project → **Storage → Create → Postgres** (Neon). This
+   injects `DATABASE_URL` + `DATABASE_URL_UNPOOLED` into the project.
+2. **Image uploads** — **Storage → Create → Blob**. This injects
+   `BLOB_READ_WRITE_TOKEN`.
+3. **Env vars** (Project → Settings → Environment Variables) — add:
+   `SESSION_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+   `DROPQ_FEE_PERCENT`, `RESEND_API_KEY`, `EMAIL_FROM`, `APP_URL`
+   (your live URL). The DB + Blob vars are added automatically by steps 1–2.
+4. **Redeploy.** The build runs `prisma generate && prisma db push && next build`,
+   which creates the tables on first deploy.
+5. **Stripe webhook** — point a Stripe webhook at
+   `https://YOURDOMAIN/api/stripe/webhook` and put its signing secret in
+   `STRIPE_WEBHOOK_SECRET`.
 
 ### Accounts
 There is **no demo login**. Create a real account at **`/signup`** (email +
@@ -154,7 +175,9 @@ Relevant code: [lib/stripe.ts](lib/stripe.ts), [lib/checkout.ts](lib/checkout.ts
   `RESEND_API_KEY` is set; otherwise links print to the server console (dev mode), so
   the flows work with no paid services. Set `EMAIL_FROM` to a verified Resend domain
   for production. (Sessions aren't invalidated on password reset yet.)
-- Uploaded images are stored on the local filesystem (`public/uploads`); swap
-  `lib/upload.ts` for S3/Cloudinary before deploying to a serverless host.
+- Image uploads use **Vercel Blob** in production (when `BLOB_READ_WRITE_TOKEN` is
+  set) and fall back to `/public/uploads` locally — see `lib/upload.ts`.
+- The build runs `prisma db push` (no migration history yet); formalize with
+  `prisma migrate` once the schema settles.
 - Natural extensions: refunds, SMS "drop is live" blasts, scheduled drop
   open/close, and AI demand-forecasting (teased in Analytics).
