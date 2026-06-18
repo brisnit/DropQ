@@ -25,15 +25,26 @@ model Seller {
   location     String?
   accent       String   @default("#6D28D9") // brand accent for storefront
   emailVerified Boolean @default(false)
+  isAdmin      Boolean  @default(false) // DropQ internal admin
   createdAt    DateTime @default(now())
 
   // Stripe Connect (payouts)
   stripeAccountId      String? @unique
   stripeChargesEnabled Boolean @default(false)
 
-  drops  Drop[]
-  orders Order[]
-  tokens Token[]
+  // DropQ fee: "absorb" (store eats the fee) | "pass" (customer pays the fee)
+  feeMode String @default("absorb")
+
+  // Geofencing notifications (location + opt-in radius)
+  geofenceEnabled Boolean @default(false)
+  latitude        Float?
+  longitude       Float?
+  geofenceRadiusM Int     @default(1500) // meters
+
+  drops       Drop[]
+  orders      Order[]
+  tokens      Token[]
+  subscribers Subscriber[]
 }
 
 // Single-use, expiring tokens for email verification and password reset.
@@ -62,8 +73,9 @@ model Drop {
   closesAt    DateTime?
   createdAt   DateTime  @default(now())
 
-  products Product[]
-  orders   Order[]
+  products    Product[]
+  orders      Order[]
+  subscribers Subscriber[]
 }
 
 model Product {
@@ -104,12 +116,44 @@ model Order {
 }
 
 model OrderItem {
-  id         String  @id @default(cuid())
+  id         String   @id @default(cuid())
   orderId    String
-  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId  String
-  product    Product @relation(fields: [productId], references: [id])
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // Nullable + SetNull so a drop's products can be edited/removed without
+  // breaking historical orders (name/price are snapshotted below).
+  productId  String?
+  product    Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   name       String
   priceCents Int
   quantity   Int
+}
+
+// Customers who sign up for future drops / opt into notifications.
+model Subscriber {
+  id        String   @id @default(cuid())
+  sellerId  String
+  seller    Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  dropId    String?
+  drop      Drop?    @relation(fields: [dropId], references: [id], onDelete: SetNull)
+  name      String?
+  email     String?
+  phone     String?
+  optInNotifications Boolean @default(true) // future drops / marketing
+  optInGeofence      Boolean @default(false)
+  source    String   @default("waitlist") // waitlist | checkout | manual
+  createdAt DateTime @default(now())
+
+  @@index([sellerId])
+  @@index([dropId])
+}
+
+// Tracks sent repeat-customer reminders so we never send duplicates.
+model ReminderLog {
+  id       String   @id @default(cuid())
+  sellerId String
+  email    String
+  kind     String // "d30" | "d90"
+  sentAt   DateTime @default(now())
+
+  @@unique([sellerId, email, kind])
 }

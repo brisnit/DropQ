@@ -29,6 +29,7 @@ export async function finalizePaidOrder(
     if (claimed.count === 0) return order;
 
     for (const it of order.items) {
+      if (!it.productId) continue; // product removed from the drop since order
       await tx.product.update({
         where: { id: it.productId },
         data: { sold: { increment: it.quantity } },

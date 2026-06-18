@@ -87,13 +87,19 @@ export async function createDropAction(formData: FormData) {
   redirect(`/dashboard/drops/${drop.id}`);
 }
 
-export async function updateDropAction(formData: FormData) {
+// Full edit: updates the drop in place (never duplicates) and syncs its items.
+export async function updateDropFullAction(formData: FormData) {
   const seller = await requireSeller();
   const dropId = String(formData.get("dropId"));
-  const drop = await prisma.drop.findUnique({ where: { id: dropId } });
+  const drop = await prisma.drop.findUnique({ where: { id: dropId }, include: { products: true } });
   if (!drop || drop.sellerId !== seller.id) return;
 
   const title = String(formData.get("title") ?? "").trim();
+  const statusRaw = String(formData.get("status") ?? drop.status);
+  const status = ["draft", "live", "closed"].includes(statusRaw) ? statusRaw : drop.status;
+  const opensAt = formData.get("opensAt") ? new Date(String(formData.get("opensAt"))) : drop.opensAt;
+  const closesAt = formData.get("closesAt") ? new Date(String(formData.get("closesAt"))) : drop.closesAt;
+
   await prisma.drop.update({
     where: { id: dropId },
     data: {
@@ -101,12 +107,56 @@ export async function updateDropAction(formData: FormData) {
       description: String(formData.get("description") ?? "").trim() || null,
       fulfillment: String(formData.get("fulfillment") ?? drop.fulfillment) || drop.fulfillment,
       pickupInfo: String(formData.get("pickupInfo") ?? "").trim() || null,
+      status,
+      opensAt,
+      closesAt,
     },
   });
+
+  // Sync products (update existing, create new, delete removed)
+  const ids = formData.getAll("p_id").map(String);
+  const names = formData.getAll("p_name").map(String);
+  const descs = formData.getAll("p_desc").map(String);
+  const prices = formData.getAll("p_price").map(String);
+  const emojis = formData.getAll("p_emoji").map(String);
+  const invs = formData.getAll("p_inventory").map(String);
+  const keepImages = formData.getAll("p_keep_image").map(String);
+  const images = formData.getAll("p_image");
+  const imageUrls = await Promise.all(images.map((img) => saveImage(img)));
+
+  const submittedIds = new Set<string>();
+  for (let i = 0; i < names.length; i++) {
+    const name = names[i].trim();
+    if (!name) continue;
+    const base = {
+      name,
+      description: (descs[i] ?? "").trim() || null,
+      priceCents: dollarsToCents(prices[i] ?? "0"),
+      emoji: (emojis[i] ?? "🍪").trim() || "🍪",
+      inventory: Math.max(0, parseInt(invs[i] ?? "0", 10) || 0),
+      sortOrder: i,
+    };
+    const newImage = imageUrls[i] ?? null;
+    const id = ids[i];
+    if (id) {
+      submittedIds.add(id);
+      const keptImage = (keepImages[i] ?? "") || null;
+      await prisma.product.update({
+        where: { id },
+        data: { ...base, imageUrl: newImage ?? keptImage },
+      });
+    } else {
+      await prisma.product.create({ data: { ...base, dropId, imageUrl: newImage } });
+    }
+  }
+  const removed = drop.products.filter((p) => !submittedIds.has(p.id)).map((p) => p.id);
+  if (removed.length) await prisma.product.deleteMany({ where: { id: { in: removed } } });
+
   revalidatePath(`/dashboard/drops/${dropId}`);
   revalidatePath("/dashboard/drops");
   revalidatePath(`/s/${seller.slug}`);
   revalidatePath(`/s/${seller.slug}/${dropId}`);
+  redirect(`/dashboard/drops/${dropId}`);
 }
 
 export async function updateDropStatusAction(formData: FormData) {
