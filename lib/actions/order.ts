@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getStripe, calcFeeCents } from "@/lib/stripe";
+import { sendEmail, orderReceivedEmail } from "@/lib/email";
 
 export type OrderState = { error?: string };
 
@@ -157,6 +158,18 @@ export async function placeOrderAction(
   if (!order) {
     return { error: "Sorry — an item just sold out. Refresh and try again." };
   }
+
+  // Confirmation email to the buyer (no-op in dev without RESEND_API_KEY).
+  await sendEmail(
+    orderReceivedEmail({
+      to: buyerEmail,
+      storeName: drop.seller.storeName,
+      buyerFirst: buyerName.split(" ")[0] || buyerName,
+      orderLink: `${await baseUrl()}/order/${order.id}`,
+      pickupInfo: drop.pickupInfo,
+      fulfillment: drop.fulfillment,
+    })
+  );
 
   revalidatePath(`/s/${drop.seller.slug}/${drop.id}`);
   revalidatePath(`/dashboard/drops/${drop.id}`);

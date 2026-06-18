@@ -1,11 +1,21 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireSeller } from "@/lib/auth";
 import { dollarsToCents } from "@/lib/format";
 import { saveImage } from "@/lib/upload";
+import { sendEmail, orderReadyEmail } from "@/lib/email";
+
+async function baseUrl(): Promise<string> {
+  const h = await headers();
+  const env = process.env.APP_URL?.replace(/\/$/, "");
+  if (env) return env;
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  return `${proto}://${h.get("host") ?? "localhost:3000"}`;
+}
 
 /* ----------------------------- Store profile ---------------------------- */
 export async function updateStoreAction(formData: FormData) {
@@ -76,6 +86,28 @@ export async function createDropAction(formData: FormData) {
   redirect(`/dashboard/drops/${drop.id}`);
 }
 
+export async function updateDropAction(formData: FormData) {
+  const seller = await requireSeller();
+  const dropId = String(formData.get("dropId"));
+  const drop = await prisma.drop.findUnique({ where: { id: dropId } });
+  if (!drop || drop.sellerId !== seller.id) return;
+
+  const title = String(formData.get("title") ?? "").trim();
+  await prisma.drop.update({
+    where: { id: dropId },
+    data: {
+      title: title || drop.title,
+      description: String(formData.get("description") ?? "").trim() || null,
+      fulfillment: String(formData.get("fulfillment") ?? drop.fulfillment) || drop.fulfillment,
+      pickupInfo: String(formData.get("pickupInfo") ?? "").trim() || null,
+    },
+  });
+  revalidatePath(`/dashboard/drops/${dropId}`);
+  revalidatePath("/dashboard/drops");
+  revalidatePath(`/s/${seller.slug}`);
+  revalidatePath(`/s/${seller.slug}/${dropId}`);
+}
+
 export async function updateDropStatusAction(formData: FormData) {
   const seller = await requireSeller();
   const dropId = String(formData.get("dropId"));
@@ -104,9 +136,28 @@ export async function updateOrderStatusAction(formData: FormData) {
   const seller = await requireSeller();
   const orderId = String(formData.get("orderId"));
   const status = String(formData.get("status"));
-  const order = await prisma.order.findUnique({ where: { id: orderId } });
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { drop: { select: { pickupInfo: true, fulfillment: true } } },
+  });
   if (!order || order.sellerId !== seller.id) return;
+
   await prisma.order.update({ where: { id: orderId }, data: { status } });
+
+  // Notify the customer when their order becomes ready (only on transition).
+  if (status === "ready" && order.status !== "ready") {
+    await sendEmail(
+      orderReadyEmail({
+        to: order.buyerEmail,
+        storeName: seller.storeName,
+        buyerFirst: order.buyerName.split(" ")[0] || order.buyerName,
+        orderLink: `${await baseUrl()}/order/${order.id}`,
+        pickupInfo: order.drop.pickupInfo,
+        fulfillment: order.drop.fulfillment,
+      })
+    );
+  }
+
   revalidatePath("/dashboard/orders");
   revalidatePath(`/dashboard/drops/${order.dropId}`);
   revalidatePath("/dashboard");

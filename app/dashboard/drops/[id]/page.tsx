@@ -1,16 +1,18 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import QRCode from "qrcode";
 import { requireSeller } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
+  updateDropAction,
   updateDropStatusAction,
   deleteDropAction,
   updateOrderStatusAction,
 } from "@/lib/actions/dashboard";
 import { formatMoney, formatDateTime, relativeTime, statusStyle } from "@/lib/format";
 import { Section } from "@/components/dashboard-ui";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button, Field, Input, Textarea, Select } from "@/components/ui";
 import { CopyButton } from "@/components/copy-button";
 import { StatusSelect } from "@/components/status-select";
 import { ConfirmSubmit } from "@/components/confirm-submit";
@@ -40,6 +42,11 @@ export default async function DropDetailPage({
   const host = h.get("host") ?? "localhost:3001";
   const proto = h.get("x-forwarded-proto") ?? "http";
   const shareUrl = `${proto}://${host}/s/${seller.slug}/${drop.id}`;
+  const qrDataUrl = await QRCode.toDataURL(shareUrl, {
+    width: 360,
+    margin: 1,
+    color: { dark: "#1b1726", light: "#ffffff" },
+  });
 
   const revenue = drop.orders.reduce((s, o) => s + o.totalCents, 0);
   const sold = drop.products.reduce((s, p) => s + p.sold, 0);
@@ -102,6 +109,68 @@ export default async function DropDetailPage({
           <p className="font-mono text-sm truncate mt-0.5">{shareUrl}</p>
         </div>
         <CopyButton text={shareUrl} />
+      </div>
+
+      {/* Edit details + QR */}
+      <div className="grid md:grid-cols-2 gap-4 mb-8">
+        <details className="bg-paper border border-line rounded-card group">
+          <summary className="list-none cursor-pointer px-5 py-4 flex items-center justify-between font-medium">
+            <span>✏️ Edit drop details</span>
+            <span className="text-muted text-sm transition group-open:rotate-180">▾</span>
+          </summary>
+          <form action={updateDropAction} className="px-5 pb-5 pt-4 border-t border-line space-y-4">
+            <input type="hidden" name="dropId" value={drop.id} />
+            <Field label="Drop name">
+              <Input name="title" defaultValue={drop.title} required />
+            </Field>
+            <Field label="Description">
+              <Textarea name="description" defaultValue={drop.description ?? ""} />
+            </Field>
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Field label="Fulfillment">
+                <Select name="fulfillment" defaultValue={drop.fulfillment}>
+                  <option value="pickup">Pickup</option>
+                  <option value="delivery">Local delivery</option>
+                  <option value="shipping">Shipping</option>
+                </Select>
+              </Field>
+              <Field label="Pickup / delivery details">
+                <Input name="pickupInfo" defaultValue={drop.pickupInfo ?? ""} />
+              </Field>
+            </div>
+            <Button type="submit">Save changes</Button>
+          </form>
+        </details>
+
+        <details className="bg-paper border border-line rounded-card group">
+          <summary className="list-none cursor-pointer px-5 py-4 flex items-center justify-between font-medium">
+            <span>📱 QR code</span>
+            <span className="text-muted text-sm transition group-open:rotate-180">▾</span>
+          </summary>
+          <div className="px-5 pb-5 pt-4 border-t border-line flex flex-col sm:flex-row items-center gap-5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={qrDataUrl}
+              alt="QR code linking to this drop"
+              width={150}
+              height={150}
+              className="rounded-xl border border-line shrink-0"
+            />
+            <div className="text-center sm:text-left">
+              <p className="text-sm text-muted">
+                Print it on a flyer, sign, or your market table. Scanning it opens
+                this drop&apos;s order page.
+              </p>
+              <a
+                href={qrDataUrl}
+                download={`dropq-${seller.slug}-${drop.id}.png`}
+                className="inline-block mt-3 text-sm font-medium px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
+              >
+                ↓ Download PNG
+              </a>
+            </div>
+          </div>
+        </details>
       </div>
 
       {/* Stats */}

@@ -73,3 +73,41 @@ export function resetEmail(to: string, link: string): Mail {
     ),
   };
 }
+
+type OrderMail = {
+  to: string;
+  storeName: string;
+  buyerFirst: string;
+  orderLink: string;
+  pickupInfo?: string | null;
+  fulfillment?: string;
+};
+
+export function orderReceivedEmail(o: OrderMail): Mail {
+  return {
+    to: o.to,
+    subject: `${o.storeName} got your order ✅`,
+    html: layout(
+      "Order received!",
+      `Hi ${o.buyerFirst}, thanks for ordering from <b>${o.storeName}</b>. We'll let you know the moment it's ready.` +
+        (o.pickupInfo ? `<br><br><b>${o.fulfillment || "Pickup"}:</b> ${o.pickupInfo}` : ""),
+      { href: o.orderLink, label: "View your order" }
+    ),
+  };
+}
+
+export function orderReadyEmail(o: OrderMail): Mail {
+  const isPickup = (o.fulfillment ?? "pickup") === "pickup";
+  return {
+    to: o.to,
+    subject: `Your ${o.storeName} order is ready${isPickup ? " for pickup" : ""} 🎉`,
+    html: layout(
+      `Your order is ready${isPickup ? " for pickup" : ""}! 🎉`,
+      `Hi ${o.buyerFirst}, your order from <b>${o.storeName}</b> is ready.` +
+        (o.pickupInfo
+          ? `<br><br><b>${isPickup ? "Pickup" : o.fulfillment}:</b> ${o.pickupInfo}`
+          : ""),
+      { href: o.orderLink, label: "View your order" }
+    ),
+  };
+}

@@ -38,7 +38,14 @@ export default async function StorePage({
   return (
     <main className="min-h-screen">
       {/* Banner */}
-      <div className="h-32 sm:h-44" style={{ backgroundColor: accent }} />
+      <div className="relative h-32 sm:h-44" style={{ backgroundColor: accent }}>
+        <Link
+          href="/"
+          className="absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-pill bg-black/25 hover:bg-black/40 text-white text-sm font-medium px-3.5 py-2 backdrop-blur-sm transition"
+        >
+          <span aria-hidden>←</span> Back
+        </Link>
+      </div>
       <div className="max-w-3xl mx-auto px-5">
         <div className="-mt-12 sm:-mt-14">
           <div
