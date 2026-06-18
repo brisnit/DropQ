@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import {
@@ -67,7 +68,8 @@ export async function signupAction(
     },
   });
 
-  await sendVerification(seller.id, seller.email);
+  // Send the verification email in the background so signup feels instant.
+  after(() => sendVerification(seller.id, seller.email));
   await createSession(seller.id);
   redirect("/dashboard");
 }
@@ -115,7 +117,8 @@ export async function requestPasswordResetAction(
   if (seller) {
     const token = await createToken(seller.id, "reset");
     const link = `${await baseUrl()}/reset?token=${token}`;
-    await sendEmail(resetEmail(seller.email, link));
+    // Respond instantly; deliver the email in the background.
+    after(() => sendEmail(resetEmail(seller.email, link)));
   }
   // Same response regardless, to avoid user enumeration.
   return { sent: true };

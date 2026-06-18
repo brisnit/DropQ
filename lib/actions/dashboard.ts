@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
@@ -146,16 +147,15 @@ export async function updateOrderStatusAction(formData: FormData) {
 
   // Notify the customer when their order becomes ready (only on transition).
   if (status === "ready" && order.status !== "ready") {
-    await sendEmail(
-      orderReadyEmail({
-        to: order.buyerEmail,
-        storeName: seller.storeName,
-        buyerFirst: order.buyerName.split(" ")[0] || order.buyerName,
-        orderLink: `${await baseUrl()}/order/${order.id}`,
-        pickupInfo: order.drop.pickupInfo,
-        fulfillment: order.drop.fulfillment,
-      })
-    );
+    const mail = orderReadyEmail({
+      to: order.buyerEmail,
+      storeName: seller.storeName,
+      buyerFirst: order.buyerName.split(" ")[0] || order.buyerName,
+      orderLink: `${await baseUrl()}/order/${order.id}`,
+      pickupInfo: order.drop.pickupInfo,
+      fulfillment: order.drop.fulfillment,
+    });
+    after(() => sendEmail(mail)); // deliver in the background
   }
 
   revalidatePath("/dashboard/orders");

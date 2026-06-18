@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
@@ -163,17 +164,17 @@ export async function placeOrderAction(
     return { error: "Sorry — an item just sold out. Refresh and try again." };
   }
 
-  // Confirmation email to the buyer (no-op in dev without RESEND_API_KEY).
-  await sendEmail(
-    orderReceivedEmail({
-      to: buyerEmail,
-      storeName: drop.seller.storeName,
-      buyerFirst: buyerName.split(" ")[0] || buyerName,
-      orderLink: `${await baseUrl()}/order/${order.id}`,
-      pickupInfo: drop.pickupInfo,
-      fulfillment: drop.fulfillment,
-    })
-  );
+  // Confirmation email to the buyer, delivered in the background (no-op in dev
+  // without RESEND_API_KEY).
+  const mail = orderReceivedEmail({
+    to: buyerEmail,
+    storeName: drop.seller.storeName,
+    buyerFirst: buyerName.split(" ")[0] || buyerName,
+    orderLink: `${await baseUrl()}/order/${order.id}`,
+    pickupInfo: drop.pickupInfo,
+    fulfillment: drop.fulfillment,
+  });
+  after(() => sendEmail(mail));
 
   revalidatePath(`/s/${drop.seller.slug}/${drop.id}`);
   revalidatePath(`/dashboard/drops/${drop.id}`);
