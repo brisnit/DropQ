@@ -51,8 +51,11 @@ export async function placeOrderAction(
   }
   if (lines.length === 0) return { error: "Add at least one item to your order." };
 
-  const totalCents = lines.reduce((s, l) => s + l.product.priceCents * l.qty, 0);
-  const feeCents = calcFeeCents(totalCents);
+  const itemsCents = lines.reduce((s, l) => s + l.product.priceCents * l.qty, 0);
+  const feeCents = calcFeeCents(itemsCents);
+  const passFee = drop.seller.feeMode === "pass";
+  // What the customer pays. In "pass" mode the DropQ fee is added on top.
+  const totalCents = passFee ? itemsCents + feeCents : itemsCents;
 
   const stripe = getStripe();
   const useStripe =
@@ -86,17 +89,32 @@ export async function placeOrderAction(
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       customer_email: buyerEmail,
-      line_items: lines.map((l) => ({
-        quantity: l.qty,
-        price_data: {
-          currency: "usd",
-          unit_amount: l.product.priceCents,
-          product_data: {
-            name: l.product.name,
-            ...(l.product.description ? { description: l.product.description } : {}),
+      line_items: [
+        ...lines.map((l) => ({
+          quantity: l.qty,
+          price_data: {
+            currency: "usd",
+            unit_amount: l.product.priceCents,
+            product_data: {
+              name: l.product.name,
+              ...(l.product.description ? { description: l.product.description } : {}),
+            },
           },
-        },
-      })),
+        })),
+        // In "pass" mode, the DropQ fee is a separate line the customer pays.
+        ...(passFee
+          ? [
+              {
+                quantity: 1,
+                price_data: {
+                  currency: "usd" as const,
+                  unit_amount: feeCents,
+                  product_data: { name: "DropQ service fee" },
+                },
+              },
+            ]
+          : []),
+      ],
       payment_intent_data: {
         // DropQ's clean platform cut. The vendor (merchant of record on this
         // direct charge) covers Stripe's processing fee.

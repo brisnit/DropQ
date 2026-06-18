@@ -3,7 +3,8 @@
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
-import { Button, Field, Input } from "@/components/ui";
+import { Button, Field } from "@/components/ui";
+import { PasswordInput } from "@/components/password-input";
 import { resetPasswordAction, type ResetState } from "@/lib/actions/auth";
 
 function SubmitButton() {
@@ -25,9 +26,8 @@ export function ResetForm({ token }: { token: string }) {
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="token" value={token} />
       <Field label="New password" hint="At least 8 characters.">
-        <Input
+        <PasswordInput
           name="password"
-          type="password"
           placeholder="••••••••"
           required
           autoFocus

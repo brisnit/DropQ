@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { Button, Field, Input } from "@/components/ui";
+import { PasswordInput } from "@/components/password-input";
 import type { AuthState } from "@/lib/actions/auth";
 
 function SubmitButton({ label }: { label: string }) {
@@ -43,9 +44,8 @@ export function AuthForm({
         />
       </Field>
       <Field label="Password" hint={isSignup ? "At least 8 characters." : undefined}>
-        <Input
+        <PasswordInput
           name="password"
-          type="password"
           placeholder="••••••••"
           required
           autoComplete={isSignup ? "new-password" : "current-password"}

@@ -19,7 +19,19 @@ async function baseUrl(): Promise<string> {
 }
 
 /* ----------------------------- Store profile ---------------------------- */
-export async function updateStoreAction(formData: FormData) {
+export type StoreSaveState = { saved?: boolean; error?: string };
+
+function numOrNull(v: FormDataEntryValue | null): number | null {
+  const s = String(v ?? "").trim();
+  if (!s) return null;
+  const n = parseFloat(s);
+  return isFinite(n) ? n : null;
+}
+
+export async function updateStoreAction(
+  _prev: StoreSaveState,
+  formData: FormData
+): Promise<StoreSaveState> {
   const seller = await requireSeller();
   await prisma.seller.update({
     where: { id: seller.id },
@@ -29,10 +41,19 @@ export async function updateStoreAction(formData: FormData) {
       bio: String(formData.get("bio") ?? "").trim() || null,
       location: String(formData.get("location") ?? "").trim() || null,
       accent: String(formData.get("accent") ?? seller.accent) || seller.accent,
+      feeMode: String(formData.get("feeMode")) === "pass" ? "pass" : "absorb",
+      geofenceEnabled: formData.get("geofenceEnabled") === "on",
+      latitude: numOrNull(formData.get("latitude")),
+      longitude: numOrNull(formData.get("longitude")),
+      geofenceRadiusM: Math.max(
+        100,
+        parseInt(String(formData.get("geofenceRadiusM") ?? "1500"), 10) || 1500
+      ),
     },
   });
   revalidatePath("/dashboard/store");
   revalidatePath(`/s/${seller.slug}`);
+  return { saved: true };
 }
 
 /* ------------------------------- Drops ---------------------------------- */

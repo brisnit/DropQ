@@ -60,6 +60,8 @@ export default async function OrderConfirmationPage({
   const accent = order.seller.accent || "#6D28D9";
   const pending = order.status === "pending";
   const paidWithStripe = !!order.stripeSessionId && !pending;
+  const itemsSum = order.items.reduce((s, it) => s + it.priceCents * it.quantity, 0);
+  const serviceFee = Math.max(0, order.totalCents - itemsSum);
 
   return (
     <main className="min-h-screen grid place-items-center px-5 py-12">
@@ -95,6 +97,12 @@ export default async function OrderConfirmationPage({
                   <span className="font-medium">{formatMoney(it.priceCents * it.quantity)}</span>
                 </div>
               ))}
+              {serviceFee > 0 && (
+                <div className="flex justify-between px-4 py-2.5 text-sm text-muted">
+                  <span>DropQ service fee</span>
+                  <span>{formatMoney(serviceFee)}</span>
+                </div>
+              )}
               <div className="flex justify-between px-4 py-3 font-semibold">
                 <span>Total {paidWithStripe ? "paid" : ""}</span>
                 <span>{formatMoney(order.totalCents)}</span>

@@ -47,11 +47,15 @@ export function StorefrontOrder({
   products,
   accent,
   paymentsEnabled,
+  feeMode = "absorb",
+  feePercent = 0,
 }: {
   dropId: string;
   products: Product[];
   accent: string;
   paymentsEnabled: boolean;
+  feeMode?: string;
+  feePercent?: number;
 }) {
   const [qty, setQty] = useState<Record<string, number>>({});
   const [state, formAction] = useActionState<OrderState, FormData>(placeOrderAction, {});
@@ -62,7 +66,10 @@ export function StorefrontOrder({
   const lines = products
     .map((p) => ({ p, n: qty[p.id] ?? 0 }))
     .filter((l) => l.n > 0);
-  const total = lines.reduce((s, l) => s + l.p.priceCents * l.n, 0);
+  const subtotal = lines.reduce((s, l) => s + l.p.priceCents * l.n, 0);
+  const passFee = feeMode === "pass";
+  const feeCents = passFee ? Math.round((subtotal * feePercent) / 100) : 0;
+  const total = subtotal + feeCents;
   const count = lines.reduce((s, l) => s + l.n, 0);
 
   return (
@@ -162,6 +169,18 @@ export function StorefrontOrder({
                 <span className="font-medium shrink-0">{formatMoney(l.p.priceCents * l.n)}</span>
               </li>
             ))}
+            {passFee && (
+              <>
+                <li className="flex justify-between text-muted">
+                  <span>Subtotal</span>
+                  <span>{formatMoney(subtotal)}</span>
+                </li>
+                <li className="flex justify-between text-muted">
+                  <span>Service fee ({feePercent}%)</span>
+                  <span>{formatMoney(feeCents)}</span>
+                </li>
+              </>
+            )}
             <li className="flex justify-between border-t border-line pt-2 mt-2 font-semibold">
               <span>Total</span>
               <span>{formatMoney(total)}</span>

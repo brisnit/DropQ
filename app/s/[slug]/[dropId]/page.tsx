@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { isStripeEnabled } from "@/lib/stripe";
+import { isStripeEnabled, feePercent } from "@/lib/stripe";
 import { Mark } from "@/components/logo";
 import { StorefrontOrder } from "@/components/storefront-order";
 
@@ -80,6 +80,8 @@ export default async function DropOrderPage({
             dropId={drop.id}
             accent={accent}
             paymentsEnabled={paymentsEnabled}
+            feeMode={drop.seller.feeMode}
+            feePercent={feePercent()}
             products={drop.products.map((p) => ({
               id: p.id,
               name: p.name,
