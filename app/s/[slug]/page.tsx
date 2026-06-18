@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { Mark } from "@/components/logo";
+import { WaitlistForm } from "@/components/waitlist-form";
 import { formatMoney, formatDate } from "@/lib/format";
 
 export async function generateMetadata({
@@ -76,8 +77,8 @@ export default async function StorePage({
           </h2>
 
           {liveDrops.length === 0 && (
-            <div className="bg-paper border border-dashed border-line-strong rounded-card p-8 text-center text-muted">
-              Check back soon — follow {seller.storeName} to hear about the next drop.
+            <div className="bg-paper border border-dashed border-line-strong rounded-card p-6 text-center text-muted mb-4">
+              Check back soon — or sign up below to hear about the next drop.
             </div>
           )}
 
@@ -124,6 +125,16 @@ export default async function StorePage({
               );
             })}
           </div>
+        </section>
+
+        {/* Future-drop sign up */}
+        <section className="mt-8 max-w-md">
+          <WaitlistForm
+            sellerId={seller.id}
+            storeName={seller.storeName}
+            accent={accent}
+            geofence={seller.geofenceEnabled}
+          />
         </section>
 
         {/* Past drops */}

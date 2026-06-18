@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { isStripeEnabled, feePercent } from "@/lib/stripe";
 import { Mark } from "@/components/logo";
 import { StorefrontOrder } from "@/components/storefront-order";
+import { WaitlistForm } from "@/components/waitlist-form";
 
 export default async function DropOrderPage({
   params,
@@ -106,6 +107,15 @@ export default async function DropOrderPage({
             >
               Back to {drop.seller.storeName}
             </Link>
+            <div className="mt-6 max-w-md mx-auto text-left">
+              <WaitlistForm
+                sellerId={drop.sellerId}
+                dropId={drop.id}
+                storeName={drop.seller.storeName}
+                accent={accent}
+                geofence={drop.seller.geofenceEnabled}
+              />
+            </div>
           </div>
         )}
       </div>
