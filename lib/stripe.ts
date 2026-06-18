@@ -17,8 +17,8 @@ export function isStripeEnabled(): boolean {
 
 /** Platform fee percent charged to vendors per transaction. */
 export function feePercent(): number {
-  const n = parseFloat(process.env.DROPQ_FEE_PERCENT ?? "5");
-  return isFinite(n) && n >= 0 ? n : 5;
+  const n = parseFloat(process.env.DROPQ_FEE_PERCENT ?? "2");
+  return isFinite(n) && n >= 0 ? n : 2;
 }
 
 export function calcFeeCents(totalCents: number): number {
