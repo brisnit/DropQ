@@ -97,13 +97,17 @@ export async function placeOrderAction(
         },
       })),
       payment_intent_data: {
+        // DropQ's clean platform cut. The vendor (merchant of record on this
+        // direct charge) covers Stripe's processing fee.
         application_fee_amount: feeCents,
-        transfer_data: { destination: drop.seller.stripeAccountId! },
+        metadata: { orderId: order.id },
       },
       metadata: { orderId: order.id },
       success_url: `${base}/order/${order.id}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${base}/s/${drop.seller.slug}/${drop.id}?canceled=1`,
-    });
+    },
+    // Direct charge: create the Checkout Session on the vendor's connected account.
+    { stripeAccount: drop.seller.stripeAccountId! });
 
     await prisma.order.update({
       where: { id: order.id },

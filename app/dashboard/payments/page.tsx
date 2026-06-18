@@ -95,9 +95,11 @@ export default async function PaymentsPage({
               <Badge className="bg-sage-tint text-sage mb-2">● Connected</Badge>
               <h2 className="font-semibold text-lg">You&apos;re ready to accept payments</h2>
               <p className="text-muted mt-1 max-w-xl">
-                Card payments go to your Stripe account. DropQ automatically keeps a{" "}
-                <span className="text-ink font-medium">{fee}%</span> platform fee per order;
-                you keep the rest, paid out by Stripe on your schedule.
+                Card payments go straight to your Stripe account and pay out to your
+                bank on your schedule. DropQ keeps a{" "}
+                <span className="text-ink font-medium">{fee}%</span> fee per order —
+                no monthly cost. Standard Stripe card-processing fees also apply, just
+                like anywhere you take card payments.
               </p>
             </div>
             <form action={stripeDashboardAction}>

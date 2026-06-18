@@ -18,32 +18,37 @@ export default async function OrderConfirmationPage({
   const { id } = await params;
   const { session_id } = await searchParams;
 
+  const sellerSelect = {
+    storeName: true,
+    slug: true,
+    accent: true,
+    stripeAccountId: true,
+  } as const;
+
   let order = await prisma.order.findUnique({
     where: { id },
-    include: {
-      items: true,
-      drop: true,
-      seller: { select: { storeName: true, slug: true, accent: true } },
-    },
+    include: { items: true, drop: true, seller: { select: sellerSelect } },
   });
   if (!order) notFound();
 
   // Returning from Stripe Checkout — verify payment and finalize (idempotent).
+  // Direct-charge sessions live on the vendor's connected account, so retrieve
+  // with that account context.
   const stripe = getStripe();
-  if (order.status === "pending" && session_id && stripe) {
+  if (order.status === "pending" && session_id && stripe && order.seller.stripeAccountId) {
     try {
-      const session = await stripe.checkout.sessions.retrieve(session_id);
+      const session = await stripe.checkout.sessions.retrieve(
+        session_id,
+        {},
+        { stripeAccount: order.seller.stripeAccountId }
+      );
       if (session.payment_status === "paid") {
         const pi =
           typeof session.payment_intent === "string" ? session.payment_intent : null;
         await finalizePaidOrder(order.id, pi);
         order = await prisma.order.findUnique({
           where: { id },
-          include: {
-            items: true,
-            drop: true,
-            seller: { select: { storeName: true, slug: true, accent: true } },
-          },
+          include: { items: true, drop: true, seller: { select: sellerSelect } },
         });
       }
     } catch {
