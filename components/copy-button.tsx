@@ -16,7 +16,7 @@ export function CopyButton({ text, label = "Copy link" }: { text: string; label?
           setCopied(false);
         }
       }}
-      className="text-sm font-medium px-3 py-2 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition whitespace-nowrap"
+      className="text-sm font-medium text-ink px-3 py-2 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition whitespace-nowrap"
     >
       {copied ? "✓ Copied" : label}
     </button>
