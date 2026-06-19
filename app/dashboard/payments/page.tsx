@@ -66,6 +66,24 @@ export default async function PaymentsPage({
         </div>
       )}
 
+      {sp.error === "connect" && (
+        <div className="mb-5 rounded-xl bg-brand-tint text-brand-dark px-4 py-3 text-sm">
+          <b>Couldn&apos;t start Stripe onboarding.</b> This usually means Stripe
+          <b> Connect isn&apos;t enabled</b> on the platform yet, or the Stripe key is invalid.
+          Try again shortly — if it keeps failing, the platform needs to enable Connect in Stripe.
+        </div>
+      )}
+      {sp.error === "disabled" && (
+        <div className="mb-5 rounded-xl bg-brand-tint text-brand-dark px-4 py-3 text-sm">
+          Payments aren&apos;t turned on for DropQ yet. Hang tight — this will be enabled soon.
+        </div>
+      )}
+      {sp.error === "dashboard" && (
+        <div className="mb-5 rounded-xl bg-brand-tint text-brand-dark px-4 py-3 text-sm">
+          Couldn&apos;t open your Stripe dashboard right now. Please try again in a moment.
+        </div>
+      )}
+
       {/* Payout stats */}
       <div className="grid grid-cols-3 gap-4 mb-7">
         <Stat label="Paid orders" value={String(paid._count)} />
