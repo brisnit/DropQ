@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
-import { Fraunces, Inter } from "next/font/google";
+import { Arvo, Google_Sans_Flex } from "next/font/google";
 import "./globals.css";
 
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+// Primary / display font
+const arvo = Arvo({
+  variable: "--font-arvo",
   subsets: ["latin"],
+  weight: ["400", "700"],
   display: "swap",
 });
 
-const inter = Inter({
-  variable: "--font-inter",
+// Secondary / body font
+const googleSans = Google_Sans_Flex({
+  variable: "--font-google-sans",
   subsets: ["latin"],
   display: "swap",
 });
@@ -24,7 +27,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${inter.variable} h-full`}>
+    <html lang="en" className={`${arvo.variable} ${googleSans.variable} h-full`}>
       <body className="min-h-full antialiased">{children}</body>
     </html>
   );

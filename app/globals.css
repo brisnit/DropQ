@@ -24,8 +24,8 @@
   --color-line: #e9e3f2;
   --color-line-strong: #d8cfe8;
 
-  --font-display: var(--font-fraunces), Georgia, serif;
-  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-arvo), Georgia, serif;
+  --font-sans: var(--font-google-sans), system-ui, sans-serif;
 
   --radius-card: 1.25rem;
   --radius-pill: 999px;
