@@ -24,6 +24,7 @@ export async function connectStripeAction() {
   const seller = await requireSeller();
   let onboardingUrl: string | null = null;
   let disabled = false;
+  let errDetail = "";
 
   try {
     const stripe = getStripe();
@@ -58,10 +59,12 @@ export async function connectStripeAction() {
     }
   } catch (e) {
     console.error("Stripe connect failed:", e);
+    errDetail = e instanceof Error ? e.message : "Unknown error";
   }
 
   if (disabled) redirect("/dashboard/payments?error=disabled");
-  if (!onboardingUrl) redirect("/dashboard/payments?error=connect");
+  if (!onboardingUrl)
+    redirect(`/dashboard/payments?error=connect&detail=${encodeURIComponent(errDetail.slice(0, 300))}`);
   redirect(onboardingUrl);
 }
 

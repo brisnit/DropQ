@@ -15,7 +15,7 @@ export const metadata = { title: "Payments — DropQ" };
 export default async function PaymentsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ connected?: string; error?: string }>;
+  searchParams: Promise<{ connected?: string; error?: string; detail?: string }>;
 }) {
   const seller = await requireSeller();
   const sp = await searchParams;
@@ -70,7 +70,9 @@ export default async function PaymentsPage({
         <div className="mb-5 rounded-xl bg-brand-tint text-brand-dark px-4 py-3 text-sm">
           <b>Couldn&apos;t start Stripe onboarding.</b> This usually means Stripe
           <b> Connect isn&apos;t enabled</b> on the platform yet, or the Stripe key is invalid.
-          Try again shortly — if it keeps failing, the platform needs to enable Connect in Stripe.
+          {sp.detail && (
+            <span className="block mt-1 font-mono text-xs opacity-80">Stripe says: {sp.detail}</span>
+          )}
         </div>
       )}
       {sp.error === "disabled" && (
