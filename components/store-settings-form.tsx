@@ -6,6 +6,7 @@ import { Button, Field, Input, Textarea } from "@/components/ui";
 import { updateStoreAction, type StoreSaveState } from "@/lib/actions/dashboard";
 
 const ACCENTS = ["#6D28D9", "#3a8895", "#3F7D5B", "#8A2D52", "#2B6CB0", "#1C1916"];
+const isHex = (v: string) => /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(v);
 
 export type StoreFormData = {
   storeName: string;
@@ -40,6 +41,11 @@ export function StoreSettingsForm({
   const [state, formAction] = useActionState<StoreSaveState, FormData>(updateStoreAction, {});
   const [dirty, setDirty] = useState(false);
   const [geo, setGeo] = useState(seller.geofenceEnabled);
+  const [accent, setAccent] = useState(seller.accent);
+  const pickAccent = (v: string) => {
+    setAccent(v);
+    setDirty(true);
+  };
 
   return (
     <form
@@ -68,14 +74,48 @@ export function StoreSettingsForm({
         <Field label="Location">
           <Input name="location" defaultValue={seller.location ?? ""} placeholder="Austin, TX" />
         </Field>
-        <Field label="Brand accent" hint="Used across your storefront.">
-          <div className="flex gap-3 flex-wrap">
+        <Field label="Brand accent" hint="Pick a preset or set any custom color.">
+          <input type="hidden" name="accent" value={accent} />
+          <div className="flex gap-3 flex-wrap items-center">
             {ACCENTS.map((c) => (
-              <label key={c} className="cursor-pointer">
-                <input type="radio" name="accent" value={c} defaultChecked={seller.accent.toUpperCase() === c.toUpperCase()} className="peer sr-only" />
-                <span className="block w-9 h-9 rounded-full ring-2 ring-transparent ring-offset-2 ring-offset-paper peer-checked:ring-ink transition" style={{ backgroundColor: c }} />
-              </label>
+              <button
+                type="button"
+                key={c}
+                onClick={() => pickAccent(c)}
+                aria-label={`Use ${c}`}
+                className={`w-9 h-9 rounded-full ring-2 ring-offset-2 ring-offset-paper transition ${
+                  accent.toUpperCase() === c.toUpperCase() ? "ring-ink" : "ring-transparent"
+                }`}
+                style={{ backgroundColor: c }}
+              />
             ))}
+            {/* Custom color picker */}
+            <label
+              title="Custom color"
+              className="relative w-9 h-9 rounded-full grid place-items-center border border-dashed border-line-strong cursor-pointer overflow-hidden hover:border-ink/40"
+            >
+              <input
+                type="color"
+                value={isHex(accent) ? accent : "#6D28D9"}
+                onChange={(e) => pickAccent(e.target.value)}
+                className="absolute -inset-2 opacity-0 cursor-pointer"
+              />
+              <span className="text-sm">🎨</span>
+            </label>
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <span
+              className="w-7 h-7 rounded-md border border-line shrink-0"
+              style={{ backgroundColor: isHex(accent) ? accent : "transparent" }}
+            />
+            <input
+              value={accent}
+              onChange={(e) => pickAccent(e.target.value)}
+              placeholder="#6D28D9"
+              aria-label="Custom hex color"
+              className="w-32 bg-paper border border-line-strong rounded-lg px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+            />
+            {!isHex(accent) && <span className="text-xs text-brand-dark">Enter a hex like #6D28D9</span>}
           </div>
         </Field>
       </div>

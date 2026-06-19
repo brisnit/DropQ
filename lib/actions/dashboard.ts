@@ -35,6 +35,8 @@ export async function updateStoreAction(
 ): Promise<StoreSaveState> {
   const seller = await requireSeller();
   const location = String(formData.get("location") ?? "").trim() || null;
+  const accentRaw = String(formData.get("accent") ?? seller.accent).trim();
+  const accent = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(accentRaw) ? accentRaw : seller.accent;
   const geofenceEnabled = formData.get("geofenceEnabled") === "on";
   let latitude = numOrNull(formData.get("latitude"));
   let longitude = numOrNull(formData.get("longitude"));
@@ -56,7 +58,7 @@ export async function updateStoreAction(
       tagline: String(formData.get("tagline") ?? "").trim() || null,
       bio: String(formData.get("bio") ?? "").trim() || null,
       location,
-      accent: String(formData.get("accent") ?? seller.accent) || seller.accent,
+      accent,
       feeMode: String(formData.get("feeMode")) === "pass" ? "pass" : "absorb",
       geofenceEnabled,
       latitude,
