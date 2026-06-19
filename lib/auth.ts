@@ -75,3 +75,25 @@ export async function requireSeller() {
   if (!seller) redirect("/login");
   return seller;
 }
+
+/** Bootstrap admins via env allowlist (comma-separated emails) or the DB flag. */
+export function isAdminEmail(email: string): boolean {
+  const list = (process.env.DROPQ_ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return list.includes(email.toLowerCase());
+}
+
+export async function getCurrentAdmin() {
+  const seller = await getCurrentSeller();
+  if (!seller) return null;
+  return seller.isAdmin || isAdminEmail(seller.email) ? seller : null;
+}
+
+export async function requireAdmin() {
+  const seller = await getCurrentSeller();
+  if (!seller) redirect("/login");
+  if (!seller.isAdmin && !isAdminEmail(seller.email)) redirect("/dashboard");
+  return seller;
+}

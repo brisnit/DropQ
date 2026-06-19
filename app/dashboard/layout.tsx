@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import { requireSeller } from "@/lib/auth";
+import { requireSeller, isAdminEmail } from "@/lib/auth";
 import { logoutAction } from "@/lib/actions/auth";
 import { Logo } from "@/components/logo";
 import { DashboardNav } from "@/components/dashboard-nav";
@@ -13,6 +13,7 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const seller = await requireSeller();
+  const admin = seller.isAdmin || isAdminEmail(seller.email);
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[260px_1fr]">
@@ -23,6 +24,14 @@ export default async function DashboardLayout({
         </div>
         <div className="p-4 flex-1">
           <DashboardNav />
+          {admin && (
+            <Link
+              href="/admin"
+              className="flex items-center gap-3 px-3 py-2.5 mt-1 rounded-xl text-sm font-medium text-brand hover:bg-brand-tint/60 transition"
+            >
+              <span className="text-base leading-none">🛡️</span> DropQ Admin
+            </Link>
+          )}
         </div>
         <div className="p-4 border-t border-line/70 space-y-3">
           <Link
