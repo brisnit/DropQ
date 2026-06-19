@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 import { Button, Field, Input, Textarea } from "@/components/ui";
 import { updateStoreAction, type StoreSaveState } from "@/lib/actions/dashboard";
 
-const ACCENTS = ["#6D28D9", "#3a8895", "#3F7D5B", "#8A2D52", "#2B6CB0", "#1C1916"];
+const ACCENTS = ["#d25b2a", "#3a8895", "#3F7D5B", "#8A2D52", "#2B6CB0", "#1C1916"];
 const isHex = (v: string) => /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(v);
 
 export type StoreFormData = {
@@ -151,7 +151,7 @@ export function StoreSettingsForm({
             >
               <input
                 type="color"
-                value={isHex(accent) ? accent : "#6D28D9"}
+                value={isHex(accent) ? accent : "#d25b2a"}
                 onChange={(e) => pickAccent(e.target.value)}
                 className="absolute -inset-2 opacity-0 cursor-pointer"
               />
@@ -166,11 +166,11 @@ export function StoreSettingsForm({
             <input
               value={accent}
               onChange={(e) => pickAccent(e.target.value)}
-              placeholder="#6D28D9"
+              placeholder="#d25b2a"
               aria-label="Custom hex color"
               className="w-32 bg-paper border border-line-strong rounded-lg px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
-            {!isHex(accent) && <span className="text-xs text-brand-dark">Enter a hex like #6D28D9</span>}
+            {!isHex(accent) && <span className="text-xs text-brand-dark">Enter a hex like #d25b2a</span>}
           </div>
         </Field>
       </div>
@@ -207,7 +207,7 @@ export function StoreSettingsForm({
             name="geofenceEnabled"
             defaultChecked={seller.geofenceEnabled}
             onChange={(e) => setGeo(e.target.checked)}
-            className="mt-1 w-4 h-4 accent-[#6d28d9]"
+            className="mt-1 w-4 h-4 accent-[#d25b2a]"
           />
           <div>
             <p className="font-semibold">Geofencing notifications <span className="text-xs font-normal text-muted">(beta)</span></p>

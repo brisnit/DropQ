@@ -62,7 +62,7 @@ export function AuthForm({
 
       {isSignup && (
         <label className="flex items-start gap-2.5 text-sm text-ink-soft">
-          <input type="checkbox" name="acceptTerms" required className="mt-0.5 w-4 h-4 accent-[#6d28d9] shrink-0" />
+          <input type="checkbox" name="acceptTerms" required className="mt-0.5 w-4 h-4 accent-[#d25b2a] shrink-0" />
           <span>
             I have read and agree to the{" "}
             <Link href="/terms" target="_blank" className="text-brand font-medium hover:underline">

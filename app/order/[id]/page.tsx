@@ -57,7 +57,7 @@ export default async function OrderConfirmationPage({
   }
   if (!order) notFound();
 
-  const accent = order.seller.accent || "#6D28D9";
+  const accent = order.seller.accent || "#d25b2a";
   const pending = order.status === "pending";
   const paidWithStripe = !!order.stripeSessionId && !pending;
   const itemsSum = order.items.reduce((s, it) => s + it.priceCents * it.quantity, 0);

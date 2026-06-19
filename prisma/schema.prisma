@@ -24,7 +24,7 @@ model Seller {
   bio          String?
   location     String?
   logoUrl      String?  // uploaded store logo (storefront avatar)
-  accent       String   @default("#6D28D9") // brand accent for storefront
+  accent       String   @default("#d25b2a") // brand accent for storefront
   emailVerified Boolean @default(false)
   isAdmin      Boolean  @default(false) // DropQ internal admin
   termsAcceptedAt DateTime? // when the vendor accepted the Vendor Agreement

@@ -11,9 +11,9 @@
   --color-ink-soft: #3f3a4d;
   --color-muted: #726c80;
 
-  --color-brand: #6d28d9;
-  --color-brand-dark: #5b21b6;
-  --color-brand-tint: #ece4fb;
+  --color-brand: #d25b2a;
+  --color-brand-dark: #ac481f;
+  --color-brand-tint: #fbe7dd;
   --color-grey: #6b7280;
   --color-grey-tint: #edeef1;
   --color-grey-dark: #3f434b;
@@ -73,8 +73,8 @@ body {
 
 .hero-glow {
   background:
-    radial-gradient(60% 50% at 75% 18%, rgba(124, 58, 237, 0.22), transparent 60%),
-    radial-gradient(52% 46% at 12% 82%, rgba(168, 85, 247, 0.18), transparent 60%);
+    radial-gradient(60% 50% at 75% 18%, rgba(210, 91, 42, 0.22), transparent 60%),
+    radial-gradient(52% 46% at 12% 82%, rgba(242, 169, 0, 0.16), transparent 60%);
 }
 
 @keyframes float-in {
