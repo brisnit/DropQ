@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button, Field, Input, Textarea } from "@/components/ui";
 import { updateStoreAction, type StoreSaveState } from "@/lib/actions/dashboard";
@@ -14,6 +14,7 @@ export type StoreFormData = {
   tagline: string | null;
   bio: string | null;
   location: string | null;
+  logoUrl: string | null;
   accent: string;
   feeMode: string;
   geofenceEnabled: boolean;
@@ -47,6 +48,26 @@ export function StoreSettingsForm({
     setDirty(true);
   };
 
+  const logoRef = useRef<HTMLInputElement>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoRemoved, setLogoRemoved] = useState(false);
+  const shownLogo = logoPreview || (logoRemoved ? null : seller.logoUrl);
+
+  const onLogoFile = (file: File | undefined) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    if (logoPreview) URL.revokeObjectURL(logoPreview);
+    setLogoPreview(URL.createObjectURL(file));
+    setLogoRemoved(false);
+    setDirty(true);
+  };
+  const removeLogo = () => {
+    if (logoRef.current) logoRef.current.value = "";
+    if (logoPreview) URL.revokeObjectURL(logoPreview);
+    setLogoPreview(null);
+    setLogoRemoved(true);
+    setDirty(true);
+  };
+
   return (
     <form
       action={formAction}
@@ -56,6 +77,40 @@ export function StoreSettingsForm({
     >
       {/* Profile */}
       <div className="bg-paper border border-line rounded-card p-6 sm:p-8 space-y-5">
+        <input type="hidden" name="removeLogo" value={logoRemoved ? "1" : "0"} />
+        <Field label="Store logo" hint="Square works best. Shown on your storefront.">
+          <div className="flex items-center gap-4">
+            <label className="relative w-20 h-20 rounded-2xl overflow-hidden border border-line-strong bg-cream grid place-items-center cursor-pointer group shrink-0">
+              {shownLogo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={shownLogo} alt="Store logo" className="w-full h-full object-cover" />
+              ) : (
+                <span className="font-display text-3xl font-semibold" style={{ color: accent }}>
+                  {seller.storeName.charAt(0)}
+                </span>
+              )}
+              <span className="absolute inset-0 bg-ink/45 text-white text-[11px] font-medium grid place-items-center opacity-0 group-hover:opacity-100 transition">
+                {shownLogo ? "Change" : "📷 Upload"}
+              </span>
+              <input
+                ref={logoRef}
+                type="file"
+                name="logo"
+                accept="image/*"
+                className="sr-only"
+                onChange={(e) => onLogoFile(e.target.files?.[0])}
+              />
+            </label>
+            <div className="text-sm">
+              <p className="text-muted">PNG or JPG, up to 8MB.</p>
+              {shownLogo && (
+                <button type="button" onClick={removeLogo} className="mt-1 text-muted hover:text-brand">
+                  Remove logo
+                </button>
+              )}
+            </div>
+          </div>
+        </Field>
         <Field label="Store name">
           <Input name="storeName" defaultValue={seller.storeName} required />
         </Field>

@@ -83,6 +83,7 @@ export default async function StorePage() {
           tagline: seller.tagline,
           bio: seller.bio,
           location: seller.location,
+          logoUrl: seller.logoUrl,
           accent: seller.accent,
           feeMode: seller.feeMode,
           geofenceEnabled: seller.geofenceEnabled,

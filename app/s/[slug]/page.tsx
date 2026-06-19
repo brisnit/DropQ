@@ -50,12 +50,21 @@ export default async function StorePage({
       {/* relative z-10 so the avatar overlaps the banner instead of being painted over by it */}
       <div className="relative z-10 max-w-3xl mx-auto px-5">
         <div className="-mt-12 sm:-mt-14">
-          <div
-            className="w-24 h-24 rounded-3xl bg-paper border-4 border-cream grid place-items-center font-display text-4xl font-semibold shadow-[var(--shadow-soft)]"
-            style={{ color: accent }}
-          >
-            {seller.storeName.charAt(0)}
-          </div>
+          {seller.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={seller.logoUrl}
+              alt={`${seller.storeName} logo`}
+              className="w-24 h-24 rounded-3xl object-cover border-4 border-cream shadow-[var(--shadow-soft)] bg-paper"
+            />
+          ) : (
+            <div
+              className="w-24 h-24 rounded-3xl bg-paper border-4 border-cream grid place-items-center font-display text-4xl font-semibold shadow-[var(--shadow-soft)]"
+              style={{ color: accent }}
+            >
+              {seller.storeName.charAt(0)}
+            </div>
+          )}
           <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-4">
             {seller.storeName}
           </h1>
