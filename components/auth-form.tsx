@@ -60,6 +60,19 @@ export function AuthForm({
         </div>
       )}
 
+      {isSignup && (
+        <label className="flex items-start gap-2.5 text-sm text-ink-soft">
+          <input type="checkbox" name="acceptTerms" required className="mt-0.5 w-4 h-4 accent-[#6d28d9] shrink-0" />
+          <span>
+            I have read and agree to the{" "}
+            <Link href="/terms" target="_blank" className="text-brand font-medium hover:underline">
+              DropQ Vendor Agreement &amp; Terms
+            </Link>
+            .
+          </span>
+        </label>
+      )}
+
       {state.error && (
         <p className="text-sm text-brand-dark bg-brand-tint rounded-lg px-3 py-2">
           {state.error}

@@ -26,6 +26,8 @@ model Seller {
   accent       String   @default("#6D28D9") // brand accent for storefront
   emailVerified Boolean @default(false)
   isAdmin      Boolean  @default(false) // DropQ internal admin
+  termsAcceptedAt DateTime? // when the vendor accepted the Vendor Agreement
+  termsVersion    String?   // which version they accepted
   createdAt    DateTime @default(now())
 
   // Stripe Connect (payouts)

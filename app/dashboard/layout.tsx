@@ -1,10 +1,11 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { requireSeller, isAdminEmail } from "@/lib/auth";
-import { logoutAction } from "@/lib/actions/auth";
+import { logoutAction, acceptTermsAction } from "@/lib/actions/auth";
 import { Logo } from "@/components/logo";
 import { DashboardNav } from "@/components/dashboard-nav";
 import { VerifyBanner } from "@/components/verify-banner";
+import { TermsGate } from "@/components/terms-gate";
 import { LinkButton } from "@/components/ui";
 
 export default async function DashboardLayout({
@@ -13,6 +14,12 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const seller = await requireSeller();
+
+  // Vendors must accept the Vendor Agreement before using the dashboard.
+  if (!seller.termsAcceptedAt) {
+    return <TermsGate action={acceptTermsAction} />;
+  }
+
   const admin = seller.isAdmin || isAdminEmail(seller.email);
 
   return (

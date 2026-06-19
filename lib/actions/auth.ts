@@ -14,6 +14,7 @@ import {
 import { slugify } from "@/lib/format";
 import { createToken, consumeToken } from "@/lib/tokens";
 import { sendEmail, verificationEmail, resetEmail } from "@/lib/email";
+import { TERMS_VERSION } from "@/lib/terms";
 
 export type AuthState = { error?: string };
 export type ResetState = { error?: string; sent?: boolean; done?: boolean };
@@ -49,12 +50,15 @@ export async function signupAction(
   const storeName = String(formData.get("storeName") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
+  const acceptTerms = formData.get("acceptTerms") === "on";
 
   if (!storeName) return { error: "Give your store a name." };
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
     return { error: "Enter a valid email." };
   if (password.length < 8)
     return { error: "Password must be at least 8 characters." };
+  if (!acceptTerms)
+    return { error: "Please read and accept the Vendor Agreement to create a store." };
 
   const existing = await prisma.seller.findUnique({ where: { email } });
   if (existing) return { error: "An account with that email already exists." };
@@ -65,6 +69,8 @@ export async function signupAction(
       passwordHash: await hashPassword(password),
       storeName,
       slug: await uniqueSlug(storeName),
+      termsAcceptedAt: new Date(),
+      termsVersion: TERMS_VERSION,
     },
   });
 
@@ -93,6 +99,16 @@ export async function loginAction(
 export async function logoutAction(): Promise<void> {
   await destroySession();
   redirect("/");
+}
+
+/** Record that the current vendor accepted the Vendor Agreement. */
+export async function acceptTermsAction(): Promise<void> {
+  const seller = await requireSeller();
+  await prisma.seller.update({
+    where: { id: seller.id },
+    data: { termsAcceptedAt: new Date(), termsVersion: TERMS_VERSION },
+  });
+  redirect("/dashboard");
 }
 
 /** Resend the verification email to the logged-in seller. */
