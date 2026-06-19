@@ -117,7 +117,9 @@ export function StoreSettingsForm({
           <div>
             <p className="font-semibold">Geofencing notifications <span className="text-xs font-normal text-muted">(beta)</span></p>
             <p className="text-sm text-muted mt-0.5">
-              Notify opted-in repeat customers when they&apos;re near your location during a live drop. Sending integrations are coming soon — this saves your settings now.
+              Notify opted-in repeat customers when they&apos;re near you during a live
+              drop. We&apos;ll find your coordinates from your <b>Location</b> above
+              automatically. (Push delivery arrives with the mobile app — this saves your settings now.)
             </p>
           </div>
         </label>
@@ -126,11 +128,11 @@ export function StoreSettingsForm({
             <Field label="Radius (meters)">
               <Input name="geofenceRadiusM" type="number" min={100} step={100} defaultValue={seller.geofenceRadiusM} />
             </Field>
-            <Field label="Latitude" hint="Optional">
-              <Input name="latitude" defaultValue={seller.latitude ?? ""} placeholder="30.2672" />
+            <Field label="Latitude" hint="Auto-filled — override if needed">
+              <Input name="latitude" defaultValue={seller.latitude ?? ""} placeholder="from Location" />
             </Field>
-            <Field label="Longitude" hint="Optional">
-              <Input name="longitude" defaultValue={seller.longitude ?? ""} placeholder="-97.7431" />
+            <Field label="Longitude" hint="Auto-filled — override if needed">
+              <Input name="longitude" defaultValue={seller.longitude ?? ""} placeholder="from Location" />
             </Field>
           </div>
         )}

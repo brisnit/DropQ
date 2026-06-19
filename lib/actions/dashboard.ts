@@ -9,6 +9,7 @@ import { requireSeller } from "@/lib/auth";
 import { dollarsToCents } from "@/lib/format";
 import { saveImage } from "@/lib/upload";
 import { sendEmail, orderReadyEmail } from "@/lib/email";
+import { geocode } from "@/lib/geofence";
 
 async function baseUrl(): Promise<string> {
   const h = await headers();
@@ -33,18 +34,33 @@ export async function updateStoreAction(
   formData: FormData
 ): Promise<StoreSaveState> {
   const seller = await requireSeller();
+  const location = String(formData.get("location") ?? "").trim() || null;
+  const geofenceEnabled = formData.get("geofenceEnabled") === "on";
+  let latitude = numOrNull(formData.get("latitude"));
+  let longitude = numOrNull(formData.get("longitude"));
+
+  // Auto-geocode from the Location text when geofencing is on and no manual
+  // coordinates were entered (best-effort; never blocks the save).
+  if (geofenceEnabled && (latitude == null || longitude == null) && location) {
+    const geo = await geocode(location);
+    if (geo) {
+      latitude = geo.lat;
+      longitude = geo.lng;
+    }
+  }
+
   await prisma.seller.update({
     where: { id: seller.id },
     data: {
       storeName: String(formData.get("storeName") ?? seller.storeName).trim() || seller.storeName,
       tagline: String(formData.get("tagline") ?? "").trim() || null,
       bio: String(formData.get("bio") ?? "").trim() || null,
-      location: String(formData.get("location") ?? "").trim() || null,
+      location,
       accent: String(formData.get("accent") ?? seller.accent) || seller.accent,
       feeMode: String(formData.get("feeMode")) === "pass" ? "pass" : "absorb",
-      geofenceEnabled: formData.get("geofenceEnabled") === "on",
-      latitude: numOrNull(formData.get("latitude")),
-      longitude: numOrNull(formData.get("longitude")),
+      geofenceEnabled,
+      latitude,
+      longitude,
       geofenceRadiusM: Math.max(
         100,
         parseInt(String(formData.get("geofenceRadiusM") ?? "1500"), 10) || 1500

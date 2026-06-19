@@ -1,6 +1,31 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 
+/**
+ * Geocode a free-text location to coordinates using OpenStreetMap Nominatim
+ * (free, no API key). Returns null on failure — callers should treat geocoding
+ * as best-effort. Respects Nominatim usage policy (identifying User-Agent).
+ */
+export async function geocode(query: string): Promise<{ lat: number; lng: number } | null> {
+  const q = query.trim();
+  if (!q) return null;
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`,
+      { headers: { "User-Agent": "DropQ/1.0 (https://dropq.app)" } }
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as Array<{ lat: string; lon: string }>;
+    if (!data.length) return null;
+    const lat = parseFloat(data[0].lat);
+    const lng = parseFloat(data[0].lon);
+    if (!isFinite(lat) || !isFinite(lng)) return null;
+    return { lat, lng };
+  } catch {
+    return null;
+  }
+}
+
 /** Great-circle distance between two lat/lng points, in meters. */
 export function distanceMeters(aLat: number, aLng: number, bLat: number, bLng: number): number {
   const R = 6_371_000;
