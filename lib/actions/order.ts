@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getStripe, calcFeeCents } from "@/lib/stripe";
 import { sendEmail, orderReceivedEmail } from "@/lib/email";
+import { sendSms } from "@/lib/notifications";
 
 export type OrderState = { error?: string };
 
@@ -30,6 +31,8 @@ export async function placeOrderAction(
   if (!buyerName) return { error: "Please add your name." };
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(buyerEmail))
     return { error: "Please add a valid email for your receipt." };
+  if ((buyerPhone ?? "").replace(/\D/g, "").length < 10)
+    return { error: "Please add a mobile number so we can text you order updates." };
 
   const drop = await prisma.drop.findUnique({
     where: { id: dropId },
@@ -182,17 +185,21 @@ export async function placeOrderAction(
     return { error: "Sorry — an item just sold out. Refresh and try again." };
   }
 
-  // Confirmation email to the buyer, delivered in the background (no-op in dev
-  // without RESEND_API_KEY).
+  // Confirmation to the buyer (text + email), delivered in the background.
+  const orderLink = `${await baseUrl()}/order/${order.id}`;
   const mail = orderReceivedEmail({
     to: buyerEmail,
     storeName: drop.seller.storeName,
     buyerFirst: buyerName.split(" ")[0] || buyerName,
-    orderLink: `${await baseUrl()}/order/${order.id}`,
+    orderLink,
     pickupInfo: drop.pickupInfo,
     fulfillment: drop.fulfillment,
   });
-  after(() => sendEmail(mail));
+  const smsText = `${drop.seller.storeName}: Got your order! 🎉 We'll text you when it's ready. ${orderLink}`;
+  after(async () => {
+    await sendEmail(mail);
+    await sendSms(buyerPhone, smsText);
+  });
 
   revalidatePath(`/s/${drop.seller.slug}/${drop.id}`);
   revalidatePath(`/dashboard/drops/${drop.id}`);

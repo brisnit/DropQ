@@ -204,9 +204,15 @@ export function StorefrontOrder({
           />
           <input
             name="buyerPhone"
-            placeholder="Phone (optional)"
+            type="tel"
+            placeholder="Mobile number (for order texts)"
+            required
             className="w-full bg-cream/60 border border-line-strong rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-ink/40"
           />
+          <p className="text-xs text-muted leading-snug">
+            We&apos;ll text you order updates (received &amp; ready for pickup). Msg &amp; data
+            rates may apply.
+          </p>
           <textarea
             name="note"
             placeholder="Notes for the maker (optional)"

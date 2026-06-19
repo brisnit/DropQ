@@ -9,6 +9,7 @@ import { requireSeller } from "@/lib/auth";
 import { dollarsToCents } from "@/lib/format";
 import { saveImage } from "@/lib/upload";
 import { sendEmail, orderReadyEmail } from "@/lib/email";
+import { sendSms } from "@/lib/notifications";
 import { geocode } from "@/lib/geofence";
 
 async function baseUrl(): Promise<string> {
@@ -239,19 +240,41 @@ export async function updateOrderStatusAction(formData: FormData) {
   });
   if (!order || order.sellerId !== seller.id) return;
 
+  const prev = order.status;
   await prisma.order.update({ where: { id: orderId }, data: { status } });
 
-  // Notify the customer when their order becomes ready (only on transition).
-  if (status === "ready" && order.status !== "ready") {
-    const mail = orderReadyEmail({
-      to: order.buyerEmail,
-      storeName: seller.storeName,
-      buyerFirst: order.buyerName.split(" ")[0] || order.buyerName,
-      orderLink: `${await baseUrl()}/order/${order.id}`,
-      pickupInfo: order.drop.pickupInfo,
-      fulfillment: order.drop.fulfillment,
-    });
-    after(() => sendEmail(mail)); // deliver in the background
+  // Text (+ email) the customer when their order status changes.
+  if (status !== prev) {
+    const link = `${await baseUrl()}/order/${order.id}`;
+    const first = order.buyerName.split(" ")[0] || order.buyerName;
+    const store = seller.storeName;
+    const isPickup = (order.drop.fulfillment ?? "pickup") === "pickup";
+    let sms: string | null = null;
+    let mail: Parameters<typeof sendEmail>[0] | null = null;
+
+    if (status === "ready") {
+      const where = order.drop.pickupInfo ? ` ${order.drop.pickupInfo}` : "";
+      sms = `${store}: Your order is ready${isPickup ? " for pickup" : ""}! 🎉${where} ${link}`;
+      mail = orderReadyEmail({
+        to: order.buyerEmail,
+        storeName: store,
+        buyerFirst: first,
+        orderLink: link,
+        pickupInfo: order.drop.pickupInfo,
+        fulfillment: order.drop.fulfillment,
+      });
+    } else if (status === "fulfilled") {
+      sms = `${store}: Thanks for your order, ${first}! 🙌 See you at the next drop.`;
+    } else if (status === "canceled") {
+      sms = `${store}: Your order was canceled. Reach out to the maker with any questions.`;
+    }
+
+    if (sms || mail) {
+      after(async () => {
+        if (mail) await sendEmail(mail);
+        if (sms) await sendSms(order.buyerPhone, sms);
+      });
+    }
   }
 
   revalidatePath("/dashboard/orders");
