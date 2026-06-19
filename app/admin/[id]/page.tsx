@@ -49,7 +49,7 @@ export default async function AdminClientPage({
 
   return (
     <div>
-      <Link href="/admin" className="text-sm text-muted hover:text-ink">← All clients</Link>
+      <Link href="/admin" className="text-sm text-muted hover:text-ink">← All vendors</Link>
 
       <div className="flex flex-wrap items-start justify-between gap-4 mt-3 mb-6">
         <div>

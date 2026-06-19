@@ -58,8 +58,8 @@ export default async function AdminHome({
     <div>
       <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
         <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">Clients</h1>
-          <p className="text-muted mt-1">Every food business on DropQ.</p>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">Vendors</h1>
+          <p className="text-muted mt-1">Every vendor on DropQ.</p>
         </div>
         <form action={grantAdminByEmailAction} className="flex items-end gap-2">
           <div>
@@ -83,7 +83,7 @@ export default async function AdminHome({
 
       {/* Platform totals */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        <Stat label="Clients" value={String(sellers.length)} />
+        <Stat label="Vendors" value={String(sellers.length)} />
         <Stat label="GMV" value={formatMoney(gmv)} sub="Total sales" />
         <Stat label="DropQ revenue" value={formatMoney(dropqRevenue)} sub="Platform fees" />
         <Stat label="Orders" value={String(totalOrders)} sub={`${totalDrops} drops`} />
@@ -124,10 +124,10 @@ export default async function AdminHome({
         </div>
       </div>
 
-      {/* Clients table */}
+      {/* Vendors table */}
       <div className="bg-paper border border-line rounded-card overflow-hidden">
         <div className="hidden md:grid grid-cols-[2fr_1fr_0.7fr_0.7fr_1fr_1fr] gap-3 px-5 py-3 border-b border-line text-xs font-semibold uppercase tracking-wide text-muted">
-          <span>Client</span>
+          <span>Vendor</span>
           <span>Status</span>
           <span className="text-right">Drops</span>
           <span className="text-right">Orders</span>
