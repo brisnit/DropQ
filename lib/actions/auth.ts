@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import {
   createSession,
@@ -108,6 +109,9 @@ export async function acceptTermsAction(): Promise<void> {
     where: { id: seller.id },
     data: { termsAcceptedAt: new Date(), termsVersion: TERMS_VERSION },
   });
+  // Bust the cached dashboard layout (it renders the gate) so it re-reads the
+  // now-accepted seller and the gate disappears.
+  revalidatePath("/dashboard", "layout");
   redirect("/dashboard");
 }
 
