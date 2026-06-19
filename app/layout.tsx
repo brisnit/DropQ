@@ -6,7 +6,7 @@ import "./globals.css";
 const arvo = Arvo({
   variable: "--font-arvo",
   subsets: ["latin"],
-  weight: ["400", "700"],
+  weight: ["400"],
   display: "swap",
 });
 

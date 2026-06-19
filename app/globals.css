@@ -57,6 +57,13 @@ body {
   color: #fff;
 }
 
+/* Display font (Arvo) always renders at regular weight (400), overriding any
+   font-bold/font-semibold utilities on headings. Also disable faux-bold. */
+.font-display {
+  font-weight: 400 !important;
+  font-synthesis-weight: none;
+}
+
 .bg-grid {
   background-image:
     linear-gradient(to right, rgba(27, 23, 38, 0.04) 1px, transparent 1px),
