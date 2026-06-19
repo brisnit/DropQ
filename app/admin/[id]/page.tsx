@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { requireAdmin } from "@/lib/auth";
+import { setAdminAction } from "@/lib/actions/admin";
 import { formatMoney, formatDate, relativeTime, statusStyle } from "@/lib/format";
 import { Stat } from "@/components/dashboard-ui";
-import { Badge } from "@/components/ui";
+import { Badge, Button } from "@/components/ui";
+import { ConfirmSubmit } from "@/components/confirm-submit";
 
 const PAID = ["new", "ready", "fulfilled"];
 
@@ -13,6 +16,7 @@ export default async function AdminClientPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const me = await requireAdmin();
   const seller = await prisma.seller.findUnique({
     where: { id },
     include: {
@@ -59,13 +63,33 @@ export default async function AdminClientPage({
             {seller.location ? ` · ${seller.location}` : ""}
           </p>
         </div>
-        <Link
-          href={`/s/${seller.slug}`}
-          target="_blank"
-          className="text-sm font-medium px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
-        >
-          View storefront ↗
-        </Link>
+        <div className="flex items-center gap-2">
+          {seller.id === me.id ? (
+            <span className="text-sm text-muted px-3 py-2.5">That&apos;s you</span>
+          ) : (
+            <form action={setAdminAction}>
+              <input type="hidden" name="targetId" value={seller.id} />
+              <input type="hidden" name="makeAdmin" value={seller.isAdmin ? "false" : "true"} />
+              {seller.isAdmin ? (
+                <ConfirmSubmit
+                  message={`Remove admin access from ${seller.email}?`}
+                  className="text-sm font-medium px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-brand hover:text-brand transition"
+                >
+                  Revoke admin
+                </ConfirmSubmit>
+              ) : (
+                <Button type="submit" variant="dark">🛡️ Make admin</Button>
+              )}
+            </form>
+          )}
+          <Link
+            href={`/s/${seller.slug}`}
+            target="_blank"
+            className="text-sm font-medium px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
+          >
+            View storefront ↗
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">

@@ -1,12 +1,18 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { grantAdminByEmailAction } from "@/lib/actions/admin";
 import { formatMoney, relativeTime, formatDate } from "@/lib/format";
 import { Stat } from "@/components/dashboard-ui";
-import { Badge } from "@/components/ui";
+import { Badge, Button, Input } from "@/components/ui";
 
 const PAID = ["new", "ready", "fulfilled"];
 
-export default async function AdminHome() {
+export default async function AdminHome({
+  searchParams,
+}: {
+  searchParams: Promise<{ admin?: string; email?: string }>;
+}) {
+  const sp = await searchParams;
   const [sellers, sales, customerGroups, liveDrops, subs] = await Promise.all([
     prisma.seller.findMany({
       include: { _count: { select: { drops: true, orders: true, subscribers: true } } },
@@ -46,12 +52,30 @@ export default async function AdminHome() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
+      <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight">Clients</h1>
           <p className="text-muted mt-1">Every food business on DropQ.</p>
         </div>
+        <form action={grantAdminByEmailAction} className="flex items-end gap-2">
+          <div>
+            <label className="block text-xs font-medium text-muted mb-1">Grant admin by email</label>
+            <Input name="email" type="email" placeholder="teammate@email.com" className="w-56" />
+          </div>
+          <Button type="submit" variant="dark">🛡️ Make admin</Button>
+        </form>
       </div>
+
+      {sp.admin === "granted" && (
+        <p className="mb-5 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">
+          ✓ {sp.email} is now a DropQ admin.
+        </p>
+      )}
+      {sp.admin === "notfound" && (
+        <p className="mb-5 text-sm bg-brand-tint text-brand-dark rounded-lg px-3 py-2">
+          No DropQ account found for {sp.email}. They need to sign up first, then grant admin.
+        </p>
+      )}
 
       {/* Platform totals */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
