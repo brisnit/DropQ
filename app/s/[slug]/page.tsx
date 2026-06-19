@@ -39,7 +39,7 @@ export default async function StorePage({
   return (
     <main className="min-h-screen">
       {/* Banner */}
-      <div className="relative h-32 sm:h-44" style={{ backgroundColor: accent }}>
+      <div className="relative h-28 sm:h-36" style={{ backgroundColor: accent }}>
         <Link
           href="/"
           className="absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-pill bg-black/25 hover:bg-black/40 text-white text-sm font-medium px-3.5 py-2 backdrop-blur-sm transition"
@@ -47,10 +47,11 @@ export default async function StorePage({
           <span aria-hidden>←</span> Back
         </Link>
       </div>
-      <div className="max-w-3xl mx-auto px-5">
+      {/* relative z-10 so the avatar overlaps the banner instead of being painted over by it */}
+      <div className="relative z-10 max-w-3xl mx-auto px-5">
         <div className="-mt-12 sm:-mt-14">
           <div
-            className="w-24 h-24 rounded-3xl bg-paper border-4 border-cream grid place-items-center text-4xl shadow-[var(--shadow-soft)]"
+            className="w-24 h-24 rounded-3xl bg-paper border-4 border-cream grid place-items-center font-display text-4xl font-semibold shadow-[var(--shadow-soft)]"
             style={{ color: accent }}
           >
             {seller.storeName.charAt(0)}
@@ -60,8 +61,12 @@ export default async function StorePage({
           </h1>
           {seller.tagline && <p className="text-lg text-ink-soft mt-1">{seller.tagline}</p>}
           <div className="flex items-center gap-3 text-sm text-muted mt-2">
-            {seller.location && <span>📍 {seller.location}</span>}
-            <span>·</span>
+            {seller.location && (
+              <>
+                <span>📍 {seller.location}</span>
+                <span>·</span>
+              </>
+            )}
             <span>Powered by DropQ</span>
           </div>
           {seller.bio && <p className="text-ink-soft mt-4 max-w-xl">{seller.bio}</p>}
