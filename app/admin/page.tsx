@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { grantAdminByEmailAction } from "@/lib/actions/admin";
+import { requireAdmin } from "@/lib/auth";
+import { grantAdminByEmailAction, setAdminAction } from "@/lib/actions/admin";
 import { formatMoney, relativeTime, formatDate } from "@/lib/format";
 import { Stat } from "@/components/dashboard-ui";
 import { Badge, Button, Input } from "@/components/ui";
+import { ConfirmSubmit } from "@/components/confirm-submit";
 
 const PAID = ["new", "ready", "fulfilled"];
 
@@ -13,6 +15,7 @@ export default async function AdminHome({
   searchParams: Promise<{ admin?: string; email?: string }>;
 }) {
   const sp = await searchParams;
+  const me = await requireAdmin();
   const [sellers, sales, customerGroups, liveDrops, subs] = await Promise.all([
     prisma.seller.findMany({
       include: { _count: { select: { drops: true, orders: true, subscribers: true } } },
@@ -43,6 +46,7 @@ export default async function AdminHome({
   const dropqRevenue = sales.reduce((s, x) => s + (x._sum.feeCents ?? 0), 0);
   const totalOrders = sales.reduce((s, x) => s + x._count, 0);
   const totalDrops = sellers.reduce((s, x) => s + x._count.drops, 0);
+  const admins = sellers.filter((s) => s.isAdmin);
 
   function status(sellerId: string, orders: number) {
     if (liveSet.has(sellerId)) return { label: "Live drop", cls: "bg-sage-tint text-sage" };
@@ -84,6 +88,40 @@ export default async function AdminHome({
         <Stat label="DropQ revenue" value={formatMoney(dropqRevenue)} sub="Platform fees" />
         <Stat label="Orders" value={String(totalOrders)} sub={`${totalDrops} drops`} />
         <Stat label="Sign-ups" value={String(subs)} sub="Across all stores" />
+      </div>
+
+      {/* Admins */}
+      <div className="bg-paper border border-line rounded-card p-5 mb-6">
+        <h2 className="font-semibold mb-3">
+          Admins <span className="text-muted font-normal">({admins.length})</span>
+        </h2>
+        <div className="flex flex-wrap gap-2">
+          {admins.map((a) => (
+            <div
+              key={a.id}
+              className="flex items-center gap-2 border border-line rounded-pill bg-cream/60 pl-3 pr-1.5 py-1"
+            >
+              <Link href={`/admin/${a.id}`} className="text-sm font-medium hover:underline">
+                {a.storeName}
+              </Link>
+              <span className="text-xs text-muted hidden sm:inline">{a.email}</span>
+              {a.id === me.id ? (
+                <span className="text-[11px] text-muted bg-line rounded-pill px-2 py-0.5">you</span>
+              ) : (
+                <form action={setAdminAction}>
+                  <input type="hidden" name="targetId" value={a.id} />
+                  <input type="hidden" name="makeAdmin" value="false" />
+                  <ConfirmSubmit
+                    message={`Remove admin access from ${a.email}?`}
+                    className="text-muted hover:text-white hover:bg-brand rounded-full w-5 h-5 grid place-items-center text-xs transition"
+                  >
+                    ✕
+                  </ConfirmSubmit>
+                </form>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Clients table */}
