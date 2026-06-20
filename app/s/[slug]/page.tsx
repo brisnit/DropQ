@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { Mark } from "@/components/logo";
 import { WaitlistForm } from "@/components/waitlist-form";
 import { Stars } from "@/components/stars";
 import { ReviewForm } from "@/components/review-form";
@@ -256,7 +255,8 @@ export default async function StorePage({
         )}
 
         <footer className="py-10 border-t border-line flex items-center justify-center gap-2 text-sm text-muted">
-          <Mark size={18} /> Want a store like this?{" "}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/q.png" alt="DropQ" className="h-[18px] w-auto" /> Want a store like this?{" "}
           <Link href="/" className="text-ink font-medium hover:underline">Start free on DropQ</Link>
         </footer>
       </div>
