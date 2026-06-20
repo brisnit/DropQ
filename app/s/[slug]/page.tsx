@@ -109,7 +109,7 @@ export default async function StorePage({
             <span>Powered by DropQ</span>
           </div>
           {seller.bio && <p className="text-ink-soft mt-4 max-w-xl">{seller.bio}</p>}
-          <SocialLinks seller={seller} accent={accent} />
+          <SocialLinks seller={seller} accent={accent} disabled={isDemo} />
         </div>
 
         {/* Live drops */}

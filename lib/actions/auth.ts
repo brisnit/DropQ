@@ -19,6 +19,7 @@ import { TERMS_VERSION } from "@/lib/terms";
 import { PARTNER_INVITE_CODE, partnerExpiryFrom } from "@/lib/plans";
 import { CATEGORY_VALUES } from "@/lib/category";
 import { recordReferralAndReward } from "@/lib/referral";
+import { createGrowthCheckoutUrl } from "@/lib/billing";
 
 export type AuthState = { error?: string };
 export type ResetState = { error?: string; sent?: boolean; done?: boolean };
@@ -113,6 +114,25 @@ export async function signupAction(
   // Send the verification email in the background so signup feels instant.
   after(() => sendVerification(seller.id, seller.email));
   await createSession(seller.id);
+
+  // Plan choice: Growth starts paid checkout immediately (unless they got Partner
+  // via an invite code, which is already free). Starter just enters the dashboard.
+  const planChoice = String(formData.get("plan") ?? "starter");
+  const wantsGrowth = planChoice === "growth" && planData.plan !== "partner";
+  if (wantsGrowth) {
+    let url: string | null = null;
+    try {
+      const base = await baseUrl();
+      url = await createGrowthCheckoutUrl(seller, {
+        successUrl: `${base}/dashboard/billing?upgraded=1&session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: `${base}/dashboard/billing?canceled=1`,
+      });
+    } catch (e) {
+      console.error("Growth signup checkout failed:", e);
+    }
+    redirect(url ?? "/dashboard/billing?error=disabled");
+  }
+
   redirect("/dashboard");
 }
 

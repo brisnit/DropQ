@@ -10,11 +10,12 @@ export const metadata = { title: "Start your store — DropQ" };
 export default async function SignupPage({
   searchParams,
 }: {
-  searchParams: Promise<{ ref?: string }>;
+  searchParams: Promise<{ ref?: string; plan?: string }>;
 }) {
   if (await getCurrentSeller()) redirect("/dashboard");
 
-  const { ref } = await searchParams;
+  const { ref, plan } = await searchParams;
+  const defaultPlan = plan === "growth" ? "growth" : "starter";
   let referrerName: string | null = null;
   if (ref) {
     const referrer = await prisma.seller.findUnique({
@@ -34,7 +35,12 @@ export default async function SignupPage({
           🎁 <b>{referrerName}</b> invited you to DropQ. Sign up to start selling!
         </div>
       )}
-      <AuthForm mode="signup" action={signupAction} referralCode={ref ?? undefined} />
+      <AuthForm
+        mode="signup"
+        action={signupAction}
+        referralCode={ref ?? undefined}
+        defaultPlan={defaultPlan}
+      />
     </AuthShell>
   );
 }

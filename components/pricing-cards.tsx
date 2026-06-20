@@ -27,7 +27,7 @@ function Cta({ planId, seller }: { planId: Plan; seller: SellerLite }) {
   }
 
   if (planId === "growth") {
-    if (!seller) return <LinkButton href="/signup" className="w-full">Get started</LinkButton>;
+    if (!seller) return <LinkButton href="/signup?plan=growth" className="w-full">Get started</LinkButton>;
     if (current === "growth" || current === "partner")
       return (
         <span className="block text-center text-sm font-semibold text-white/90 py-2.5">

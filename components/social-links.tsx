@@ -47,25 +47,47 @@ function Icon({ name }: { name: SocialKey }) {
 
 type Socials = Partial<Record<SocialKey, string | null>>;
 
-export function SocialLinks({ seller, accent }: { seller: Socials; accent?: string }) {
+export function SocialLinks({
+  seller,
+  accent,
+  disabled = false,
+}: {
+  seller: Socials;
+  accent?: string;
+  disabled?: boolean;
+}) {
   const links = SOCIALS.map((s) => ({ ...s, url: seller[s.key] })).filter((l) => l.url);
   if (!links.length) return null;
+  const base = "w-9 h-9 rounded-full border border-line grid place-items-center";
   return (
     <div className="flex flex-wrap items-center gap-2 mt-4">
-      {links.map((l) => (
-        <a
-          key={l.key}
-          href={l.url!}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={l.label}
-          title={l.label}
-          className="w-9 h-9 rounded-full border border-line grid place-items-center hover:bg-cream transition"
-          style={{ color: accent }}
-        >
-          <Icon name={l.key} />
-        </a>
-      ))}
+      {links.map((l) =>
+        disabled ? (
+          // Demo storefront: show the icons but don't link anywhere.
+          <span
+            key={l.key}
+            aria-label={l.label}
+            title={l.label}
+            className={`${base} cursor-default`}
+            style={{ color: accent }}
+          >
+            <Icon name={l.key} />
+          </span>
+        ) : (
+          <a
+            key={l.key}
+            href={l.url!}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={l.label}
+            title={l.label}
+            className={`${base} hover:bg-cream transition`}
+            style={{ color: accent }}
+          >
+            <Icon name={l.key} />
+          </a>
+        )
+      )}
     </div>
   );
 }

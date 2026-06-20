@@ -4,7 +4,8 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireSeller, getCurrentSeller } from "@/lib/auth";
-import { getStripe, ensureGrowthPriceId } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
+import { createGrowthCheckoutUrl } from "@/lib/billing";
 import { effectivePlan } from "@/lib/plans";
 
 async function baseUrl(): Promise<string> {
@@ -36,41 +37,19 @@ export async function createGrowthCheckoutAction() {
   let disabled = false;
   let errDetail = "";
 
-  try {
-    const stripe = getStripe();
-    if (!stripe) {
-      disabled = true;
-    } else {
-      let customerId = seller.stripeCustomerId;
-      if (!customerId) {
-        const customer = await stripe.customers.create({
-          email: seller.email,
-          name: seller.storeName,
-          metadata: { sellerId: seller.id },
-        });
-        customerId = customer.id;
-        await prisma.seller.update({
-          where: { id: seller.id },
-          data: { stripeCustomerId: customerId },
-        });
-      }
-      const priceId = await ensureGrowthPriceId(stripe);
+  if (!getStripe()) {
+    disabled = true;
+  } else {
+    try {
       const base = await baseUrl();
-      const session = await stripe.checkout.sessions.create({
-        mode: "subscription",
-        customer: customerId,
-        line_items: [{ price: priceId, quantity: 1 }],
-        success_url: `${base}/dashboard/billing?upgraded=1&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${base}/dashboard/billing?canceled=1`,
-        metadata: { sellerId: seller.id, plan: "growth" },
-        subscription_data: { metadata: { sellerId: seller.id } },
-        allow_promotion_codes: true,
+      url = await createGrowthCheckoutUrl(seller, {
+        successUrl: `${base}/dashboard/billing?upgraded=1&session_id={CHECKOUT_SESSION_ID}`,
+        cancelUrl: `${base}/dashboard/billing?canceled=1`,
       });
-      url = session.url;
+    } catch (e) {
+      console.error("Growth checkout failed:", e);
+      errDetail = e instanceof Error ? e.message : "Unknown error";
     }
-  } catch (e) {
-    console.error("Growth checkout failed:", e);
-    errDetail = e instanceof Error ? e.message : "Unknown error";
   }
 
   if (disabled) redirect("/dashboard/billing?error=disabled");
