@@ -52,6 +52,15 @@ export function AuthForm({
         />
       </Field>
 
+      {isSignup && (
+        <Field
+          label="Invite code"
+          hint="Have an Early Partner code? Enter it — otherwise leave blank to start free on Starter."
+        >
+          <Input name="inviteCode" placeholder="Optional" autoComplete="off" />
+        </Field>
+      )}
+
       {!isSignup && (
         <div className="-mt-2 text-right">
           <Link href="/forgot" className="text-sm text-brand font-medium hover:underline">

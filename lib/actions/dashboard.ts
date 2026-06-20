@@ -11,6 +11,7 @@ import { saveImage } from "@/lib/upload";
 import { sendEmail, orderReadyEmail } from "@/lib/email";
 import { sendSms } from "@/lib/notifications";
 import { geocode } from "@/lib/geofence";
+import { canCreateDrop } from "@/lib/plans";
 
 async function baseUrl(): Promise<string> {
   const h = await headers();
@@ -86,6 +87,11 @@ export async function updateStoreAction(
 export async function createDropAction(formData: FormData) {
   const seller = await requireSeller();
 
+  // Plan gate: Starter is capped at a lifetime number of drops.
+  if (!canCreateDrop(seller)) {
+    redirect("/dashboard/billing?limit=1");
+  }
+
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return; // basic guard; client enforces required
 
@@ -128,6 +134,13 @@ export async function createDropAction(formData: FormData) {
       closesAt,
       products: { create: products },
     },
+  });
+
+  // Count it against the lifetime allowance (never decremented, so deleting a
+  // drop doesn't refund a Starter slot).
+  await prisma.seller.update({
+    where: { id: seller.id },
+    data: { dropsCreated: { increment: 1 } },
   });
 
   revalidatePath("/dashboard/drops");

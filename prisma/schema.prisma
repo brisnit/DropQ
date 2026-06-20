@@ -31,9 +31,20 @@ model Seller {
   termsVersion    String?   // which version they accepted
   createdAt    DateTime @default(now())
 
+  // Subscription plan: starter | growth | partner | pro
+  plan               String    @default("starter")
+  dropsCreated       Int       @default(0) // lifetime drops created (Starter limit)
+  partnerActivatedAt DateTime? // Early Partner Program start
+  partnerExpiresAt   DateTime? // Partner auto-converts to Growth after this date
+
   // Stripe Connect (payouts)
   stripeAccountId      String? @unique
   stripeChargesEnabled Boolean @default(false)
+
+  // Stripe Billing (DropQ subscription charged to the vendor)
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String?
+  subscriptionStatus   String? // active | past_due | canceled | incomplete
 
   // DropQ fee: "absorb" (store eats the fee) | "pass" (customer pays the fee)
   feeMode String @default("absorb")
@@ -48,6 +59,15 @@ model Seller {
   orders      Order[]
   tokens      Token[]
   subscribers Subscriber[]
+}
+
+// Email captures for the (not-yet-purchasable) Pro plan.
+model ProWaitlist {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  sellerId  String? // set if a logged-in vendor joined
+  storeName String?
+  createdAt DateTime @default(now())
 }
 
 // Single-use, expiring tokens for email verification and password reset.

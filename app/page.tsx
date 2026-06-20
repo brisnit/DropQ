@@ -360,17 +360,16 @@ export default function Home() {
               Start free. Pay only when you sell.
             </h2>
             <p className="text-lg text-cream/70 mt-4">
-              No monthly fee to launch. A small per-order fee keeps the lights on
-              — so we only win when you do. Upgrade for lower fees and more growth
-              tools as you scale.
+              Try free on Starter, run unlimited drops on Growth, and keep a simple
+              2% transaction fee at every tier. Cancel anytime.
             </p>
           </div>
           <div className="grid sm:grid-cols-3 gap-5 mt-12">
             {[
-              ["Starter", "$0", "/mo", ["Unlimited drops", "Online ordering", "Pickup & delivery", "Customer list", "Small per-order fee"], false],
-              ["Growth", "$29", "/mo", ["Lower per-order fee", "Text blasts to followers", "Analytics dashboard", "Custom storefront", "Priority support"], true],
-              ["Pro", "$99", "/mo", ["Lowest fees", "Multiple locations", "Team accounts", "Advanced reports", "AI demand forecasting"], false],
-            ].map(([name, price, per, feats, featured]) => (
+              ["Starter", "$0", "/mo", "Try DropQ", ["3 drops to start", "Online ordering", "Pickup & delivery", "Customer list", "QR codes", "2% transaction fee"], false, false],
+              ["Growth", "$20", "/mo", "Run Drops", ["Unlimited drops", "Customer signups (SMS + email)", "Sales analytics", "Repeat-customer tracking", "Shareable drop links", "2% transaction fee"], true, false],
+              ["Pro", "$99", "/mo", "Grow Customers", ["Everything in Growth", "Advanced analytics", "Automated reminders", "Multiple locations & team", "Reduced 1.5% fee"], false, true],
+            ].map(([name, price, per, position, feats, featured, soon]) => (
               <div
                 key={String(name)}
                 className={`rounded-card p-6 ${
@@ -379,9 +378,11 @@ export default function Home() {
                     : "bg-cream/5 border border-cream/15"
                 }`}
               >
-                {featured ? (
-                  <Badge className="bg-grey text-white mb-3">Most popular</Badge>
-                ) : null}
+                <div className="flex items-center justify-between mb-3">
+                  <span className={`text-xs font-semibold uppercase tracking-[0.16em] ${featured ? "text-white/80" : "text-grey"}`}>{String(position)}</span>
+                  {featured ? <Badge className="bg-grey text-white">Most popular</Badge> : null}
+                  {soon ? <Badge className="bg-cream/15 text-cream">Coming soon</Badge> : null}
+                </div>
                 <h3 className="font-semibold text-lg">{String(name)}</h3>
                 <div className="mt-2 mb-5">
                   <span className="font-display text-4xl font-semibold">{String(price)}</span>
@@ -398,9 +399,9 @@ export default function Home() {
               </div>
             ))}
           </div>
-          <p className="text-sm text-cream/50 mt-6">
-            Illustrative pricing for this MVP demo.
-          </p>
+          <div className="mt-8">
+            <LinkButton href="/pricing" variant="secondary">See full pricing &amp; features →</LinkButton>
+          </div>
         </Section>
       </div>
 

@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { runRepeatReminders } from "@/lib/reminders";
+import { convertExpiredPartners } from "@/lib/billing";
 
 // Daily repeat-customer reminders. Wired to Vercel Cron via vercel.json.
 // Protected by CRON_SECRET (Vercel sends it as a Bearer token automatically
@@ -13,5 +14,6 @@ export async function GET(req: NextRequest) {
     }
   }
   const result = await runRepeatReminders();
-  return Response.json({ ok: true, ...result });
+  const partnersConverted = await convertExpiredPartners();
+  return Response.json({ ok: true, ...result, partnersConverted });
 }

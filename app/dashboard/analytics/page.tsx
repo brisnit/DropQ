@@ -2,6 +2,7 @@ import { requireSeller } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatMoney } from "@/lib/format";
 import { PageHeader, Stat, EmptyState, Section } from "@/components/dashboard-ui";
+import { hasGrowthFeatures } from "@/lib/plans";
 
 export const metadata = { title: "Analytics — DropQ" };
 
@@ -13,6 +14,22 @@ function quarterKey(d: Date) {
 
 export default async function AnalyticsPage() {
   const seller = await requireSeller();
+
+  // Analytics is a Growth+ feature — Starter sees an upgrade prompt.
+  if (!hasGrowthFeatures(seller)) {
+    return (
+      <Section>
+        <PageHeader title="Analytics" subtitle="Sales insights for your drops." />
+        <EmptyState
+          emoji="📈"
+          title="Analytics is a Growth feature"
+          body="Upgrade to Growth ($20/mo) to unlock sales by drop, sales by product, repeat-customer tracking, and more."
+          ctaHref="/dashboard/billing"
+          ctaLabel="Upgrade to Growth"
+        />
+      </Section>
+    );
+  }
 
   const [orders, drops, signupCount] = await Promise.all([
     prisma.order.findMany({

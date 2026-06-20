@@ -7,7 +7,7 @@ const LINKS = [
   { href: "/#how", label: "How it works" },
   { href: "/#drops", label: "Drops" },
   { href: "/#features", label: "Features" },
-  { href: "/#pricing", label: "Pricing" },
+  { href: "/pricing", label: "Pricing" },
 ];
 
 export async function SiteNav() {

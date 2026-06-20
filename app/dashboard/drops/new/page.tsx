@@ -2,12 +2,34 @@ import Link from "next/link";
 import { requireSeller } from "@/lib/auth";
 import { createDropAction } from "@/lib/actions/dashboard";
 import { DropEditor } from "@/components/drop-editor";
-import { Section } from "@/components/dashboard-ui";
+import { Section, EmptyState } from "@/components/dashboard-ui";
+import { canCreateDrop, STARTER_DROP_LIMIT } from "@/lib/plans";
 
 export const metadata = { title: "New drop — DropQ" };
 
 export default async function NewDropPage() {
-  await requireSeller();
+  const seller = await requireSeller();
+
+  // Starter plan: block past the lifetime drop limit and route toward Growth.
+  if (!canCreateDrop(seller)) {
+    return (
+      <Section>
+        <Link href="/dashboard/drops" className="text-sm text-muted hover:text-ink">
+          ← Back to drops
+        </Link>
+        <div className="mt-3">
+          <EmptyState
+            emoji="🚀"
+            title="You've used all your Starter drops"
+            body={`Starter includes ${STARTER_DROP_LIMIT} drops total. Upgrade to Growth for unlimited drops, analytics, and the full selling toolkit — $20/mo.`}
+            ctaHref="/dashboard/billing"
+            ctaLabel="Upgrade to Growth"
+          />
+        </div>
+      </Section>
+    );
+  }
+
   return (
     <Section>
       <Link href="/dashboard/drops" className="text-sm text-muted hover:text-ink">

@@ -6,8 +6,23 @@ import { formatMoney, relativeTime, formatDate } from "@/lib/format";
 import { Stat } from "@/components/dashboard-ui";
 import { Badge, Button, Input } from "@/components/ui";
 import { ConfirmSubmit } from "@/components/confirm-submit";
+import {
+  effectivePlan,
+  planLabel,
+  isPartnerExpired,
+  dropsRemaining,
+  STARTER_DROP_LIMIT,
+  type Plan,
+} from "@/lib/plans";
 
 const PAID = ["new", "ready", "fulfilled"];
+
+const PLAN_BADGE: Record<Plan, string> = {
+  starter: "bg-line text-ink-soft",
+  growth: "bg-brand-tint text-brand-dark",
+  partner: "bg-sage-tint text-sage",
+  pro: "bg-quad/15 text-tertiary",
+};
 
 export default async function AdminHome({
   searchParams,
@@ -16,7 +31,7 @@ export default async function AdminHome({
 }) {
   const sp = await searchParams;
   const me = await requireAdmin();
-  const [sellers, sales, customerGroups, liveDrops, subs] = await Promise.all([
+  const [sellers, sales, customerGroups, liveDrops, subs, proWaitlist] = await Promise.all([
     prisma.seller.findMany({
       include: { _count: { select: { drops: true, orders: true, subscribers: true } } },
       orderBy: { createdAt: "desc" },
@@ -35,6 +50,7 @@ export default async function AdminHome({
     }),
     prisma.drop.findMany({ where: { status: "live" }, select: { sellerId: true }, distinct: ["sellerId"] }),
     prisma.subscriber.count(),
+    prisma.proWaitlist.findMany({ orderBy: { createdAt: "desc" } }),
   ]);
 
   const salesMap = new Map(sales.map((s) => [s.sellerId, s]));
@@ -47,6 +63,17 @@ export default async function AdminHome({
   const totalOrders = sales.reduce((s, x) => s + x._count, 0);
   const totalDrops = sellers.reduce((s, x) => s + x._count.drops, 0);
   const admins = sellers.filter((s) => s.isAdmin);
+
+  // ---- Plan analytics ----
+  const planCount: Record<Plan, number> = { starter: 0, growth: 0, partner: 0, pro: 0 };
+  for (const s of sellers) planCount[effectivePlan(s)]++;
+  const partners = sellers.filter((s) => s.plan === "partner");
+  const growthSubs = sellers.filter(
+    (s) => effectivePlan(s) === "growth" && s.subscriptionStatus === "active"
+  );
+  const starterNearLimit = sellers.filter(
+    (s) => effectivePlan(s) === "starter" && dropsRemaining(s) <= 1
+  );
 
   function status(sellerId: string, orders: number) {
     if (liveSet.has(sellerId)) return { label: "Live drop", cls: "bg-sage-tint text-sage" };
@@ -88,6 +115,69 @@ export default async function AdminHome({
         <Stat label="DropQ revenue" value={formatMoney(dropqRevenue)} sub="Platform fees" />
         <Stat label="Orders" value={String(totalOrders)} sub={`${totalDrops} drops`} />
         <Stat label="Sign-ups" value={String(subs)} sub="Across all stores" />
+      </div>
+
+      {/* Plans overview */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Stat label="Starter" value={String(planCount.starter)} sub={`${starterNearLimit.length} near limit`} />
+        <Stat label="Growth" value={String(planCount.growth)} sub={`${growthSubs.length} paying`} />
+        <Stat label="Partner" value={String(planCount.partner)} sub="Early Partner Program" />
+        <Stat label="Pro waitlist" value={String(proWaitlist.length)} sub="Coming soon" />
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-4 mb-8">
+        {/* Partner expirations */}
+        <div className="bg-paper border border-line rounded-card p-5">
+          <h2 className="font-semibold mb-3">Partner plans <span className="text-muted font-normal">({partners.length})</span></h2>
+          {partners.length === 0 ? (
+            <p className="text-sm text-muted">No Partner accounts yet.</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {partners.map((p) => (
+                <li key={p.id} className="flex items-center justify-between gap-2">
+                  <Link href={`/admin/${p.id}`} className="font-medium hover:underline truncate">{p.storeName}</Link>
+                  <span className={isPartnerExpired(p) ? "text-brand-dark" : "text-muted"}>
+                    {p.partnerExpiresAt ? (isPartnerExpired(p) ? `expired ${formatDate(p.partnerExpiresAt)}` : `until ${formatDate(p.partnerExpiresAt)}`) : "—"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Starters approaching the limit */}
+        <div className="bg-paper border border-line rounded-card p-5">
+          <h2 className="font-semibold mb-3">Starters near limit <span className="text-muted font-normal">({starterNearLimit.length})</span></h2>
+          {starterNearLimit.length === 0 ? (
+            <p className="text-sm text-muted">None approaching the {STARTER_DROP_LIMIT}-drop limit.</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {starterNearLimit.map((s) => (
+                <li key={s.id} className="flex items-center justify-between gap-2">
+                  <Link href={`/admin/${s.id}`} className="font-medium hover:underline truncate">{s.storeName}</Link>
+                  <span className="text-muted">{s.dropsCreated}/{STARTER_DROP_LIMIT} used</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Pro waitlist */}
+        <div className="bg-paper border border-line rounded-card p-5">
+          <h2 className="font-semibold mb-3">Pro waitlist <span className="text-muted font-normal">({proWaitlist.length})</span></h2>
+          {proWaitlist.length === 0 ? (
+            <p className="text-sm text-muted">No signups yet.</p>
+          ) : (
+            <ul className="space-y-1.5 text-sm max-h-44 overflow-y-auto">
+              {proWaitlist.map((w) => (
+                <li key={w.id} className="flex items-center justify-between gap-2">
+                  <span className="truncate">{w.email}</span>
+                  <span className="text-muted text-xs shrink-0">{formatDate(w.createdAt)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
 
       {/* Admins */}
@@ -148,6 +238,7 @@ export default async function AdminHome({
                 <div className="min-w-0 col-span-2 md:col-span-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium truncate">{s.storeName}</span>
+                    <Badge className={PLAN_BADGE[effectivePlan(s)]}>{planLabel(effectivePlan(s))}</Badge>
                     {s.isAdmin && <Badge className="bg-ink text-cream">admin</Badge>}
                   </div>
                   <p className="text-xs text-muted truncate">{s.email}</p>

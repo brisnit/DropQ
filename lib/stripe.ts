@@ -1,5 +1,6 @@
 import "server-only";
 import Stripe from "stripe";
+import { GROWTH_PRICE_CENTS, GROWTH_PRICE_LOOKUP_KEY } from "@/lib/plans";
 
 let _stripe: Stripe | null = null;
 
@@ -23,4 +24,34 @@ export function feePercent(): number {
 
 export function calcFeeCents(totalCents: number): number {
   return Math.round((totalCents * feePercent()) / 100);
+}
+
+/**
+ * Resolve the recurring Stripe Price ID for the Growth plan. Prefers an explicit
+ * STRIPE_GROWTH_PRICE_ID; otherwise finds-or-creates a Price by lookup key so
+ * billing works with zero dashboard setup. Idempotent.
+ */
+export async function ensureGrowthPriceId(stripe: Stripe): Promise<string> {
+  const envId = process.env.STRIPE_GROWTH_PRICE_ID;
+  if (envId) return envId;
+
+  const existing = await stripe.prices.list({
+    lookup_keys: [GROWTH_PRICE_LOOKUP_KEY],
+    active: true,
+    limit: 1,
+  });
+  if (existing.data[0]) return existing.data[0].id;
+
+  const product = await stripe.products.create({
+    name: "DropQ Growth",
+    description: "DropQ Growth plan — unlimited drops and the full selling toolkit.",
+  });
+  const price = await stripe.prices.create({
+    product: product.id,
+    unit_amount: GROWTH_PRICE_CENTS,
+    currency: "usd",
+    recurring: { interval: "month" },
+    lookup_key: GROWTH_PRICE_LOOKUP_KEY,
+  });
+  return price.id;
 }

@@ -6,6 +6,7 @@ import { formatMoney, formatDate, statusStyle } from "@/lib/format";
 import { PageHeader, EmptyState, Section } from "@/components/dashboard-ui";
 import { LinkButton, Badge } from "@/components/ui";
 import { ConfirmSubmit } from "@/components/confirm-submit";
+import { effectivePlan, canCreateDrop, dropsRemaining, STARTER_DROP_LIMIT } from "@/lib/plans";
 
 export const metadata = { title: "Drops — DropQ" };
 
@@ -20,13 +21,40 @@ export default async function DropsPage() {
     },
   });
 
+  const isStarter = effectivePlan(seller) === "starter";
+  const remaining = dropsRemaining(seller);
+  const atLimit = !canCreateDrop(seller);
+
   return (
     <Section>
       <PageHeader
         title="Drops"
         subtitle="Each drop is a menu you sell in a window. Create one, share the link, sell out."
-        action={<LinkButton href="/dashboard/drops/new">+ New drop</LinkButton>}
+        action={
+          atLimit ? (
+            <LinkButton href="/dashboard/billing">⭐ Upgrade for unlimited</LinkButton>
+          ) : (
+            <LinkButton href="/dashboard/drops/new">
+              + New drop{isStarter ? ` (${remaining} left)` : ""}
+            </LinkButton>
+          )
+        }
       />
+
+      {isStarter && (
+        <div className="mb-5 text-sm rounded-xl bg-cream border border-line px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+          <span className="text-ink-soft">
+            {atLimit ? (
+              <>You&apos;ve used all <b>{STARTER_DROP_LIMIT}</b> Starter drops.</>
+            ) : (
+              <>Starter plan · <b>{remaining}</b> of {STARTER_DROP_LIMIT} lifetime drops remaining.</>
+            )}
+          </span>
+          <Link href="/dashboard/billing" className="text-brand font-medium hover:underline">
+            Upgrade to Growth →
+          </Link>
+        </div>
+      )}
 
       {drops.length === 0 ? (
         <EmptyState

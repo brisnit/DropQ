@@ -16,6 +16,7 @@ import { slugify } from "@/lib/format";
 import { createToken, consumeToken } from "@/lib/tokens";
 import { sendEmail, verificationEmail, resetEmail } from "@/lib/email";
 import { TERMS_VERSION } from "@/lib/terms";
+import { PARTNER_INVITE_CODE, partnerExpiryFrom } from "@/lib/plans";
 
 export type AuthState = { error?: string };
 export type ResetState = { error?: string; sent?: boolean; done?: boolean };
@@ -52,6 +53,7 @@ export async function signupAction(
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const acceptTerms = formData.get("acceptTerms") === "on";
+  const inviteCode = String(formData.get("inviteCode") ?? "").trim();
 
   if (!storeName) return { error: "Give your store a name." };
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
@@ -60,6 +62,29 @@ export async function signupAction(
     return { error: "Password must be at least 8 characters." };
   if (!acceptTerms)
     return { error: "Please read and accept the Vendor Agreement to create a store." };
+
+  // Early Partner Program: a valid invite code grants the Partner plan (free for
+  // 12 months, unlimited drops). Any other non-empty code is rejected.
+  let planData: {
+    plan?: string;
+    partnerActivatedAt?: Date;
+    partnerExpiresAt?: Date;
+  } = {};
+  if (inviteCode) {
+    if (inviteCode === PARTNER_INVITE_CODE) {
+      const now = new Date();
+      planData = {
+        plan: "partner",
+        partnerActivatedAt: now,
+        partnerExpiresAt: partnerExpiryFrom(now),
+      };
+    } else {
+      return {
+        error:
+          "That invite code isn't valid. Leave it blank to start on the free Starter plan.",
+      };
+    }
+  }
 
   const existing = await prisma.seller.findUnique({ where: { email } });
   if (existing) return { error: "An account with that email already exists." };
@@ -72,6 +97,7 @@ export async function signupAction(
       slug: await uniqueSlug(storeName),
       termsAcceptedAt: new Date(),
       termsVersion: TERMS_VERSION,
+      ...planData,
     },
   });
 

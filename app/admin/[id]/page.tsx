@@ -2,20 +2,38 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { setAdminAction } from "@/lib/actions/admin";
+import { setAdminAction, setPlanAction } from "@/lib/actions/admin";
 import { formatMoney, formatDate, relativeTime, statusStyle } from "@/lib/format";
 import { Stat } from "@/components/dashboard-ui";
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button, Select } from "@/components/ui";
 import { ConfirmSubmit } from "@/components/confirm-submit";
+import {
+  effectivePlan,
+  planLabel,
+  isPartnerExpired,
+  dropsRemaining,
+  STARTER_DROP_LIMIT,
+  type Plan,
+} from "@/lib/plans";
 
 const PAID = ["new", "ready", "fulfilled"];
 
+const PLAN_BADGE: Record<Plan, string> = {
+  starter: "bg-line text-ink-soft",
+  growth: "bg-brand-tint text-brand-dark",
+  partner: "bg-sage-tint text-sage",
+  pro: "bg-quad/15 text-tertiary",
+};
+
 export default async function AdminClientPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ plan?: string }>;
 }) {
   const { id } = await params;
+  const { plan: planUpdated } = await searchParams;
   const me = await requireAdmin();
   const seller = await prisma.seller.findUnique({
     where: { id },
@@ -55,6 +73,7 @@ export default async function AdminClientPage({
         <div>
           <div className="flex items-center gap-3">
             <h1 className="font-display text-3xl font-semibold tracking-tight">{seller.storeName}</h1>
+            <Badge className={PLAN_BADGE[effectivePlan(seller)]}>{planLabel(effectivePlan(seller))}</Badge>
             {seller.isAdmin && <Badge className="bg-ink text-cream">admin</Badge>}
             {seller.stripeChargesEnabled && <Badge className="bg-sage-tint text-sage">payouts on</Badge>}
           </div>
@@ -98,6 +117,39 @@ export default async function AdminClientPage({
         <Stat label="Orders" value={String(agg._count)} />
         <Stat label="Customers" value={String(customerGroups.length)} />
         <Stat label="Sign-ups" value={String(seller._count.subscribers)} />
+      </div>
+
+      {/* Plan management */}
+      <div className="bg-paper border border-line rounded-card p-5 mb-8">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="font-semibold">Plan & billing</h2>
+            <p className="text-sm text-muted mt-1">
+              On <b>{planLabel(effectivePlan(seller))}</b>
+              {effectivePlan(seller) === "starter" && ` · ${seller.dropsCreated}/${STARTER_DROP_LIMIT} drops used (${dropsRemaining(seller)} left)`}
+              {seller.subscriptionStatus ? ` · subscription ${seller.subscriptionStatus}` : ""}
+              {seller.plan === "partner" && seller.partnerExpiresAt
+                ? ` · ${isPartnerExpired(seller) ? "expired" : "free until"} ${formatDate(seller.partnerExpiresAt)}`
+                : ""}
+            </p>
+          </div>
+          <form action={setPlanAction} className="flex items-end gap-2">
+            <input type="hidden" name="targetId" value={seller.id} />
+            <div>
+              <label className="block text-xs font-medium text-muted mb-1">Set plan</label>
+              <Select name="plan" defaultValue={seller.plan} className="w-40">
+                <option value="starter">Starter</option>
+                <option value="growth">Growth</option>
+                <option value="partner">Partner (resets 12mo)</option>
+                <option value="pro">Pro</option>
+              </Select>
+            </div>
+            <Button type="submit" variant="dark">Update</Button>
+          </form>
+        </div>
+        {planUpdated === "updated" && (
+          <p className="mt-3 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">✓ Plan updated.</p>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
