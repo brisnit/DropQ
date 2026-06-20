@@ -32,7 +32,10 @@ async function main() {
       tagline: "Small-batch cookies & laminated pastry, baked Friday mornings.",
       bio: "A two-person home bakery in Austin. We drop a fresh menu every Friday and sell out most weeks. Cottage food permitted.",
       location: "Austin, TX",
-      accent: "#cd1718",
+      accent: "#7a5230",
+      category: "food",
+      logoUrl: "/demo/marble-crumb-logo.svg",
+      headerImageUrl: "/demo/marble-crumb-header.svg",
     },
   });
 
