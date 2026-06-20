@@ -40,8 +40,8 @@ export function Logo({
       <Image
         src="/brand/dropq-logo.png"
         alt="DropQ"
-        width={1352}
-        height={378}
+        width={1862}
+        height={589}
         priority
         // Artwork is dark olive + red, so on dark surfaces render it as a
         // clean white silhouette instead of an invisible olive.
