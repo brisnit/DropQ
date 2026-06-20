@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { Mark } from "@/components/logo";
 import { WaitlistForm } from "@/components/waitlist-form";
+import { Stars } from "@/components/stars";
+import { ReviewForm } from "@/components/review-form";
 import { formatMoney, formatDate } from "@/lib/format";
 
 export async function generateMetadata({
@@ -28,6 +30,7 @@ export default async function StorePage({
         orderBy: { createdAt: "desc" },
         include: { products: true },
       },
+      reviews: { orderBy: { createdAt: "desc" } },
     },
   });
   if (!seller) notFound();
@@ -36,10 +39,27 @@ export default async function StorePage({
   const liveDrops = seller.drops.filter((d) => d.status === "live");
   const pastDrops = seller.drops.filter((d) => d.status === "closed");
 
+  const reviews = seller.reviews;
+  const reviewCount = reviews.length;
+  const avgService = reviewCount
+    ? reviews.reduce((s, r) => s + r.serviceRating, 0) / reviewCount
+    : 0;
+  const avgQuality = reviewCount
+    ? reviews.reduce((s, r) => s + r.qualityRating, 0) / reviewCount
+    : 0;
+
   return (
     <main className="min-h-screen">
       {/* Banner */}
-      <div className="relative h-28 sm:h-36" style={{ backgroundColor: accent }}>
+      <div className="relative h-28 sm:h-36 overflow-hidden" style={{ backgroundColor: accent }}>
+        {seller.headerImageUrl && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={seller.headerImageUrl}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
         <Link
           href="/"
           className="absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-pill bg-black/25 hover:bg-black/40 text-white text-sm font-medium px-3.5 py-2 backdrop-blur-sm transition"
@@ -149,6 +169,63 @@ export default async function StorePage({
             accent={accent}
             geofence={seller.geofenceEnabled}
           />
+        </section>
+
+        {/* Ratings & reviews */}
+        <section className="mt-12" id="reviews">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <h2 className="font-semibold text-lg">Ratings &amp; reviews</h2>
+            {reviewCount > 0 && (
+              <span className="text-sm text-muted">{reviewCount} review{reviewCount !== 1 ? "s" : ""}</span>
+            )}
+          </div>
+
+          {reviewCount > 0 ? (
+            <div className="grid sm:grid-cols-2 gap-4 mb-6">
+              <div className="bg-paper border border-line rounded-card p-5">
+                <p className="text-sm text-muted">Service</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="font-display text-2xl font-semibold">{avgService.toFixed(1)}</span>
+                  <Stars value={avgService} className="text-lg" />
+                </div>
+              </div>
+              <div className="bg-paper border border-line rounded-card p-5">
+                <p className="text-sm text-muted">Product quality</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="font-display text-2xl font-semibold">{avgQuality.toFixed(1)}</span>
+                  <Stars value={avgQuality} className="text-lg" />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-muted mb-6">No reviews yet — be the first to leave one.</p>
+          )}
+
+          {reviewCount > 0 && (
+            <div className="space-y-3 mb-6">
+              {reviews.slice(0, 20).map((r) => (
+                <div key={r.id} className="bg-paper border border-line rounded-card p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-medium">{r.authorName}</p>
+                    <span className="text-xs text-muted">{formatDate(r.createdAt)}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-5 gap-y-1 mt-1 text-sm">
+                    <span className="flex items-center gap-1.5 text-muted">
+                      Service <Stars value={r.serviceRating} className="text-sm" />
+                    </span>
+                    <span className="flex items-center gap-1.5 text-muted">
+                      Quality <Stars value={r.qualityRating} className="text-sm" />
+                    </span>
+                  </div>
+                  {r.comment && <p className="text-ink-soft mt-2">{r.comment}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="max-w-xl">
+            <ReviewForm slug={seller.slug} accent={accent} />
+          </div>
         </section>
 
         {/* Past drops */}

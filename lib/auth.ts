@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "./db";
 
-const SECRET = process.env.SESSION_SECRET || "hotplate-dev-secret";
+const SECRET = process.env.SESSION_SECRET || "dropq-dev-secret";
 const COOKIE = "hp_session";
 const MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 

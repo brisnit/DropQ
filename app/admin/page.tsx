@@ -27,7 +27,7 @@ const PLAN_BADGE: Record<Plan, string> = {
 export default async function AdminHome({
   searchParams,
 }: {
-  searchParams: Promise<{ admin?: string; email?: string }>;
+  searchParams: Promise<{ admin?: string; email?: string; deleted?: string }>;
 }) {
   const sp = await searchParams;
   const me = await requireAdmin();
@@ -105,6 +105,11 @@ export default async function AdminHome({
       {sp.admin === "notfound" && (
         <p className="mb-5 text-sm bg-brand-tint text-brand-dark rounded-lg px-3 py-2">
           No DropQ account found for {sp.email}. They need to sign up first, then grant admin.
+        </p>
+      )}
+      {sp.deleted && (
+        <p className="mb-5 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">
+          ✓ Vendor deleted.
         </p>
       )}
 

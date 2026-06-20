@@ -15,6 +15,7 @@ export type StoreFormData = {
   bio: string | null;
   location: string | null;
   logoUrl: string | null;
+  headerImageUrl: string | null;
   accent: string;
   feeMode: string;
   geofenceEnabled: boolean;
@@ -68,6 +69,26 @@ export function StoreSettingsForm({
     setDirty(true);
   };
 
+  const headerRef = useRef<HTMLInputElement>(null);
+  const [headerPreview, setHeaderPreview] = useState<string | null>(null);
+  const [headerRemoved, setHeaderRemoved] = useState(false);
+  const shownHeader = headerPreview || (headerRemoved ? null : seller.headerImageUrl);
+
+  const onHeaderFile = (file: File | undefined) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    if (headerPreview) URL.revokeObjectURL(headerPreview);
+    setHeaderPreview(URL.createObjectURL(file));
+    setHeaderRemoved(false);
+    setDirty(true);
+  };
+  const removeHeader = () => {
+    if (headerRef.current) headerRef.current.value = "";
+    if (headerPreview) URL.revokeObjectURL(headerPreview);
+    setHeaderPreview(null);
+    setHeaderRemoved(true);
+    setDirty(true);
+  };
+
   return (
     <form
       action={formAction}
@@ -78,6 +99,7 @@ export function StoreSettingsForm({
       {/* Profile */}
       <div className="bg-paper border border-line rounded-card p-6 sm:p-8 space-y-5">
         <input type="hidden" name="removeLogo" value={logoRemoved ? "1" : "0"} />
+        <input type="hidden" name="removeHeader" value={headerRemoved ? "1" : "0"} />
         <Field label="Store logo" hint="Square works best. Shown on your storefront.">
           <div className="flex items-center gap-4">
             <label className="relative w-20 h-20 rounded-2xl overflow-hidden border border-line-strong bg-cream grid place-items-center cursor-pointer group shrink-0">
@@ -109,6 +131,41 @@ export function StoreSettingsForm({
                 </button>
               )}
             </div>
+          </div>
+        </Field>
+
+        <Field
+          label="Header background"
+          hint="Shown as the banner at the top of your storefront. Solid accent color is used if no image is set."
+        >
+          <label className="relative block w-full aspect-[4/1] rounded-2xl overflow-hidden border border-line-strong cursor-pointer group">
+            {shownHeader ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={shownHeader} alt="Store header" className="w-full h-full object-cover" />
+            ) : (
+              <span className="absolute inset-0" style={{ backgroundColor: accent }} />
+            )}
+            <span className="absolute inset-0 bg-ink/40 text-white text-sm font-medium grid place-items-center opacity-0 group-hover:opacity-100 transition">
+              {shownHeader ? "Change header image" : "📷 Upload header image"}
+            </span>
+            <input
+              ref={headerRef}
+              type="file"
+              name="headerImage"
+              accept="image/png,image/jpeg,image/webp,image/avif"
+              className="sr-only"
+              onChange={(e) => onHeaderFile(e.target.files?.[0])}
+            />
+          </label>
+          <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+            <p className="text-muted">
+              Best size <b>1600×400px</b> (4:1, landscape). JPG, PNG, WebP or AVIF, up to 8MB.
+            </p>
+            {shownHeader && (
+              <button type="button" onClick={removeHeader} className="text-muted hover:text-brand shrink-0">
+                Remove
+              </button>
+            )}
           </div>
         </Field>
         <Field label="Store name">

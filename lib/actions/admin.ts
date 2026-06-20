@@ -45,6 +45,17 @@ export async function setAdminAction(formData: FormData) {
   revalidatePath("/admin");
 }
 
+/** Permanently delete a vendor and everything they own (admins only). */
+export async function deleteVendorAction(formData: FormData) {
+  const me = await requireAdmin();
+  const targetId = String(formData.get("targetId") ?? "");
+  if (!targetId || targetId === me.id) return; // never delete yourself
+  // Cascades to the vendor's drops, products, orders, reviews, subscribers, etc.
+  await prisma.seller.delete({ where: { id: targetId } });
+  revalidatePath("/admin");
+  redirect("/admin?deleted=1");
+}
+
 /** Grant admin to an account by email (from the admin home). */
 export async function grantAdminByEmailAction(formData: FormData) {
   await requireAdmin();

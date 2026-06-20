@@ -24,6 +24,7 @@ model Seller {
   bio          String?
   location     String?
   logoUrl      String?  // uploaded store logo (storefront avatar)
+  headerImageUrl String? // uploaded storefront header/banner background
   accent       String   @default("#cd1718") // brand accent for storefront
   category     String   @default("food") // food | collectibles | apparel | art | other
   emailVerified Boolean @default(false)
@@ -60,6 +61,21 @@ model Seller {
   orders      Order[]
   tokens      Token[]
   subscribers Subscriber[]
+  reviews     Review[]
+}
+
+// Customer ratings + comments for a storefront.
+model Review {
+  id            String   @id @default(cuid())
+  sellerId      String
+  seller        Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  authorName    String
+  serviceRating Int // 1-5 stars
+  qualityRating Int // 1-5 stars
+  comment       String?
+  createdAt     DateTime @default(now())
+
+  @@index([sellerId])
 }
 
 // Email captures for the (not-yet-purchasable) Pro plan.

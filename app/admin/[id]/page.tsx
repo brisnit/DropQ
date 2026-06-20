@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { setAdminAction, setPlanAction } from "@/lib/actions/admin";
+import { setAdminAction, setPlanAction, deleteVendorAction } from "@/lib/actions/admin";
 import { formatMoney, formatDate, relativeTime, statusStyle } from "@/lib/format";
 import { Stat } from "@/components/dashboard-ui";
 import { Badge, Button, Select } from "@/components/ui";
@@ -190,6 +190,27 @@ export default async function AdminClientPage({
           </div>
         </div>
       </div>
+
+      {/* Danger zone — remove a vendor entirely */}
+      {seller.id !== me.id && (
+        <div className="mt-10 pt-6 border-t border-line flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-semibold text-brand-dark">Delete this vendor</p>
+            <p className="text-sm text-muted">
+              Permanently removes {seller.storeName}, their storefront, drops, products, orders, and reviews. This cannot be undone.
+            </p>
+          </div>
+          <form action={deleteVendorAction}>
+            <input type="hidden" name="targetId" value={seller.id} />
+            <ConfirmSubmit
+              message={`Are you sure? This permanently deletes ${seller.storeName} and ALL of their drops, orders, products, and reviews. This cannot be undone.`}
+              className="text-sm font-semibold px-4 py-2.5 rounded-xl bg-brand text-white hover:bg-brand-dark transition"
+            >
+              Delete vendor
+            </ConfirmSubmit>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

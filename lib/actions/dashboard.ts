@@ -44,6 +44,11 @@ export async function updateStoreAction(
   const removeLogo = formData.get("removeLogo") === "1";
   const logoUrl = newLogo ?? (removeLogo ? null : seller.logoUrl);
 
+  // Header/banner image: same upload-wins / remove / keep logic.
+  const newHeader = await saveImage(formData.get("headerImage"));
+  const removeHeader = formData.get("removeHeader") === "1";
+  const headerImageUrl = newHeader ?? (removeHeader ? null : seller.headerImageUrl);
+
   const accentRaw = String(formData.get("accent") ?? seller.accent).trim();
   const accent = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(accentRaw) ? accentRaw : seller.accent;
   const geofenceEnabled = formData.get("geofenceEnabled") === "on";
@@ -68,6 +73,7 @@ export async function updateStoreAction(
       bio: String(formData.get("bio") ?? "").trim() || null,
       location,
       logoUrl,
+      headerImageUrl,
       accent,
       feeMode: String(formData.get("feeMode")) === "pass" ? "pass" : "absorb",
       geofenceEnabled,
