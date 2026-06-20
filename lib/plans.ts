@@ -24,7 +24,13 @@ type SellerPlanFields = {
   plan: string;
   partnerExpiresAt: Date | null;
   dropsCreated: number;
+  growthBonusUntil?: Date | null;
 };
+
+/** Active referral reward: free Growth-level access through growthBonusUntil. */
+export function hasGrowthBonus(seller: { growthBonusUntil?: Date | null }): boolean {
+  return !!seller.growthBonusUntil && new Date(seller.growthBonusUntil) > new Date();
+}
 
 /**
  * The plan a seller is actually entitled to right now. A Partner whose 12
@@ -34,6 +40,8 @@ type SellerPlanFields = {
 export function effectivePlan(seller: SellerPlanFields): Plan {
   const plan = (seller.plan as Plan) || "starter";
   if (plan === "partner" && isPartnerExpired(seller)) return "growth";
+  // A referral bonus lifts a Starter to Growth-level while it's active.
+  if (plan === "starter" && hasGrowthBonus(seller)) return "growth";
   return plan;
 }
 

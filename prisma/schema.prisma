@@ -47,6 +47,10 @@ model Seller {
   partnerActivatedAt DateTime? // Early Partner Program start
   partnerExpiresAt   DateTime? // Partner auto-converts to Growth after this date
 
+  // Referral program
+  referralCode     String?   @unique // this vendor's invite code
+  growthBonusUntil DateTime? // free Growth-level access earned via referrals
+
   // Stripe Connect (payouts)
   stripeAccountId      String? @unique
   stripeChargesEnabled Boolean @default(false)
@@ -65,12 +69,28 @@ model Seller {
   longitude       Float?
   geofenceRadiusM Int     @default(1500) // meters
 
-  drops       Drop[]
-  orders      Order[]
-  tokens      Token[]
-  subscribers Subscriber[]
-  reviews     Review[]
-  gallery     GalleryImage[]
+  drops         Drop[]
+  orders        Order[]
+  tokens        Token[]
+  subscribers   Subscriber[]
+  reviews       Review[]
+  gallery       GalleryImage[]
+  referralsMade Referral[]     @relation("Referrer")
+  referredBy    Referral?      @relation("Referred")
+}
+
+// Vendor-to-vendor referrals. One reward per referred account (referredId unique).
+model Referral {
+  id              String    @id @default(cuid())
+  referrerId      String
+  referrer        Seller    @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredId      String    @unique
+  referred        Seller    @relation("Referred", fields: [referredId], references: [id], onDelete: Cascade)
+  status          String    @default("signed_up") // signed_up | rewarded
+  rewardGrantedAt DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([referrerId])
 }
 
 // Storefront photo gallery (vendor-uploaded images).

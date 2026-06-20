@@ -20,15 +20,18 @@ function SubmitButton({ label }: { label: string }) {
 export function AuthForm({
   mode,
   action,
+  referralCode,
 }: {
   mode: "login" | "signup";
   action: (prev: AuthState, fd: FormData) => Promise<AuthState>;
+  referralCode?: string;
 }) {
   const [state, formAction] = useActionState(action, {});
   const isSignup = mode === "signup";
 
   return (
     <form action={formAction} className="space-y-4">
+      {isSignup && referralCode && <input type="hidden" name="ref" value={referralCode} />}
       {isSignup && (
         <Field label="Store name" hint="You can change this anytime.">
           <Input name="storeName" placeholder="Marble & Crumb" required autoFocus />

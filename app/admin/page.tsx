@@ -32,7 +32,7 @@ export default async function AdminHome({
 }) {
   const sp = await searchParams;
   const me = await requireAdmin();
-  const [sellers, sales, customerGroups, liveDrops, subs, proWaitlist] = await Promise.all([
+  const [sellers, sales, customerGroups, liveDrops, subs, proWaitlist, referrals] = await Promise.all([
     prisma.seller.findMany({
       // The marketing demo store is a visual showcase only — keep it out of Vendors.
       where: { email: { not: DEMO_SELLER_EMAIL } },
@@ -54,7 +54,16 @@ export default async function AdminHome({
     prisma.drop.findMany({ where: { status: "live" }, select: { sellerId: true }, distinct: ["sellerId"] }),
     prisma.subscriber.count(),
     prisma.proWaitlist.findMany({ orderBy: { createdAt: "desc" } }),
+    prisma.referral.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      include: {
+        referrer: { select: { storeName: true } },
+        referred: { select: { storeName: true } },
+      },
+    }),
   ]);
+  const rewardedReferrals = referrals.filter((r) => r.status === "rewarded").length;
 
   const salesMap = new Map(sales.map((s) => [s.sellerId, s]));
   const liveSet = new Set(liveDrops.map((d) => d.sellerId));
@@ -186,6 +195,35 @@ export default async function AdminHome({
             </ul>
           )}
         </div>
+      </div>
+
+      {/* Referrals */}
+      <div className="bg-paper border border-line rounded-card p-5 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold">
+            Referrals <span className="text-muted font-normal">({referrals.length})</span>
+          </h2>
+          <span className="text-sm text-muted">{rewardedReferrals} reward{rewardedReferrals !== 1 ? "s" : ""} granted</span>
+        </div>
+        {referrals.length === 0 ? (
+          <p className="text-sm text-muted">No referrals yet.</p>
+        ) : (
+          <div className="divide-y divide-line">
+            {referrals.map((r) => (
+              <div key={r.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                <span className="min-w-0 truncate">
+                  <b>{r.referrer.storeName}</b> <span className="text-muted">referred</span> {r.referred.storeName}
+                </span>
+                <span className="shrink-0 flex items-center gap-2 text-muted">
+                  <Badge className={r.status === "rewarded" ? "bg-sage-tint text-sage" : "bg-line text-ink-soft"}>
+                    {r.status === "rewarded" ? "rewarded" : "signed up"}
+                  </Badge>
+                  {formatDate(r.createdAt)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Admins */}

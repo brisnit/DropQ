@@ -18,6 +18,7 @@ import { sendEmail, verificationEmail, resetEmail } from "@/lib/email";
 import { TERMS_VERSION } from "@/lib/terms";
 import { PARTNER_INVITE_CODE, partnerExpiryFrom } from "@/lib/plans";
 import { CATEGORY_VALUES } from "@/lib/category";
+import { recordReferralAndReward } from "@/lib/referral";
 
 export type AuthState = { error?: string };
 export type ResetState = { error?: string; sent?: boolean; done?: boolean };
@@ -104,6 +105,10 @@ export async function signupAction(
       ...planData,
     },
   });
+
+  // If they came through a referral link, credit the referrer (background).
+  const ref = String(formData.get("ref") ?? "").trim();
+  if (ref) after(() => recordReferralAndReward(ref, seller.id));
 
   // Send the verification email in the background so signup feels instant.
   after(() => sendVerification(seller.id, seller.email));

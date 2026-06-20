@@ -6,6 +6,7 @@ import {
   planLabel,
   dropsRemaining,
   isPartnerExpired,
+  hasGrowthBonus,
   STARTER_DROP_LIMIT,
 } from "@/lib/plans";
 import { createGrowthCheckoutAction, manageBillingAction } from "@/lib/actions/billing";
@@ -35,6 +36,8 @@ export default async function BillingPage({
   const seller = await requireSeller();
   const plan = effectivePlan(seller);
   const remaining = dropsRemaining(seller);
+  // Growth via a referral bonus (not a paid subscription).
+  const bonusOnly = seller.plan === "starter" && hasGrowthBonus(seller);
   const planColor: Record<string, string> = {
     starter: "bg-line text-ink-soft",
     growth: "bg-brand-tint text-brand-dark",
@@ -88,17 +91,20 @@ export default async function BillingPage({
           <div>
             <div className="flex items-center gap-2.5">
               <h2 className="font-display text-2xl font-semibold">{planLabel(plan)}</h2>
-              <Badge className={planColor[plan]}>{plan === "growth" ? "$20/mo" : plan === "pro" ? "$99/mo" : "Free"}</Badge>
+              <Badge className={planColor[plan]}>
+                {plan === "growth" ? (bonusOnly ? "Free bonus" : "$20/mo") : plan === "pro" ? "$99/mo" : "Free"}
+              </Badge>
             </div>
             <p className="text-muted text-sm mt-1">
               {plan === "starter" && `${remaining} of ${STARTER_DROP_LIMIT} lifetime drops remaining.`}
-              {plan === "growth" && "Unlimited drops · billed monthly."}
+              {plan === "growth" &&
+                (bonusOnly ? "Growth-level features from a referral bonus." : "Unlimited drops · billed monthly.")}
               {plan === "partner" && "Early Partner — unlimited drops, free for your first year."}
             </p>
           </div>
 
           <div className="flex gap-2">
-            {plan === "starter" && (
+            {(plan === "starter" || bonusOnly) && (
               <form action={createGrowthCheckoutAction}>
                 <Button>Upgrade to Growth — $20/mo</Button>
               </form>
@@ -110,6 +116,13 @@ export default async function BillingPage({
             )}
           </div>
         </div>
+
+        {/* Referral bonus notice */}
+        {bonusOnly && seller.growthBonusUntil && (
+          <div className="mt-4 text-sm rounded-xl bg-sage-tint text-sage px-4 py-3">
+            🎁 Free Growth from referrals until <b>{formatDate(seller.growthBonusUntil)}</b>. Upgrade anytime to keep Growth after it ends.
+          </div>
+        )}
 
         {/* Partner expiry notice */}
         {seller.plan === "partner" && seller.partnerExpiresAt && (

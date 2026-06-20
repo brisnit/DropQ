@@ -1,9 +1,13 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { requireSeller } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { formatMoney, relativeTime, statusStyle } from "@/lib/format";
+import { formatMoney, formatDate, relativeTime, statusStyle } from "@/lib/format";
+import { hasGrowthBonus } from "@/lib/plans";
+import { getOrCreateReferralCode } from "@/lib/referral";
 import { Stat, PageHeader, Section } from "@/components/dashboard-ui";
 import { LinkButton, Badge } from "@/components/ui";
+import { CopyLinkButton } from "@/components/copy-link-button";
 
 export const metadata = { title: "Overview — DropQ" };
 
@@ -38,6 +42,26 @@ export default async function OverviewPage() {
   const revenue = agg._sum.totalCents ?? 0;
   const liveDrop = drops.find((d) => d.status === "live");
   const draftDrop = drops.find((d) => d.status === "draft");
+
+  // Referral program
+  const referralCode = await getOrCreateReferralCode(seller);
+  const referrals = await prisma.referral.findMany({
+    where: { referrerId: seller.id },
+    orderBy: { createdAt: "desc" },
+    include: { referred: { select: { storeName: true } } },
+  });
+  const h = await headers();
+  const base =
+    process.env.APP_URL?.replace(/\/$/, "") ??
+    `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host") ?? "localhost:3000"}`;
+  const referralLink = `${base}/signup?ref=${referralCode}`;
+  const rewardedCount = referrals.filter((r) => r.status === "rewarded").length;
+  const referralHistory = referrals.slice(0, 5).map((r) => ({
+    name: r.referred.storeName,
+    status: r.status,
+    date: formatDate(r.createdAt),
+  }));
+  const bonusUntil = hasGrowthBonus(seller) ? formatDate(seller.growthBonusUntil!) : null;
 
   // What should they do next?
   let next: { tone: string; title: string; body: string; href: string; cta: string };
@@ -118,6 +142,53 @@ export default async function OverviewPage() {
           value={liveDrop ? "1" : "0"}
           sub={liveDrop ? liveDrop.title.slice(0, 22) : "None active"}
         />
+      </div>
+
+      {/* Referral program */}
+      <div className="bg-ink text-cream rounded-card p-6 sm:p-7 mb-8">
+        <p className="text-xs font-semibold uppercase tracking-wider text-grey">Refer &amp; earn</p>
+        <h2 className="font-display text-2xl font-semibold mt-1">Invite a vendor. Earn free Growth.</h2>
+        <p className="text-cream/75 mt-1.5 max-w-xl text-sm">
+          Know another vendor who could use DropQ? Share your referral link. When they
+          sign up, you&apos;ll get one free month of Growth-level features.
+        </p>
+        <div className="mt-4 flex flex-col sm:flex-row gap-2">
+          <input
+            readOnly
+            value={referralLink}
+            className="flex-1 min-w-0 bg-cream/10 border border-cream/20 rounded-xl px-3.5 py-2.5 text-sm font-mono text-cream/90 focus:outline-none focus:border-cream/50"
+          />
+          <CopyLinkButton
+            value={referralLink}
+            className="shrink-0 bg-cream text-ink font-medium rounded-xl px-5 py-2.5 hover:bg-white transition"
+          />
+        </div>
+        <div className="flex flex-wrap gap-x-6 gap-y-1 mt-4 text-sm text-cream/70">
+          <span><b className="text-cream">{referrals.length}</b> signed up</span>
+          <span><b className="text-cream">{rewardedCount}</b> reward{rewardedCount !== 1 ? "s" : ""} granted</span>
+          {bonusUntil && (
+            <span>🎁 Free Growth active until <b className="text-cream">{bonusUntil}</b></span>
+          )}
+        </div>
+        {referralHistory.length > 0 && (
+          <div className="mt-4 border-t border-cream/15 pt-3 space-y-1.5">
+            {referralHistory.map((hItem, i) => (
+              <div key={i} className="flex items-center justify-between gap-3 text-sm">
+                <span className="text-cream/90 truncate">{hItem.name}</span>
+                <span className="shrink-0 flex items-center gap-2 text-cream/60">
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded-pill ${
+                      hItem.status === "rewarded" ? "bg-sage/30 text-sage" : "bg-cream/10 text-cream/80"
+                    }`}
+                  >
+                    {hItem.status === "rewarded" ? "Reward granted" : "Signed up"}
+                  </span>
+                  {hItem.date}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
