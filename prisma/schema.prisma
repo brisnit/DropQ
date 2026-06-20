@@ -26,6 +26,14 @@ model Seller {
   logoUrl      String?  // uploaded store logo (storefront avatar)
   headerImageUrl String? // uploaded storefront header/banner background
   accent       String   @default("#cd1718") // brand accent for storefront
+
+  // Social media links (stored as full URLs)
+  instagram String?
+  tiktok    String?
+  twitter   String?
+  facebook  String?
+  youtube   String?
+  website   String?
   category     String   @default("food") // food | collectibles | apparel | art | other
   emailVerified Boolean @default(false)
   isAdmin      Boolean  @default(false) // DropQ internal admin
@@ -62,6 +70,19 @@ model Seller {
   tokens      Token[]
   subscribers Subscriber[]
   reviews     Review[]
+  gallery     GalleryImage[]
+}
+
+// Storefront photo gallery (vendor-uploaded images).
+model GalleryImage {
+  id        String   @id @default(cuid())
+  sellerId  String
+  seller    Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  url       String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([sellerId])
 }
 
 // Customer ratings + comments for a storefront.

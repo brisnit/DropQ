@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { WaitlistForm } from "@/components/waitlist-form";
 import { Stars } from "@/components/stars";
 import { ReviewForm } from "@/components/review-form";
+import { SocialLinks } from "@/components/social-links";
 import { formatMoney, formatDate } from "@/lib/format";
 import { isDemoStore } from "@/lib/demo";
 
@@ -31,6 +32,7 @@ export default async function StorePage({
         include: { products: true },
       },
       reviews: { orderBy: { createdAt: "desc" } },
+      gallery: { orderBy: { sortOrder: "asc" } },
     },
   });
   if (!seller) notFound();
@@ -107,6 +109,7 @@ export default async function StorePage({
             <span>Powered by DropQ</span>
           </div>
           {seller.bio && <p className="text-ink-soft mt-4 max-w-xl">{seller.bio}</p>}
+          <SocialLinks seller={seller} accent={accent} />
         </div>
 
         {/* Live drops */}
@@ -168,6 +171,24 @@ export default async function StorePage({
             })}
           </div>
         </section>
+
+        {/* Gallery */}
+        {seller.gallery.length > 0 && (
+          <section className="mt-10">
+            <h2 className="font-semibold text-lg mb-4">Gallery</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {seller.gallery.map((img) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={img.id}
+                  src={img.url}
+                  alt=""
+                  className="w-full aspect-square object-cover rounded-card border border-line"
+                />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Future-drop sign up */}
         <section className="mt-8 max-w-md">

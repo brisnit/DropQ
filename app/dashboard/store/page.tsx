@@ -1,10 +1,14 @@
 import Link from "next/link";
 import { requireSeller } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { connectStripeAction } from "@/lib/actions/stripe";
+import { addGalleryImagesAction, deleteGalleryImageAction } from "@/lib/actions/dashboard";
 import { isStripeEnabled, feePercent } from "@/lib/stripe";
 import { PageHeader, Section } from "@/components/dashboard-ui";
 import { Button, Badge } from "@/components/ui";
 import { StoreSettingsForm } from "@/components/store-settings-form";
+import { GalleryUpload } from "@/components/gallery-upload";
+import { ConfirmSubmit } from "@/components/confirm-submit";
 
 export const metadata = { title: "Store — DropQ" };
 
@@ -14,6 +18,10 @@ export default async function StorePage() {
   const fee = feePercent();
   const started = !!seller.stripeAccountId;
   const connected = seller.stripeChargesEnabled && started;
+  const gallery = await prisma.galleryImage.findMany({
+    where: { sellerId: seller.id },
+    orderBy: { sortOrder: "asc" },
+  });
 
   return (
     <Section>
@@ -86,6 +94,12 @@ export default async function StorePage() {
           logoUrl: seller.logoUrl,
           headerImageUrl: seller.headerImageUrl,
           accent: seller.accent,
+          instagram: seller.instagram,
+          tiktok: seller.tiktok,
+          twitter: seller.twitter,
+          facebook: seller.facebook,
+          youtube: seller.youtube,
+          website: seller.website,
           feeMode: seller.feeMode,
           geofenceEnabled: seller.geofenceEnabled,
           latitude: seller.latitude,
@@ -93,6 +107,38 @@ export default async function StorePage() {
           geofenceRadiusM: seller.geofenceRadiusM,
         }}
       />
+
+      {/* Photo gallery */}
+      <div id="gallery" className="mt-6 max-w-2xl bg-paper border border-line rounded-card p-6 sm:p-8">
+        <h2 className="font-semibold text-lg">Photo gallery</h2>
+        <p className="text-muted text-sm mt-1">
+          Show off your products, space, or past drops. These appear in a gallery on your storefront.
+        </p>
+
+        {gallery.length > 0 && (
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-5">
+            {gallery.map((img) => (
+              <div key={img.id} className="relative group rounded-xl overflow-hidden border border-line aspect-square">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={img.url} alt="" className="w-full h-full object-cover" />
+                <form action={deleteGalleryImageAction} className="absolute top-1.5 right-1.5">
+                  <input type="hidden" name="imageId" value={img.id} />
+                  <ConfirmSubmit
+                    message="Remove this photo from your gallery?"
+                    className="w-7 h-7 rounded-full bg-ink/70 text-white grid place-items-center text-xs opacity-0 group-hover:opacity-100 transition hover:bg-brand"
+                  >
+                    ✕
+                  </ConfirmSubmit>
+                </form>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-5">
+          <GalleryUpload action={addGalleryImagesAction} />
+        </div>
+      </div>
     </Section>
   );
 }

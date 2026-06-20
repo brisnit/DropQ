@@ -4,6 +4,7 @@ import { useActionState, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button, Field, Input, Textarea } from "@/components/ui";
 import { updateStoreAction, type StoreSaveState } from "@/lib/actions/dashboard";
+import { SOCIALS } from "@/lib/social";
 
 const ACCENTS = ["#cd1718", "#3a8895", "#3F7D5B", "#8A2D52", "#2B6CB0", "#1C1916"];
 const isHex = (v: string) => /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(v);
@@ -17,6 +18,12 @@ export type StoreFormData = {
   logoUrl: string | null;
   headerImageUrl: string | null;
   accent: string;
+  instagram: string | null;
+  tiktok: string | null;
+  twitter: string | null;
+  facebook: string | null;
+  youtube: string | null;
+  website: string | null;
   feeMode: string;
   geofenceEnabled: boolean;
   latitude: number | null;
@@ -233,6 +240,28 @@ export function StoreSettingsForm({
             {!isHex(accent) && <span className="text-xs text-brand-dark">Enter a hex like #cd1718</span>}
           </div>
         </Field>
+      </div>
+
+      {/* Social media */}
+      <div className="bg-paper border border-line rounded-card p-6 sm:p-8 space-y-4">
+        <div>
+          <h2 className="font-semibold text-lg">Social media</h2>
+          <p className="text-muted text-sm mt-1">
+            Add your handles or links — they appear as icons on your storefront so customers can follow you.
+          </p>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          {SOCIALS.map((s) => (
+            <Field key={s.key} label={s.label}>
+              <Input
+                name={`social_${s.key}`}
+                defaultValue={seller[s.key] ?? ""}
+                placeholder={s.placeholder}
+                autoComplete="off"
+              />
+            </Field>
+          ))}
+        </div>
       </div>
 
       {/* Fee handling */}

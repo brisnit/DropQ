@@ -13,6 +13,7 @@ import { sendSms } from "@/lib/notifications";
 import { geocode } from "@/lib/geofence";
 import { canCreateDrop } from "@/lib/plans";
 import { ORDER_STATUSES } from "@/lib/orders";
+import { SOCIALS, normalizeSocialUrl } from "@/lib/social";
 
 async function baseUrl(): Promise<string> {
   const h = await headers();
@@ -51,6 +52,11 @@ export async function updateStoreAction(
 
   const accentRaw = String(formData.get("accent") ?? seller.accent).trim();
   const accent = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(accentRaw) ? accentRaw : seller.accent;
+
+  // Social links — normalize handles/partial URLs to full https URLs.
+  const socials = Object.fromEntries(
+    SOCIALS.map((s) => [s.key, normalizeSocialUrl(s.key, String(formData.get(`social_${s.key}`) ?? ""))])
+  );
   const geofenceEnabled = formData.get("geofenceEnabled") === "on";
   let latitude = numOrNull(formData.get("latitude"));
   let longitude = numOrNull(formData.get("longitude"));
@@ -75,6 +81,12 @@ export async function updateStoreAction(
       logoUrl,
       headerImageUrl,
       accent,
+      instagram: socials.instagram,
+      tiktok: socials.tiktok,
+      twitter: socials.twitter,
+      facebook: socials.facebook,
+      youtube: socials.youtube,
+      website: socials.website,
       feeMode: String(formData.get("feeMode")) === "pass" ? "pass" : "absorb",
       geofenceEnabled,
       latitude,
@@ -88,6 +100,34 @@ export async function updateStoreAction(
   revalidatePath("/dashboard/store");
   revalidatePath(`/s/${seller.slug}`);
   return { saved: true };
+}
+
+/* ------------------------------ Gallery --------------------------------- */
+export async function addGalleryImagesAction(formData: FormData) {
+  const seller = await requireSeller();
+  const files = formData.getAll("galleryImages");
+  const urls = (await Promise.all(files.map((f) => saveImage(f)))).filter(
+    (u): u is string => !!u
+  );
+  if (urls.length) {
+    const start = await prisma.galleryImage.count({ where: { sellerId: seller.id } });
+    await prisma.galleryImage.createMany({
+      data: urls.map((url, i) => ({ sellerId: seller.id, url, sortOrder: start + i })),
+    });
+  }
+  revalidatePath("/dashboard/store");
+  revalidatePath(`/s/${seller.slug}`);
+  redirect("/dashboard/store#gallery");
+}
+
+export async function deleteGalleryImageAction(formData: FormData) {
+  const seller = await requireSeller();
+  const imageId = String(formData.get("imageId") ?? "");
+  // Scope the delete to the current seller so nobody can remove another's photo.
+  await prisma.galleryImage.deleteMany({ where: { id: imageId, sellerId: seller.id } });
+  revalidatePath("/dashboard/store");
+  revalidatePath(`/s/${seller.slug}`);
+  redirect("/dashboard/store#gallery");
 }
 
 /* ------------------------------- Drops ---------------------------------- */
