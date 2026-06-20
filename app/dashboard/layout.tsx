@@ -6,6 +6,7 @@ import { Logo } from "@/components/logo";
 import { DashboardNav } from "@/components/dashboard-nav";
 import { VerifyBanner } from "@/components/verify-banner";
 import { TermsGate } from "@/components/terms-gate";
+import { TERMS_VERSION } from "@/lib/terms";
 import { LinkButton } from "@/components/ui";
 
 export default async function DashboardLayout({
@@ -15,8 +16,9 @@ export default async function DashboardLayout({
 }) {
   const seller = await requireSeller();
 
-  // Vendors must accept the Vendor Agreement before using the dashboard.
-  if (!seller.termsAcceptedAt) {
+  // Vendors must accept the current Vendor Agreement before using the dashboard.
+  // Re-prompt anyone who hasn't accepted, or who accepted an older version.
+  if (!seller.termsAcceptedAt || seller.termsVersion !== TERMS_VERSION) {
     return <TermsGate action={acceptTermsAction} />;
   }
 

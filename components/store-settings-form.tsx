@@ -126,7 +126,10 @@ export function StoreSettingsForm({
         <Field label="About" hint="Your story — buyers love knowing who they're supporting.">
           <Textarea name="bio" defaultValue={seller.bio ?? ""} placeholder="Tell customers about your food and your business." />
         </Field>
-        <Field label="Location">
+        <Field
+          label="Store location"
+          hint="Your city/area — shown on your storefront with a 📍. Set the exact pickup or delivery address on each drop."
+        >
           <Input name="location" defaultValue={seller.location ?? ""} placeholder="Austin, TX" />
         </Field>
         <Field label="Brand accent" hint="Pick a preset or set any custom color.">

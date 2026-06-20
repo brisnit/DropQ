@@ -148,11 +148,32 @@ export default function TermsPage() {
           </p>
         </Section>
 
-        <Section n="10" title="Prohibited Conduct">
+        <Section n="10" title="Prohibited &amp; Illegal Products; Account Bans">
           <p>
-            You may not use the Platform to sell unlawful, unsafe, recalled, counterfeit, or
-            prohibited items, to deceive customers, to infringe others&rsquo; rights, or to violate
-            any law. DropQ may suspend or terminate any account that violates this Agreement.
+            You must comply with all applicable federal, state, and local laws at all times. You
+            may <b>not</b> create a DropQ store, run a drop, or use the Platform to offer, list,
+            sell, or deliver any product or service that is illegal, restricted, or prohibited
+            under the laws of the state and locality where you operate, prepare, or fulfill orders.
+            This includes, without limitation: controlled substances and cannabis, THC, or CBD
+            products where prohibited; alcohol, tobacco, or vaping products sold without the
+            required license; any food or other good that requires a permit, license, registration,
+            or inspection you do not hold (including applicable cottage-food, food-handler, and
+            health-department requirements); weapons; and recalled, counterfeit, stolen, unsafe, or
+            otherwise unlawful items.
+          </p>
+          <p>
+            You may also not use the Platform to deceive customers, misrepresent your products,
+            infringe others&rsquo; rights, or otherwise violate any law or this Agreement.
+            <b> Determining which laws apply to you and complying with them is your sole
+            responsibility.</b>
+          </p>
+          <p>
+            If DropQ believes, in its sole discretion, that you have violated this Section or any
+            other part of this Agreement, DropQ may immediately suspend, remove, or
+            <b> permanently ban</b> your store, drops, and account from the Platform, withhold or
+            reverse affected payouts, and report unlawful activity to the appropriate authorities —
+            with or without prior notice, and in addition to any other rights or remedies available
+            to DropQ.
           </p>
         </Section>
 
