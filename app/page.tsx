@@ -73,6 +73,14 @@ function Section({
   );
 }
 
+const SELL_CATEGORIES = [
+  { emoji: "🍪", label: "Food & Beverage", eg: "Bakers, cottage food, popups" },
+  { emoji: "🃏", label: "Collectibles", eg: "Cards, toys, antiques, vintage" },
+  { emoji: "👕", label: "Apparel & Merch", eg: "Limited runs & branded merch" },
+  { emoji: "🎨", label: "Art & Handmade", eg: "Prints, ceramics, makers" },
+  { emoji: "✨", label: "& anything else", eg: "Hobby goods, oddities & more" },
+];
+
 const STEPS = [
   {
     n: "01",
@@ -83,7 +91,7 @@ const STEPS = [
   {
     n: "02",
     title: "Build a drop",
-    body: "List this week's menu, set quantities, and pick when ordering opens and closes. Sell-outs handled automatically.",
+    body: "List your products, set quantities, and pick when ordering opens and closes. Sell-outs handled automatically.",
     emoji: "🗓️",
   },
   {
@@ -102,9 +110,9 @@ const STEPS = [
 
 const FEATURES = [
   {
-    tag: "Food Drops",
-    title: "Built for the way food actually sells",
-    body: "Limited menus, timed windows, real scarcity. Set inventory per item and DropQ stops the sale at exactly the right moment — no overselling, no refunds, no crashed site when 500 people show up at once.",
+    tag: "Limited Drops",
+    title: "Built for the way drops actually sell",
+    body: "Limited inventory, timed windows, real scarcity. Set quantity per item and DropQ stops the sale at exactly the right moment — no overselling, no refunds, no crashed site when 500 people show up at once.",
     emoji: "🔥",
   },
   {
@@ -148,17 +156,17 @@ export default function Home() {
       <Section className="pt-16 pb-20 sm:pt-24 grid lg:grid-cols-2 gap-14 items-center">
         <div className="animate-in">
           <Badge className="bg-grey-tint text-[#3f434b] mb-5">
-            The operating system for food businesses
+            The operating system for independent sellers
           </Badge>
           <h1 className="font-display text-[2.6rem] sm:text-6xl leading-[1.02] font-semibold tracking-tight">
-            Sell food online
+            Sell anything in drops
             <br />
             <span className="text-brand">the way you actually sell it.</span>
           </h1>
           <p className="mt-6 text-lg text-ink-soft max-w-lg">
-            Run drops, take orders, manage pickup &amp; delivery, and grow a
-            loyal customer base — all from one beautiful platform built for
-            bakers, cottage food makers, and food creators.
+            Run timed drops, take orders, manage pickup, delivery &amp; shipping,
+            and grow a loyal customer base — whether you sell food, collectibles,
+            apparel, art, or anything in between.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <LinkButton href="/signup" size="lg">
@@ -179,7 +187,7 @@ export default function Home() {
       <div className="border-y border-line bg-paper/60">
         <Section className="py-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-center">
           {[
-            ["12,000+", "food businesses"],
+            ["12,000+", "independent sellers"],
             ["$200M+", "sold through drops"],
             ["9 min", "to a typical sell-out"],
             ["4.9★", "seller rating"],
@@ -192,6 +200,30 @@ export default function Home() {
         </Section>
       </div>
 
+      {/* CATEGORIES — DropQ is for every kind of seller */}
+      <Section className="py-16 sm:py-20">
+        <div className="max-w-2xl mx-auto text-center">
+          <Eyebrow>For every kind of seller</Eyebrow>
+          <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-3">
+            Whatever you sell, drop it on DropQ.
+          </h2>
+          <p className="text-lg text-ink-soft mt-4">
+            Food makers, collectors, designers, and artists all run timed drops and
+            live sales on DropQ. Pick your category at signup and your store speaks
+            your language.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mt-10">
+          {SELL_CATEGORIES.map((c) => (
+            <div key={c.label} className="bg-paper border border-line rounded-card p-5 text-center">
+              <div className="text-4xl">{c.emoji}</div>
+              <h3 className="font-semibold mt-3">{c.label}</h3>
+              <p className="text-xs text-muted mt-1">{c.eg}</p>
+            </div>
+          ))}
+        </div>
+      </Section>
+
       {/* PROBLEM */}
       <Section className="py-20 sm:py-28">
         <div className="max-w-3xl">
@@ -200,7 +232,7 @@ export default function Home() {
             Your business runs on a dozen apps that don't talk to each other.
           </h2>
           <p className="text-lg text-ink-soft mt-5">
-            Instagram for marketing. Link-in-bio for the menu. A spreadsheet for
+            Instagram for marketing. Link-in-bio for the catalog. A spreadsheet for
             orders. Venmo for payment. A group text for the waitlist. Sticky
             notes for the rest. It works — until a drop goes viral and the whole
             thing falls apart at the worst possible moment.
@@ -208,7 +240,7 @@ export default function Home() {
         </div>
         <div className="grid sm:grid-cols-3 gap-4 mt-10">
           {[
-            ["😵‍💫", "Overselling & refunds", "No real inventory means promising cookies you can't make."],
+            ["😵‍💫", "Overselling & refunds", "No real inventory means promising stock you can't deliver."],
             ["💥", "Crashed links", "A story from a big account, and your ordering page buckles."],
             ["🫥", "Customers you lose", "No list, no way to bring last week's buyers back."],
           ].map(([emoji, t, b]) => (
@@ -258,9 +290,9 @@ export default function Home() {
             Scarcity that sells out — on purpose.
           </h2>
           <p className="text-lg text-ink-soft mt-5">
-            A drop is a limited menu, available for a set window. You decide what
-            you're making, how many, and when ordering opens. Customers feel the
-            urgency. You bake to exact demand with zero waste.
+            A drop is a limited release, available for a set window. You decide what
+            you're offering, how many, and when ordering opens. Customers feel the
+            urgency. You sell to exact demand with nothing left on the table.
           </p>
           <ul className="mt-6 space-y-3">
             {[
@@ -283,9 +315,9 @@ export default function Home() {
           </div>
           <div className="space-y-3">
             {[
-              ["Brown Butter Chocolate Chunk", 23, 40],
-              ["Miso Snickerdoodle", 19, 30],
-              ["Morning Bun", 30, 36],
+              ["1st-Edition Holo Card", 23, 40],
+              ["Resin Art Print — A2", 19, 30],
+              ["Hand-thrown Ceramic Mug", 30, 36],
             ].map(([name, sold, total]) => {
               const pct = Math.round((Number(sold) / Number(total)) * 100);
               return (
@@ -411,7 +443,7 @@ export default function Home() {
           Your next drop is waiting.
         </h2>
         <p className="text-lg text-ink-soft mt-5 max-w-xl mx-auto">
-          Join thousands of food entrepreneurs running a real business from one
+          Join thousands of independent sellers running a real business from one
           beautiful platform. Free to start.
         </p>
         <div className="mt-8 flex justify-center gap-3">
