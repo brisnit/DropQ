@@ -23,6 +23,10 @@ async function main() {
     category: "food",
     logoUrl: "/demo/marble-crumb-logo.png",
     headerImageUrl: "/demo/marble-crumb-header.png",
+    instagram: "https://instagram.com/marbleandcrumb",
+    tiktok: "https://tiktok.com/@marbleandcrumb",
+    facebook: "https://facebook.com/marbleandcrumb",
+    website: "https://marbleandcrumb.example",
     emailVerified: true,
     termsAcceptedAt: now,
     termsVersion: "1.1",
@@ -42,6 +46,17 @@ async function main() {
   // Clean slate for this store only (keeps it idempotent).
   await prisma.drop.deleteMany({ where: { sellerId: seller.id } });
   await prisma.review.deleteMany({ where: { sellerId: seller.id } });
+  await prisma.galleryImage.deleteMany({ where: { sellerId: seller.id } });
+
+  await prisma.galleryImage.createMany({
+    data: [
+      { sellerId: seller.id, url: "/demo/marble-crumb-header.png", sortOrder: 0 },
+      { sellerId: seller.id, url: "/demo/gallery-1.svg", sortOrder: 1 },
+      { sellerId: seller.id, url: "/demo/gallery-2.svg", sortOrder: 2 },
+      { sellerId: seller.id, url: "/demo/gallery-3.svg", sortOrder: 3 },
+      { sellerId: seller.id, url: "/demo/gallery-4.svg", sortOrder: 4 },
+    ],
+  });
 
   await prisma.drop.create({
     data: {
