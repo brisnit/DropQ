@@ -123,8 +123,8 @@ const FEATURES = [
   },
   {
     tag: "Fulfillment",
-    title: "Pickup, local delivery, or shipping",
-    body: "Offer pickup windows, delivery zones, or nationwide shipping. Every order shows exactly what, when, and how.",
+    title: "Pickup or local delivery",
+    body: "Offer pickup windows or local delivery zones. Every order shows exactly what, when, and where.",
     emoji: "📦",
   },
   {
@@ -164,7 +164,7 @@ export default function Home() {
             <span className="text-brand">the way you actually sell it.</span>
           </h1>
           <p className="mt-6 text-lg text-ink-soft max-w-lg">
-            Run timed drops, take orders, manage pickup, delivery &amp; shipping,
+            Run timed drops, take orders, manage pickup &amp; local delivery,
             and grow a loyal customer base — whether you sell food, collectibles,
             apparel, art, or anything in between.
           </p>

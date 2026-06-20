@@ -241,7 +241,6 @@ export function DropEditor({
             <Select name="fulfillment" defaultValue={defaults.fulfillment ?? (live ? "handoff" : "pickup")}>
               <option value="pickup">Pickup</option>
               <option value="delivery">Local delivery</option>
-              <option value="shipping">Shipping</option>
               <option value="handoff">On-site / local handoff</option>
             </Select>
           </Field>

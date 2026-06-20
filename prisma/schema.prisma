@@ -129,7 +129,7 @@ model Drop {
   description String?
   status      String    @default("draft") // draft | live | closed
   mode        String    @default("preorder") // preorder (regular drop) | live (live selling / on-site QR)
-  fulfillment String    @default("pickup") // pickup | delivery | shipping | handoff
+  fulfillment String    @default("pickup") // pickup | delivery | handoff
   pickupInfo  String?
   opensAt     DateTime?
   closesAt    DateTime?

@@ -36,7 +36,7 @@ export default async function DropOrderPage({
         ? "Local delivery"
         : drop.fulfillment === "handoff"
           ? "On-site / local handoff"
-          : "Shipping";
+          : "Pickup";
 
   return (
     <main className="min-h-screen">
