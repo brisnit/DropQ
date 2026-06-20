@@ -24,7 +24,7 @@ export default async function DropOrderPage({
   });
   if (!drop || drop.seller.slug !== slug) notFound();
 
-  const accent = drop.seller.accent || "#d25b2a";
+  const accent = drop.seller.accent || "#cd1718";
   const isLive = drop.status === "live";
   const paymentsEnabled =
     isStripeEnabled() && drop.seller.stripeChargesEnabled && !!drop.seller.stripeAccountId;

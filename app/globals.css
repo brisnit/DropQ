@@ -2,18 +2,26 @@
 
 /* ---------------------------------------------------------------------------
    DropQ Design System — modern, premium, food-forward.
-   Purple-led brand: grape primary, warm paper, grey + sage as accents.
+   Brand palette: red primary (the "Q"), olive secondary (the "Drop"),
+   orange + amber as warm accents.
 --------------------------------------------------------------------------- */
 @theme {
-  --color-cream: #faf7fb;
+  --color-cream: #faf8f5;
   --color-paper: #ffffff;
-  --color-ink: #1b1726;
-  --color-ink-soft: #3f3a4d;
-  --color-muted: #726c80;
+  --color-ink: #1c1a12;
+  --color-ink-soft: #3f3c30;
+  --color-muted: #726f60;
 
-  --color-brand: #d25b2a;
-  --color-brand-dark: #ac481f;
-  --color-brand-tint: #fbe7dd;
+  /* Primary — brand red (the Q) */
+  --color-brand: #cd1718;
+  --color-brand-dark: #a11213;
+  --color-brand-tint: #fbe5e5;
+  /* Secondary — olive (the "Drop" wordmark / dark accents) */
+  --color-secondary: #353a0d;
+  --color-secondary-tint: #ecefdd;
+  /* Tertiary + Quadrinary — warm accents */
+  --color-tertiary: #f56100;
+  --color-quad: #ff9c00;
   --color-grey: #6b7280;
   --color-grey-tint: #edeef1;
   --color-grey-dark: #3f434b;
@@ -21,8 +29,8 @@
   --color-sage-tint: #e2efe7;
   --color-berry: #8a2d52;
 
-  --color-line: #e9e3f2;
-  --color-line-strong: #d8cfe8;
+  --color-line: #ece8e0;
+  --color-line-strong: #dcd6c9;
 
   --font-display: var(--font-bree-serif), Georgia, serif;
   --font-sans: var(--font-google-sans), system-ui, sans-serif;
@@ -73,8 +81,9 @@ body {
 
 .hero-glow {
   background:
-    radial-gradient(60% 50% at 75% 18%, rgba(210, 91, 42, 0.22), transparent 60%),
-    radial-gradient(52% 46% at 12% 82%, rgba(242, 169, 0, 0.16), transparent 60%);
+    radial-gradient(60% 50% at 75% 18%, rgba(205, 23, 24, 0.16), transparent 60%),
+    radial-gradient(52% 46% at 12% 82%, rgba(245, 97, 0, 0.16), transparent 60%),
+    radial-gradient(40% 38% at 45% 50%, rgba(255, 156, 0, 0.10), transparent 60%);
 }
 
 @keyframes float-in {
