@@ -50,11 +50,10 @@ async function main() {
 
   await prisma.galleryImage.createMany({
     data: [
-      { sellerId: seller.id, url: "/demo/marble-crumb-header.png", sortOrder: 0 },
-      { sellerId: seller.id, url: "/demo/gallery-1.svg", sortOrder: 1 },
-      { sellerId: seller.id, url: "/demo/gallery-2.svg", sortOrder: 2 },
-      { sellerId: seller.id, url: "/demo/gallery-3.svg", sortOrder: 3 },
-      { sellerId: seller.id, url: "/demo/gallery-4.svg", sortOrder: 4 },
+      { sellerId: seller.id, url: "/demo/gallery-1.png", sortOrder: 0 },
+      { sellerId: seller.id, url: "/demo/gallery-2.png", sortOrder: 1 },
+      { sellerId: seller.id, url: "/demo/gallery-3.png", sortOrder: 2 },
+      { sellerId: seller.id, url: "/demo/gallery-4.png", sortOrder: 3 },
     ],
   });
 
