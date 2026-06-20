@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { getStripe, calcFeeCents } from "@/lib/stripe";
 import { sendEmail, orderReceivedEmail } from "@/lib/email";
 import { sendSms } from "@/lib/notifications";
+import { isDemoStore } from "@/lib/demo";
 
 export type OrderState = { error?: string };
 
@@ -40,6 +41,9 @@ export async function placeOrderAction(
   });
   if (!drop) return { error: "This drop no longer exists." };
   if (drop.status !== "live") return { error: "Ordering for this drop is closed." };
+  // The marketing showcase is a visual demo only — never takes real orders.
+  if (isDemoStore(drop.seller))
+    return { error: "This is a demo storefront. Sign up free to open your own store and take real orders!" };
 
   // Build line items from server-trusted prices + inventory
   const lines: { product: (typeof drop.products)[number]; qty: number }[] = [];

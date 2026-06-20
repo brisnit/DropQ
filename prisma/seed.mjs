@@ -34,8 +34,8 @@ async function main() {
       location: "Austin, TX",
       accent: "#7a5230",
       category: "food",
-      logoUrl: "/demo/marble-crumb-logo.svg",
-      headerImageUrl: "/demo/marble-crumb-header.svg",
+      logoUrl: "/demo/marble-crumb-logo.png",
+      headerImageUrl: "/demo/marble-crumb-header.png",
     },
   });
 

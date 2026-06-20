@@ -14,6 +14,7 @@ import {
   STARTER_DROP_LIMIT,
   type Plan,
 } from "@/lib/plans";
+import { DEMO_SELLER_EMAIL } from "@/lib/demo";
 
 const PAID = ["new", "in_progress", "ready", "completed", "fulfilled"];
 
@@ -33,6 +34,8 @@ export default async function AdminHome({
   const me = await requireAdmin();
   const [sellers, sales, customerGroups, liveDrops, subs, proWaitlist] = await Promise.all([
     prisma.seller.findMany({
+      // The marketing demo store is a visual showcase only — keep it out of Vendors.
+      where: { email: { not: DEMO_SELLER_EMAIL } },
       include: { _count: { select: { drops: true, orders: true, subscribers: true } } },
       orderBy: { createdAt: "desc" },
     }),

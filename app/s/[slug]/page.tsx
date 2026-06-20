@@ -6,6 +6,7 @@ import { WaitlistForm } from "@/components/waitlist-form";
 import { Stars } from "@/components/stars";
 import { ReviewForm } from "@/components/review-form";
 import { formatMoney, formatDate } from "@/lib/format";
+import { isDemoStore } from "@/lib/demo";
 
 export async function generateMetadata({
   params,
@@ -48,8 +49,16 @@ export default async function StorePage({
     ? reviews.reduce((s, r) => s + r.qualityRating, 0) / reviewCount
     : 0;
 
+  const isDemo = isDemoStore(seller);
+
   return (
     <main className="min-h-screen">
+      {isDemo && (
+        <div className="bg-ink text-cream text-center text-sm py-2 px-4">
+          ✨ This is a demo store — a visual example of a DropQ storefront.{" "}
+          <Link href="/signup" className="underline font-medium">Start your own free →</Link>
+        </div>
+      )}
       {/* Banner */}
       <div className="relative h-28 sm:h-36 overflow-hidden" style={{ backgroundColor: accent }}>
         {seller.headerImageUrl && (
