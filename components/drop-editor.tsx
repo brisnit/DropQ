@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button, Field, Input, Textarea, Select } from "@/components/ui";
+import { vocab, showItemMeta, isFood } from "@/lib/category";
 
 export type DropDefaults = {
   title?: string;
@@ -20,6 +21,9 @@ export type DropDefaults = {
     price?: string;
     inventory?: string;
     imageUrl?: string | null;
+    productType?: string;
+    condition?: string;
+    rarity?: string;
   }>;
 };
 
@@ -31,39 +35,64 @@ type Row = {
   desc: string;
   price: string;
   inventory: string;
+  productType: string;
+  condition: string;
+  rarity: string;
   imageUrl?: string | null; // existing photo (edit)
   imagePreview?: string; // new local preview
 };
 
-const EMOJI_CHOICES = ["🍪", "🥐", "🍞", "🧁", "🎂", "🥧", "🍩", "🟤", "🍌", "🥗", "🍜", "🌮", "🍱", "🫙", "❤️", "🔥"];
+const FOOD_EMOJI = ["🍪", "🥐", "🍞", "🧁", "🎂", "🥧", "🍩", "🟤", "🍌", "🥗", "🍜", "🌮", "🍱", "🫙", "❤️", "🔥"];
+const OBJECT_EMOJI = ["🃏", "🎴", "🧸", "🎨", "🖼️", "🏆", "💎", "👕", "🧢", "👟", "⚾", "🏀", "📦", "✨", "❤️", "🔥"];
 
 let counter = 0;
-const blankRow = (emoji = "🍪"): Row => ({
+const blankRow = (emoji: string): Row => ({
   key: counter++,
   emoji,
   name: "",
   desc: "",
   price: "",
   inventory: "",
+  productType: "",
+  condition: "",
+  rarity: "",
 });
 
-function SaveBar({ mode, status }: { mode: "create" | "edit"; status: string }) {
+function SaveBar({
+  mode,
+  status,
+  live,
+}: {
+  mode: "create" | "edit";
+  status: string;
+  live: boolean;
+}) {
   const { pending } = useFormStatus();
   return (
     <div className="sticky bottom-0 -mx-5 sm:-mx-8 px-5 sm:px-8 py-4 bg-cream/90 backdrop-blur border-t border-line flex items-center justify-between gap-3">
       <p className="text-sm text-muted hidden sm:block">
-        {mode === "create" ? "You can edit everything after creating." : "Changes save to this drop — no duplicate is created."}
+        {mode === "create"
+          ? live
+            ? "Live selling opens immediately so customers can order on-site."
+            : "You can edit everything after creating."
+          : "Changes save to this drop — no duplicate is created."}
       </p>
       <div className="flex gap-2 ml-auto">
         {mode === "create" ? (
-          <>
-            <Button type="submit" name="status" value="draft" variant="secondary" disabled={pending}>
-              Save as draft
-            </Button>
+          live ? (
             <Button type="submit" name="status" value="live" disabled={pending}>
-              {pending ? "Publishing…" : "Publish drop"}
+              {pending ? "Starting…" : "Start live selling"}
             </Button>
-          </>
+          ) : (
+            <>
+              <Button type="submit" name="status" value="draft" variant="secondary" disabled={pending}>
+                Save as draft
+              </Button>
+              <Button type="submit" name="status" value="live" disabled={pending}>
+                {pending ? "Publishing…" : "Publish drop"}
+              </Button>
+            </>
+          )
         ) : (
           <Button type="submit" name="status" value={status} disabled={pending}>
             {pending ? "Saving…" : "Save changes"}
@@ -79,25 +108,38 @@ export function DropEditor({
   mode = "create",
   defaults = {},
   dropId,
+  category = "food",
+  dropMode = "preorder",
 }: {
   action: (formData: FormData) => void | Promise<void>;
   mode?: "create" | "edit";
   defaults?: DropDefaults;
   dropId?: string;
+  category?: string;
+  dropMode?: "preorder" | "live";
 }) {
+  const v = vocab(category);
+  const meta = showItemMeta(category);
+  const live = dropMode === "live";
+  const defaultEmoji = isFood(category) ? "🍪" : "📦";
+  const emojiChoices = isFood(category) ? FOOD_EMOJI : OBJECT_EMOJI;
+
   const initialRows: Row[] =
     defaults.products && defaults.products.length
       ? defaults.products.map((p) => ({
           key: counter++,
           id: p.id,
-          emoji: p.emoji || "🍪",
+          emoji: p.emoji || defaultEmoji,
           name: p.name ?? "",
           desc: p.desc ?? "",
           price: p.price ?? "",
           inventory: p.inventory ?? "",
+          productType: p.productType ?? "",
+          condition: p.condition ?? "",
+          rarity: p.rarity ?? "",
           imageUrl: p.imageUrl ?? null,
         }))
-      : [blankRow("🍪"), blankRow("🥐")];
+      : [blankRow(defaultEmoji), blankRow(defaultEmoji)];
 
   const [rows, setRows] = useState<Row[]>(initialRows);
   const [error, setError] = useState<string | null>(null);
@@ -139,23 +181,25 @@ export function DropEditor({
 
   // Client-side validation that runs before the server action.
   const validate = (e: React.FormEvent<HTMLFormElement>) => {
-    const fd = new FormData(e.currentTarget);
-    const opens = String(fd.get("opensAt") ?? "");
-    const closes = String(fd.get("closesAt") ?? "");
-    if (!opens || !closes) {
-      e.preventDefault();
-      setError("Please set both an open and a close date/time.");
-      return;
-    }
-    if (closes <= opens) {
-      e.preventDefault();
-      setError("Close date/time must be after the open date/time.");
-      return;
+    if (!live) {
+      const fd = new FormData(e.currentTarget);
+      const opens = String(fd.get("opensAt") ?? "");
+      const closes = String(fd.get("closesAt") ?? "");
+      if (!opens || !closes) {
+        e.preventDefault();
+        setError("Please set both an open and a close date/time.");
+        return;
+      }
+      if (closes <= opens) {
+        e.preventDefault();
+        setError("Close date/time must be after the open date/time.");
+        return;
+      }
     }
     const hasItem = rows.some((r) => r.name.trim().length > 0);
     if (!hasItem) {
       e.preventDefault();
-      setError("Add at least one menu item with a name.");
+      setError(`Add at least one ${v.itemNoun} with a name.`);
       return;
     }
     setError(null);
@@ -164,44 +208,76 @@ export function DropEditor({
   return (
     <form action={action} onSubmit={validate} className="space-y-8">
       {dropId && <input type="hidden" name="dropId" value={dropId} />}
+      <input type="hidden" name="mode" value={dropMode} />
       {/* Drop details */}
       <div className="bg-paper border border-line rounded-card p-6 space-y-5">
-        <h2 className="font-semibold text-lg">Drop details</h2>
-        <Field label="Title" hint="What you'd call this drop in a story or text.">
-          <Input name="title" defaultValue={defaults.title ?? ""} placeholder="Friday Cookie Drop — Brown Butter Week" required />
+        <h2 className="font-semibold text-lg">{live ? "Live drop details" : "Drop details"}</h2>
+        {live && (
+          <p className="text-sm rounded-xl bg-quad/10 text-tertiary px-4 py-3">
+            🟢 Live selling mode — customers scan your QR and order on the spot. Orders appear in your dashboard in real time.
+          </p>
+        )}
+        <Field label="Title" hint={`What you'd call this ${live ? "live event" : "drop"}.`}>
+          <Input
+            name="title"
+            defaultValue={defaults.title ?? ""}
+            placeholder={isFood(category) ? "Friday Cookie Drop — Brown Butter Week" : "Saturday Card Show — Booth 14"}
+            required
+          />
         </Field>
         <Field label="Description">
-          <Textarea name="description" defaultValue={defaults.description ?? ""} placeholder="Tell customers what's special this week, and any details they should know." />
+          <Textarea
+            name="description"
+            defaultValue={defaults.description ?? ""}
+            placeholder={
+              isFood(category)
+                ? "Tell customers what's special this week, and any details they should know."
+                : "Tell customers what you've got, condition notes, and anything they should know."
+            }
+          />
         </Field>
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="Fulfillment">
-            <Select name="fulfillment" defaultValue={defaults.fulfillment ?? "pickup"}>
+            <Select name="fulfillment" defaultValue={defaults.fulfillment ?? (live ? "handoff" : "pickup")}>
               <option value="pickup">Pickup</option>
               <option value="delivery">Local delivery</option>
               <option value="shipping">Shipping</option>
+              <option value="handoff">On-site / local handoff</option>
             </Select>
           </Field>
-          <Field label="Location" hint="Where customers pick up, or your delivery area.">
-            <Input name="pickupInfo" defaultValue={defaults.location ?? ""} placeholder="2118 E Cesar Chavez, Austin" />
+          <Field
+            label={live ? "Location / booth" : "Location"}
+            hint={live ? "Where you're set up (table, booth, address)." : "Where customers pick up, or your delivery area."}
+          >
+            <Input
+              name="pickupInfo"
+              defaultValue={defaults.location ?? ""}
+              placeholder={isFood(category) ? "2118 E Cesar Chavez, Austin" : "Booth 14, City Card Show"}
+            />
           </Field>
         </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Opens" hint="When ordering starts.">
-            <Input name="opensAt" type="datetime-local" defaultValue={defaults.opensAt ?? ""} required />
-          </Field>
-          <Field label="Closes" hint="Last call for orders.">
-            <Input name="closesAt" type="datetime-local" defaultValue={defaults.closesAt ?? ""} required />
-          </Field>
-        </div>
+        {!live && (
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Field label="Opens" hint="When ordering starts.">
+              <Input name="opensAt" type="datetime-local" defaultValue={defaults.opensAt ?? ""} required />
+            </Field>
+            <Field label="Closes" hint="Last call for orders.">
+              <Input name="closesAt" type="datetime-local" defaultValue={defaults.closesAt ?? ""} required />
+            </Field>
+          </div>
+        )}
       </div>
 
       {/* Items */}
       <div className="bg-paper border border-line rounded-card p-6">
         <div className="flex items-center justify-between mb-1">
-          <h2 className="font-semibold text-lg">Menu items</h2>
-          <span className="text-sm text-muted">{rows.length} item{rows.length !== 1 ? "s" : ""}</span>
+          <h2 className="font-semibold text-lg">{v.itemsLabel}</h2>
+          <span className="text-sm text-muted">
+            {rows.length} {v.itemNoun}
+            {rows.length !== 1 ? "s" : ""}
+          </span>
         </div>
-        <p className="text-sm text-muted mb-5">Add a real photo of each item, or pick an icon. Photos sell food best.</p>
+        <p className="text-sm text-muted mb-5">{v.photoHint}</p>
 
         <div className="space-y-4">
           {rows.map((row, i) => {
@@ -239,7 +315,7 @@ export function DropEditor({
                       <details className="relative">
                         <summary className="list-none cursor-pointer text-[11px] text-muted hover:text-ink select-none">Icon ▾</summary>
                         <div className="absolute z-10 mt-1 left-1/2 -translate-x-1/2 w-56 grid grid-cols-8 gap-1 bg-paper border border-line rounded-xl p-2 shadow-[var(--shadow-lift)]">
-                          {EMOJI_CHOICES.map((e) => (
+                          {emojiChoices.map((e) => (
                             <button
                               key={e}
                               type="button"
@@ -265,7 +341,7 @@ export function DropEditor({
                       name="p_name"
                       value={row.name}
                       onChange={(e) => update(row.key, { name: e.target.value })}
-                      placeholder={`Item ${i + 1} name`}
+                      placeholder={`${v.itemPlaceholder} ${i + 1} name`}
                       className="w-full bg-paper border border-line-strong rounded-lg px-3 py-2 text-ink placeholder:text-muted/70 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                     />
                     <input
@@ -298,13 +374,40 @@ export function DropEditor({
                         />
                       </div>
                     </div>
+
+                    {/* Collectible / non-food metadata */}
+                    {meta && (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <input
+                          name="p_type"
+                          value={row.productType}
+                          onChange={(e) => update(row.key, { productType: e.target.value })}
+                          placeholder="Type (e.g. Trading card)"
+                          className="w-full bg-paper border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder:text-muted/70 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                        />
+                        <input
+                          name="p_condition"
+                          value={row.condition}
+                          onChange={(e) => update(row.key, { condition: e.target.value })}
+                          placeholder="Condition (e.g. Mint)"
+                          className="w-full bg-paper border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder:text-muted/70 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                        />
+                        <input
+                          name="p_rarity"
+                          value={row.rarity}
+                          onChange={(e) => update(row.key, { rarity: e.target.value })}
+                          placeholder="Rarity / edition"
+                          className="w-full bg-paper border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder:text-muted/70 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <button
                     type="button"
                     onClick={() => remove(row.key)}
                     className="text-muted hover:text-brand w-8 h-8 grid place-items-center rounded-lg hover:bg-line transition shrink-0"
-                    aria-label="Remove item"
+                    aria-label={`Remove ${v.itemNoun}`}
                   >
                     ✕
                   </button>
@@ -316,10 +419,10 @@ export function DropEditor({
 
         <button
           type="button"
-          onClick={() => setRows((rs) => [...rs, blankRow()])}
+          onClick={() => setRows((rs) => [...rs, blankRow(defaultEmoji)])}
           className="mt-4 w-full border border-dashed border-line-strong rounded-xl py-3 text-sm font-medium text-ink-soft hover:border-brand hover:text-brand transition"
         >
-          + Add another item
+          {v.addAnother}
         </button>
       </div>
 
@@ -327,7 +430,7 @@ export function DropEditor({
         <p className="text-sm text-brand-dark bg-brand-tint rounded-lg px-4 py-3 -mt-2">{error}</p>
       )}
 
-      <SaveBar mode={mode} status={defaults.status ?? "draft"} />
+      <SaveBar mode={mode} status={defaults.status ?? "draft"} live={live} />
     </form>
   );
 }

@@ -20,7 +20,7 @@ export async function runRepeatReminders(now: number = Date.now()): Promise<{ se
   const base = process.env.APP_URL?.replace(/\/$/, "") ?? "";
 
   const orders = await prisma.order.findMany({
-    where: { status: { in: ["new", "ready", "fulfilled"] } },
+    where: { status: { in: ["new", "in_progress", "ready", "completed", "fulfilled"] } },
     orderBy: { createdAt: "desc" },
     select: {
       sellerId: true,

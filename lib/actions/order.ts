@@ -60,9 +60,17 @@ export async function placeOrderAction(
   // What the customer pays. In "pass" mode the DropQ fee is added on top.
   const totalCents = passFee ? itemsCents + feeCents : itemsCents;
 
+  // Order source: a live-selling drop produces "live" (on-site QR) orders.
+  const source = drop.mode === "live" ? "live" : "online";
+  // Live customers can choose to pay in person (cash/card at the booth).
+  const payInPerson = String(formData.get("payInPerson") ?? "") === "1";
+
   const stripe = getStripe();
   const useStripe =
-    !!stripe && drop.seller.stripeChargesEnabled && !!drop.seller.stripeAccountId;
+    !!stripe &&
+    drop.seller.stripeChargesEnabled &&
+    !!drop.seller.stripeAccountId &&
+    !payInPerson;
 
   // ----- Real payments via Stripe Connect (destination charge + platform fee) -----
   if (useStripe && stripe) {
@@ -77,6 +85,9 @@ export async function placeOrderAction(
         totalCents,
         feeCents,
         status: "pending",
+        source,
+        paymentStatus: "pending",
+        events: { create: { type: "created", detail: source } },
         items: {
           create: lines.map((l) => ({
             productId: l.product.id,
@@ -165,6 +176,9 @@ export async function placeOrderAction(
           totalCents,
           feeCents,
           status: "new",
+          source,
+          paymentStatus: "unpaid",
+          events: { create: { type: "created", detail: source } },
           items: {
             create: lines.map((l) => ({
               productId: l.product.id,

@@ -26,10 +26,17 @@ export default async function DropOrderPage({
 
   const accent = drop.seller.accent || "#cd1718";
   const isLive = drop.status === "live";
+  const isLiveDrop = drop.mode === "live";
   const paymentsEnabled =
     isStripeEnabled() && drop.seller.stripeChargesEnabled && !!drop.seller.stripeAccountId;
   const fulfillmentLabel =
-    drop.fulfillment === "pickup" ? "Pickup" : drop.fulfillment === "delivery" ? "Local delivery" : "Shipping";
+    drop.fulfillment === "pickup"
+      ? "Pickup"
+      : drop.fulfillment === "delivery"
+        ? "Local delivery"
+        : drop.fulfillment === "handoff"
+          ? "On-site / local handoff"
+          : "Shipping";
 
   return (
     <main className="min-h-screen">
@@ -58,7 +65,7 @@ export default async function DropOrderPage({
               style={{ backgroundColor: accent }}
               className="inline-flex items-center gap-1.5 text-white text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-pill"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-white live-dot" /> Ordering open
+              <span className="w-1.5 h-1.5 rounded-full bg-white live-dot" /> {isLiveDrop ? "Live now — order here" : "Ordering open"}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 bg-line text-ink-soft text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-pill">
@@ -81,6 +88,7 @@ export default async function DropOrderPage({
             dropId={drop.id}
             accent={accent}
             paymentsEnabled={paymentsEnabled}
+            live={isLiveDrop}
             feeMode={drop.seller.feeMode}
             feePercent={feePercent()}
             products={drop.products.map((p) => ({
@@ -91,6 +99,9 @@ export default async function DropOrderPage({
               emoji: p.emoji,
               imageUrl: p.imageUrl,
               remaining: Math.max(0, p.inventory - p.sold),
+              productType: p.productType,
+              condition: p.condition,
+              rarity: p.rarity,
             }))}
           />
         ) : (

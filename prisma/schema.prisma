@@ -25,6 +25,7 @@ model Seller {
   location     String?
   logoUrl      String?  // uploaded store logo (storefront avatar)
   accent       String   @default("#cd1718") // brand accent for storefront
+  category     String   @default("food") // food | collectibles | apparel | art | other
   emailVerified Boolean @default(false)
   isAdmin      Boolean  @default(false) // DropQ internal admin
   termsAcceptedAt DateTime? // when the vendor accepted the Vendor Agreement
@@ -90,7 +91,8 @@ model Drop {
   title       String
   description String?
   status      String    @default("draft") // draft | live | closed
-  fulfillment String    @default("pickup") // pickup | delivery | shipping
+  mode        String    @default("preorder") // preorder (regular drop) | live (live selling / on-site QR)
+  fulfillment String    @default("pickup") // pickup | delivery | shipping | handoff
   pickupInfo  String?
   opensAt     DateTime?
   closesAt    DateTime?
@@ -114,6 +116,11 @@ model Product {
   sold        Int     @default(0)
   sortOrder   Int     @default(0)
 
+  // Optional metadata, used mainly by collectible / non-food storefronts
+  productType String? // category / type (e.g. "Trading card", "Designer toy")
+  condition   String? // e.g. "New", "Mint", "Used — good"
+  rarity      String? // rarity / edition (e.g. "1 of 50", "Holo rare")
+
   orderItems OrderItem[]
 }
 
@@ -129,13 +136,28 @@ model Order {
   note       String?
   totalCents Int
   feeCents   Int      @default(0) // DropQ platform fee taken from this order
-  status     String   @default("new") // pending | new | ready | fulfilled | canceled
+  status     String   @default("new") // pending | new | in_progress | ready | completed | canceled (legacy: fulfilled)
+  source     String   @default("online") // online (preorder/regular drop) | live (live QR / on-site POS)
+  paymentStatus String @default("unpaid") // unpaid (pay in person) | pending (awaiting Stripe) | paid
   // Stripe
   stripeSessionId       String? @unique
   stripePaymentIntentId String?
   createdAt  DateTime @default(now())
 
-  items OrderItem[]
+  items  OrderItem[]
+  events OrderEvent[]
+}
+
+// Timestamped audit trail of order lifecycle events.
+model OrderEvent {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  type      String   // created | status | payment
+  detail    String?  // e.g. the new status or payment state
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
 }
 
 model OrderItem {

@@ -60,6 +60,7 @@ export default async function OrderConfirmationPage({
   const accent = order.seller.accent || "#cd1718";
   const pending = order.status === "pending";
   const paidWithStripe = !!order.stripeSessionId && !pending;
+  const payInPerson = order.paymentStatus === "unpaid" && order.source === "live";
   const itemsSum = order.items.reduce((s, it) => s + it.priceCents * it.quantity, 0);
   const serviceFee = Math.max(0, order.totalCents - itemsSum);
 
@@ -134,7 +135,11 @@ export default async function OrderConfirmationPage({
 
         <p className="text-center text-xs text-muted mt-5 flex items-center justify-center gap-1.5">
           <Mark size={16} />
-          {paidWithStripe ? "Paid securely with Stripe · Powered by DropQ" : "Powered by DropQ · Demo order, no payment taken"}
+          {paidWithStripe
+            ? "Paid securely with Stripe · Powered by DropQ"
+            : payInPerson
+              ? "Pay the seller in person · Powered by DropQ"
+              : "Powered by DropQ · Demo order, no payment taken"}
         </p>
       </div>
     </main>

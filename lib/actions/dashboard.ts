@@ -12,6 +12,7 @@ import { sendEmail, orderReadyEmail } from "@/lib/email";
 import { sendSms } from "@/lib/notifications";
 import { geocode } from "@/lib/geofence";
 import { canCreateDrop } from "@/lib/plans";
+import { ORDER_STATUSES } from "@/lib/orders";
 
 async function baseUrl(): Promise<string> {
   const h = await headers();
@@ -95,9 +96,22 @@ export async function createDropAction(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return; // basic guard; client enforces required
 
-  const status = String(formData.get("status") ?? "draft");
-  const opensAt = formData.get("opensAt") ? new Date(String(formData.get("opensAt"))) : null;
-  const closesAt = formData.get("closesAt") ? new Date(String(formData.get("closesAt"))) : null;
+  const liveMode = String(formData.get("mode") ?? "preorder") === "live";
+  const statusRaw = String(formData.get("status") ?? "draft");
+  // Live drops open immediately; regular drops honor the chosen status.
+  const status = liveMode || statusRaw === "live" ? "live" : "draft";
+
+  const now = new Date();
+  const opensAt = formData.get("opensAt")
+    ? new Date(String(formData.get("opensAt")))
+    : liveMode
+      ? now
+      : null;
+  const closesAt = formData.get("closesAt")
+    ? new Date(String(formData.get("closesAt")))
+    : liveMode
+      ? new Date(now.getTime() + 1000 * 60 * 60 * 24 * 30)
+      : null;
 
   // Parse parallel product arrays (one entry per row, aligned by index)
   const names = formData.getAll("p_name").map(String);
@@ -105,6 +119,9 @@ export async function createDropAction(formData: FormData) {
   const prices = formData.getAll("p_price").map(String);
   const emojis = formData.getAll("p_emoji").map(String);
   const invs = formData.getAll("p_inventory").map(String);
+  const types = formData.getAll("p_type").map(String);
+  const conditions = formData.getAll("p_condition").map(String);
+  const rarities = formData.getAll("p_rarity").map(String);
   const images = formData.getAll("p_image"); // File entries, may be empty
 
   // Save uploaded photos (in parallel), preserving row order
@@ -119,6 +136,9 @@ export async function createDropAction(formData: FormData) {
       imageUrl: imageUrls[i] ?? null,
       inventory: Math.max(0, parseInt(invs[i] ?? "0", 10) || 0),
       sortOrder: i,
+      productType: (types[i] ?? "").trim() || null,
+      condition: (conditions[i] ?? "").trim() || null,
+      rarity: (rarities[i] ?? "").trim() || null,
     }))
     .filter((p) => p.name.length > 0);
 
@@ -127,7 +147,8 @@ export async function createDropAction(formData: FormData) {
       sellerId: seller.id,
       title,
       description: String(formData.get("description") ?? "").trim() || null,
-      status: status === "live" ? "live" : "draft",
+      mode: liveMode ? "live" : "preorder",
+      status,
       fulfillment: String(formData.get("fulfillment") ?? "pickup"),
       pickupInfo: String(formData.get("pickupInfo") ?? "").trim() || null,
       opensAt,
@@ -181,6 +202,9 @@ export async function updateDropFullAction(formData: FormData) {
   const emojis = formData.getAll("p_emoji").map(String);
   const invs = formData.getAll("p_inventory").map(String);
   const keepImages = formData.getAll("p_keep_image").map(String);
+  const types = formData.getAll("p_type").map(String);
+  const conditions = formData.getAll("p_condition").map(String);
+  const rarities = formData.getAll("p_rarity").map(String);
   const images = formData.getAll("p_image");
   const imageUrls = await Promise.all(images.map((img) => saveImage(img)));
 
@@ -195,6 +219,9 @@ export async function updateDropFullAction(formData: FormData) {
       emoji: (emojis[i] ?? "🍪").trim() || "🍪",
       inventory: Math.max(0, parseInt(invs[i] ?? "0", 10) || 0),
       sortOrder: i,
+      productType: (types[i] ?? "").trim() || null,
+      condition: (conditions[i] ?? "").trim() || null,
+      rarity: (rarities[i] ?? "").trim() || null,
     };
     const newImage = imageUrls[i] ?? null;
     const id = ids[i];
@@ -247,6 +274,8 @@ export async function updateOrderStatusAction(formData: FormData) {
   const seller = await requireSeller();
   const orderId = String(formData.get("orderId"));
   const status = String(formData.get("status"));
+  // Guard against unknown statuses from a stale/tampered form.
+  if (!ORDER_STATUSES.includes(status as (typeof ORDER_STATUSES)[number])) return;
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: { drop: { select: { pickupInfo: true, fulfillment: true } } },
@@ -254,10 +283,15 @@ export async function updateOrderStatusAction(formData: FormData) {
   if (!order || order.sellerId !== seller.id) return;
 
   const prev = order.status;
-  await prisma.order.update({ where: { id: orderId }, data: { status } });
+  if (status === prev) return;
+
+  await prisma.order.update({
+    where: { id: orderId },
+    data: { status, events: { create: { type: "status", detail: status } } },
+  });
 
   // Text (+ email) the customer when their order status changes.
-  if (status !== prev) {
+  {
     const link = `${await baseUrl()}/order/${order.id}`;
     const first = order.buyerName.split(" ")[0] || order.buyerName;
     const store = seller.storeName;
@@ -276,7 +310,7 @@ export async function updateOrderStatusAction(formData: FormData) {
         pickupInfo: order.drop.pickupInfo,
         fulfillment: order.drop.fulfillment,
       });
-    } else if (status === "fulfilled") {
+    } else if (status === "completed") {
       sms = `${store}: Thanks for your order, ${first}! 🙌 See you at the next drop.`;
     } else if (status === "canceled") {
       sms = `${store}: Your order was canceled. Reach out to the maker with any questions.`;

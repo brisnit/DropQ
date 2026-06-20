@@ -37,6 +37,8 @@ export default async function EditDropPage({
         mode="edit"
         dropId={drop.id}
         action={updateDropFullAction}
+        category={seller.category}
+        dropMode={drop.mode === "live" ? "live" : "preorder"}
         defaults={{
           title: drop.title,
           description: drop.description ?? "",
@@ -53,6 +55,9 @@ export default async function EditDropPage({
             price: (p.priceCents / 100).toFixed(2),
             inventory: String(p.inventory),
             imageUrl: p.imageUrl,
+            productType: p.productType ?? "",
+            condition: p.condition ?? "",
+            rarity: p.rarity ?? "",
           })),
         }}
       />

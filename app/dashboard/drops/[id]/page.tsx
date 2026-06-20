@@ -10,10 +10,12 @@ import {
   updateOrderStatusAction,
 } from "@/lib/actions/dashboard";
 import { formatMoney, formatDateTime, relativeTime, statusStyle } from "@/lib/format";
+import { vocab, showItemMeta } from "@/lib/category";
 import { Section } from "@/components/dashboard-ui";
 import { Badge, Button } from "@/components/ui";
 import { ShareButton } from "@/components/share-button";
 import { StatusSelect } from "@/components/status-select";
+import { LiveOrders } from "@/components/live-orders";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 
 export default async function DropDetailPage({
@@ -51,6 +53,23 @@ export default async function DropDetailPage({
   const sold = drop.products.reduce((s, p) => s + p.sold, 0);
   const stock = drop.products.reduce((s, p) => s + p.inventory, 0);
 
+  const v = vocab(seller.category);
+  const meta = showItemMeta(seller.category);
+  const isLiveDrop = drop.mode === "live";
+  const liveOrders = drop.orders.map((o) => ({
+    id: o.id,
+    buyerName: o.buyerName,
+    buyerEmail: o.buyerEmail,
+    buyerPhone: o.buyerPhone,
+    note: o.note,
+    status: o.status,
+    paymentStatus: o.paymentStatus,
+    source: o.source,
+    totalCents: o.totalCents,
+    createdAt: o.createdAt.toISOString(),
+    items: o.items.map((it) => ({ id: it.id, name: it.name, quantity: it.quantity })),
+  }));
+
   return (
     <Section>
       <Link href="/dashboard/drops" className="text-sm text-muted hover:text-ink">
@@ -65,6 +84,9 @@ export default async function DropDetailPage({
               {drop.title}
             </h1>
             <Badge className={statusStyle(drop.status)}>{drop.status}</Badge>
+            <Badge className={isLiveDrop ? "bg-quad/15 text-tertiary" : "bg-line text-ink-soft"}>
+              {isLiveDrop ? "🟢 Live selling" : "Preorder drop"}
+            </Badge>
           </div>
           {drop.pickupInfo && <p className="text-muted mt-1">{drop.fulfillment} · {drop.pickupInfo}</p>}
         </div>
@@ -111,22 +133,27 @@ export default async function DropDetailPage({
       <div className="grid md:grid-cols-[1fr_auto] gap-4 mb-8 items-stretch">
         <div className="bg-ink text-cream rounded-card p-5 flex flex-col justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-xs uppercase tracking-wider text-cream/60">Share this drop</p>
+            <p className="text-xs uppercase tracking-wider text-cream/60">
+              {isLiveDrop ? "Live order link — show this QR on-site" : "Share this drop"}
+            </p>
             <p className="font-mono text-sm break-all mt-1">{shareUrl}</p>
           </div>
           <ShareButton
             url={shareUrl}
             title={drop.title}
-            label="Share / Copy link"
+            label="Copy link"
             className="self-start text-sm font-semibold text-ink bg-cream hover:bg-white px-4 py-2.5 rounded-lg transition"
           />
         </div>
 
         <div className="bg-paper border border-line rounded-card p-5 flex flex-col items-center gap-3 text-center">
+          <p className="text-xs uppercase tracking-wider text-muted">
+            {isLiveDrop ? "Live order QR" : "Drop QR"}
+          </p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={qrDataUrl}
-            alt="QR code linking to this drop"
+            alt={isLiveDrop ? "QR code for live on-site orders" : "QR code linking to this drop"}
             width={132}
             height={132}
             className="rounded-xl border border-line"
@@ -160,7 +187,7 @@ export default async function DropDetailPage({
       <div className="grid lg:grid-cols-5 gap-6">
         {/* Items */}
         <div className="lg:col-span-2">
-          <h2 className="font-semibold mb-3">Menu ({drop.products.length})</h2>
+          <h2 className="font-semibold mb-3">{v.catalog} ({drop.products.length})</h2>
           <div className="bg-paper border border-line rounded-card divide-y divide-line">
             {drop.products.map((p) => {
               const pct = p.inventory ? Math.round((p.sold / p.inventory) * 100) : 0;
@@ -177,6 +204,11 @@ export default async function DropDetailPage({
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{p.name}</p>
                       {p.description && <p className="text-xs text-muted truncate">{p.description}</p>}
+                      {meta && (p.productType || p.condition || p.rarity) && (
+                        <p className="text-[11px] text-muted truncate">
+                          {[p.productType, p.condition, p.rarity].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
                     </div>
                     <span className="font-semibold">{formatMoney(p.priceCents)}</span>
                   </div>
@@ -194,41 +226,47 @@ export default async function DropDetailPage({
           </div>
         </div>
 
-        {/* Orders */}
+        {/* Orders — live polling feed for live drops, static list otherwise */}
         <div className="lg:col-span-3">
-          <h2 className="font-semibold mb-3">Orders ({drop.orders.length})</h2>
-          {drop.orders.length === 0 ? (
-            <div className="bg-paper border border-dashed border-line-strong rounded-card p-8 text-center text-muted">
-              No orders yet. Share your link to start selling.
-            </div>
+          {isLiveDrop ? (
+            <LiveOrders dropId={drop.id} initialOrders={liveOrders} />
           ) : (
-            <div className="space-y-3">
-              {drop.orders.map((o) => (
-                <div key={o.id} className="bg-paper border border-line rounded-card p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium">{o.buyerName}</p>
-                      <p className="text-xs text-muted">
-                        {o.buyerEmail}
-                        {o.buyerPhone ? ` · ${o.buyerPhone}` : ""} · {relativeTime(o.createdAt)}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="font-semibold">{formatMoney(o.totalCents)}</span>
-                      <StatusSelect action={updateOrderStatusAction} orderId={o.id} value={o.status} />
-                    </div>
-                  </div>
-                  <ul className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-soft">
-                    {o.items.map((it) => (
-                      <li key={it.id}>
-                        <span className="text-muted">{it.quantity}×</span> {it.name}
-                      </li>
-                    ))}
-                  </ul>
-                  {o.note && <p className="mt-2 text-sm text-muted italic">“{o.note}”</p>}
+            <>
+              <h2 className="font-semibold mb-3">Orders ({drop.orders.length})</h2>
+              {drop.orders.length === 0 ? (
+                <div className="bg-paper border border-dashed border-line-strong rounded-card p-8 text-center text-muted">
+                  No orders yet. Share your link to start selling.
                 </div>
-              ))}
-            </div>
+              ) : (
+                <div className="space-y-3">
+                  {drop.orders.map((o) => (
+                    <div key={o.id} className="bg-paper border border-line rounded-card p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-medium">{o.buyerName}</p>
+                          <p className="text-xs text-muted">
+                            {o.buyerEmail}
+                            {o.buyerPhone ? ` · ${o.buyerPhone}` : ""} · {relativeTime(o.createdAt)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="font-semibold">{formatMoney(o.totalCents)}</span>
+                          <StatusSelect action={updateOrderStatusAction} orderId={o.id} value={o.status} />
+                        </div>
+                      </div>
+                      <ul className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-soft">
+                        {o.items.map((it) => (
+                          <li key={it.id}>
+                            <span className="text-muted">{it.quantity}×</span> {it.name}
+                          </li>
+                        ))}
+                      </ul>
+                      {o.note && <p className="mt-2 text-sm text-muted italic">“{o.note}”</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

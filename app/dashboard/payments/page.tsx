@@ -44,7 +44,7 @@ export default async function PaymentsPage({
 
   // Payout summary (exclude unpaid/canceled)
   const paid = await prisma.order.aggregate({
-    where: { sellerId: seller.id, status: { in: ["new", "ready", "fulfilled"] } },
+    where: { sellerId: seller.id, status: { in: ["new", "in_progress", "ready", "completed", "fulfilled"] } },
     _sum: { totalCents: true, feeCents: true },
     _count: true,
   });

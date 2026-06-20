@@ -17,6 +17,7 @@ import { createToken, consumeToken } from "@/lib/tokens";
 import { sendEmail, verificationEmail, resetEmail } from "@/lib/email";
 import { TERMS_VERSION } from "@/lib/terms";
 import { PARTNER_INVITE_CODE, partnerExpiryFrom } from "@/lib/plans";
+import { CATEGORY_VALUES } from "@/lib/category";
 
 export type AuthState = { error?: string };
 export type ResetState = { error?: string; sent?: boolean; done?: boolean };
@@ -54,6 +55,8 @@ export async function signupAction(
   const password = String(formData.get("password") ?? "");
   const acceptTerms = formData.get("acceptTerms") === "on";
   const inviteCode = String(formData.get("inviteCode") ?? "").trim();
+  const categoryRaw = String(formData.get("category") ?? "food");
+  const category = CATEGORY_VALUES.includes(categoryRaw) ? categoryRaw : "food";
 
   if (!storeName) return { error: "Give your store a name." };
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
@@ -95,6 +98,7 @@ export async function signupAction(
       passwordHash: await hashPassword(password),
       storeName,
       slug: await uniqueSlug(storeName),
+      category,
       termsAcceptedAt: new Date(),
       termsVersion: TERMS_VERSION,
       ...planData,

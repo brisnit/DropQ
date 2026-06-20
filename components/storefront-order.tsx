@@ -13,30 +13,53 @@ type Product = {
   emoji: string;
   imageUrl: string | null;
   remaining: number;
+  productType?: string | null;
+  condition?: string | null;
+  rarity?: string | null;
 };
 
-function PlaceButton({
-  total,
+function SubmitBtn({
+  label,
+  busy,
   count,
+  total,
   accent,
-  paymentsEnabled,
+  outline = false,
+  payInPerson = false,
 }: {
-  total: number;
+  label: string;
+  busy: string;
   count: number;
+  total: number;
   accent: string;
-  paymentsEnabled: boolean;
+  outline?: boolean;
+  payInPerson?: boolean;
 }) {
   const { pending } = useFormStatus();
-  const idle = paymentsEnabled ? "Continue to payment" : "Place order";
-  const busy = paymentsEnabled ? "Redirecting…" : "Placing order…";
+  const disabled = pending || count === 0;
+  const extra = payInPerson ? { name: "payInPerson", value: "1" } : {};
+  if (outline) {
+    return (
+      <button
+        type="submit"
+        {...extra}
+        disabled={disabled}
+        style={{ borderColor: accent, color: accent }}
+        className="w-full font-semibold rounded-xl py-3 border-2 bg-paper disabled:opacity-50 transition active:scale-[0.99]"
+      >
+        {pending ? busy : count === 0 ? "Add items first" : label}
+      </button>
+    );
+  }
   return (
     <button
       type="submit"
-      disabled={pending || count === 0}
+      {...extra}
+      disabled={disabled}
       style={{ backgroundColor: accent }}
       className="w-full text-white font-semibold rounded-xl py-3.5 flex items-center justify-between px-5 disabled:opacity-50 transition active:scale-[0.99]"
     >
-      <span>{pending ? busy : count === 0 ? "Add items to order" : idle}</span>
+      <span>{pending ? busy : count === 0 ? "Add items to order" : label}</span>
       {count > 0 && <span>{formatMoney(total)}</span>}
     </button>
   );
@@ -49,6 +72,7 @@ export function StorefrontOrder({
   paymentsEnabled,
   feeMode = "absorb",
   feePercent = 0,
+  live = false,
 }: {
   dropId: string;
   products: Product[];
@@ -56,6 +80,7 @@ export function StorefrontOrder({
   paymentsEnabled: boolean;
   feeMode?: string;
   feePercent?: number;
+  live?: boolean;
 }) {
   const [qty, setQty] = useState<Record<string, number>>({});
   const [state, formAction] = useActionState<OrderState, FormData>(placeOrderAction, {});
@@ -106,6 +131,11 @@ export function StorefrontOrder({
               <div className="flex-1 min-w-0">
                 <p className="font-medium">{p.name}</p>
                 {p.description && <p className="text-sm text-muted">{p.description}</p>}
+                {(p.productType || p.condition || p.rarity) && (
+                  <p className="text-xs text-muted mt-0.5 flex flex-wrap gap-x-1.5">
+                    {[p.productType, p.condition, p.rarity].filter(Boolean).join(" · ")}
+                  </p>
+                )}
                 <p className="text-sm mt-0.5">
                   <span className="font-semibold">{formatMoney(p.priceCents)}</span>
                   {!soldOut && p.remaining <= 8 && (
@@ -224,11 +254,28 @@ export function StorefrontOrder({
           <p className="text-sm text-brand-dark bg-brand-tint rounded-lg px-3 py-2">{state.error}</p>
         )}
 
-        <PlaceButton total={total} count={count} accent={accent} paymentsEnabled={paymentsEnabled} />
+        {live && paymentsEnabled ? (
+          <div className="space-y-2">
+            <SubmitBtn label="Pay now" busy="Redirecting…" count={count} total={total} accent={accent} />
+            <SubmitBtn label="Pay in person" busy="Placing order…" count={count} total={total} accent={accent} outline payInPerson />
+          </div>
+        ) : (
+          <SubmitBtn
+            label={paymentsEnabled ? "Continue to payment" : live ? "Place order — pay in person" : "Place order"}
+            busy={paymentsEnabled ? "Redirecting…" : "Placing order…"}
+            count={count}
+            total={total}
+            accent={accent}
+          />
+        )}
         <p className="text-xs text-muted text-center">
           {paymentsEnabled
-            ? "🔒 Secure checkout powered by Stripe."
-            : "Demo checkout — no real payment is taken."}
+            ? live
+              ? "🔒 Pay now with Stripe, or pay in person at checkout."
+              : "🔒 Secure checkout powered by Stripe."
+            : live
+              ? "Order now, pay the seller in person."
+              : "Demo checkout — no real payment is taken."}
         </p>
       </div>
     </form>

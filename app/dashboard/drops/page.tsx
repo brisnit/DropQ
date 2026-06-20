@@ -29,14 +29,17 @@ export default async function DropsPage() {
     <Section>
       <PageHeader
         title="Drops"
-        subtitle="Each drop is a menu you sell in a window. Create one, share the link, sell out."
+        subtitle="A regular drop is a preorder window. A live drop takes on-site orders via QR in real time."
         action={
           atLimit ? (
             <LinkButton href="/dashboard/billing">⭐ Upgrade for unlimited</LinkButton>
           ) : (
-            <LinkButton href="/dashboard/drops/new">
-              + New drop{isStarter ? ` (${remaining} left)` : ""}
-            </LinkButton>
+            <div className="flex flex-wrap gap-2">
+              <LinkButton href="/dashboard/drops/new" variant="secondary">
+                + Regular drop
+              </LinkButton>
+              <LinkButton href="/dashboard/drops/new?mode=live">🟢 Live selling drop</LinkButton>
+            </div>
           )
         }
       />
@@ -83,9 +86,10 @@ export default async function DropsPage() {
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-center gap-2.5 flex-wrap">
                         <h3 className="font-display text-lg font-semibold truncate">{d.title}</h3>
                         <Badge className={statusStyle(d.status)}>{d.status}</Badge>
+                        {d.mode === "live" && <Badge className="bg-quad/15 text-tertiary">🟢 live</Badge>}
                       </div>
                       <p className="text-sm text-muted mt-1">
                         {d.products.length} item{d.products.length !== 1 ? "s" : ""} ·{" "}

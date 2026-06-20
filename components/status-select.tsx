@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
-const ORDER_STATUSES = ["new", "ready", "fulfilled", "canceled"];
+import { ORDER_STATUSES, orderStatusLabel } from "@/lib/orders";
 
 export function StatusSelect({
   action,
@@ -27,11 +26,15 @@ export function StatusSelect({
           setStatus(e.target.value);
           e.currentTarget.form?.requestSubmit();
         }}
-        className="text-xs font-semibold rounded-lg border border-line-strong bg-paper px-2 py-1.5 capitalize focus:outline-none focus:border-brand cursor-pointer"
+        className="text-xs font-semibold rounded-lg border border-line-strong bg-paper px-2 py-1.5 focus:outline-none focus:border-brand cursor-pointer"
       >
+        {/* Legacy 'fulfilled' orders still display correctly via the label map. */}
+        {!ORDER_STATUSES.includes(status as (typeof ORDER_STATUSES)[number]) && (
+          <option value={status}>{orderStatusLabel(status)}</option>
+        )}
         {ORDER_STATUSES.map((s) => (
           <option key={s} value={s}>
-            {s}
+            {orderStatusLabel(s)}
           </option>
         ))}
       </select>

@@ -3,8 +3,9 @@
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import Link from "next/link";
-import { Button, Field, Input } from "@/components/ui";
+import { Button, Field, Input, Select } from "@/components/ui";
 import { PasswordInput } from "@/components/password-input";
+import { CATEGORIES } from "@/lib/category";
 import type { AuthState } from "@/lib/actions/auth";
 
 function SubmitButton({ label }: { label: string }) {
@@ -31,6 +32,17 @@ export function AuthForm({
       {isSignup && (
         <Field label="Store name" hint="You can change this anytime.">
           <Input name="storeName" placeholder="Marble & Crumb" required autoFocus />
+        </Field>
+      )}
+      {isSignup && (
+        <Field label="What do you sell?" hint="We'll tailor your store and wording to fit.">
+          <Select name="category" defaultValue="food">
+            {CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </Select>
         </Field>
       )}
       <Field label="Email">

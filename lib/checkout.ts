@@ -15,6 +15,7 @@ export async function finalizePaidOrder(
       where: { id: orderId, status: "pending" },
       data: {
         status: "new",
+        paymentStatus: "paid",
         ...(paymentIntentId ? { stripePaymentIntentId: paymentIntentId } : {}),
       },
     });
@@ -27,6 +28,8 @@ export async function finalizePaidOrder(
 
     // Already finalized by someone else — nothing more to do.
     if (claimed.count === 0) return order;
+
+    await tx.orderEvent.create({ data: { orderId, type: "payment", detail: "paid" } });
 
     for (const it of order.items) {
       if (!it.productId) continue; // product removed from the drop since order

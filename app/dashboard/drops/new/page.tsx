@@ -7,8 +7,14 @@ import { canCreateDrop, STARTER_DROP_LIMIT } from "@/lib/plans";
 
 export const metadata = { title: "New drop — DropQ" };
 
-export default async function NewDropPage() {
+export default async function NewDropPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mode?: string }>;
+}) {
   const seller = await requireSeller();
+  const { mode } = await searchParams;
+  const dropMode = mode === "live" ? "live" : "preorder";
 
   // Starter plan: block past the lifetime drop limit and route toward Growth.
   if (!canCreateDrop(seller)) {
@@ -36,9 +42,13 @@ export default async function NewDropPage() {
         ← Back to drops
       </Link>
       <h1 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight mt-3 mb-7">
-        Create a drop
+        {dropMode === "live" ? "Start a live selling drop" : "Create a drop"}
       </h1>
-      <DropEditor action={createDropAction} />
+      <DropEditor
+        action={createDropAction}
+        category={seller.category}
+        dropMode={dropMode}
+      />
     </Section>
   );
 }

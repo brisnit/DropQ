@@ -6,7 +6,7 @@ import { hasGrowthFeatures } from "@/lib/plans";
 
 export const metadata = { title: "Analytics — DropQ" };
 
-const PAID = ["new", "ready", "fulfilled"];
+const PAID = ["new", "in_progress", "ready", "completed", "fulfilled"];
 
 function quarterKey(d: Date) {
   return `${d.getUTCFullYear()} Q${Math.floor(d.getUTCMonth() / 3) + 1}`;

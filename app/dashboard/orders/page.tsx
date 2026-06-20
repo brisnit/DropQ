@@ -3,13 +3,14 @@ import { requireSeller } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { updateOrderStatusAction } from "@/lib/actions/dashboard";
 import { formatMoney, relativeTime, statusStyle } from "@/lib/format";
+import { orderStatusLabel, paymentLabel, paymentStyle } from "@/lib/orders";
 import { PageHeader, EmptyState, Section } from "@/components/dashboard-ui";
 import { Badge } from "@/components/ui";
 import { StatusSelect } from "@/components/status-select";
 
 export const metadata = { title: "Orders — DropQ" };
 
-const FILTERS = ["all", "new", "ready", "fulfilled", "canceled"] as const;
+const FILTERS = ["all", "new", "in_progress", "ready", "completed", "canceled"] as const;
 
 export default async function OrdersPage({
   searchParams,
@@ -23,7 +24,9 @@ export default async function OrdersPage({
   const orders = await prisma.order.findMany({
     where: {
       sellerId: seller.id,
-      ...(filter !== "all" ? { status: filter } : { status: { not: "pending" } }),
+      ...(filter !== "all"
+        ? { status: filter === "completed" ? { in: ["completed", "fulfilled"] } : filter }
+        : { status: { not: "pending" } }),
     },
     orderBy: { createdAt: "desc" },
     include: { items: true, drop: { select: { title: true, id: true } } },
@@ -49,13 +52,13 @@ export default async function OrdersPage({
           <Link
             key={f}
             href={f === "all" ? "/dashboard/orders" : `/dashboard/orders?status=${f}`}
-            className={`px-3.5 py-1.5 rounded-pill text-sm font-medium capitalize transition ${
+            className={`px-3.5 py-1.5 rounded-pill text-sm font-medium transition ${
               filter === f
                 ? "bg-ink text-cream"
                 : "bg-paper border border-line text-ink-soft hover:border-ink/25"
             }`}
           >
-            {f} <span className="opacity-60">{countFor(f)}</span>
+            {f === "all" ? "All" : orderStatusLabel(f)} <span className="opacity-60">{countFor(f)}</span>
           </Link>
         ))}
       </div>
@@ -74,9 +77,11 @@ export default async function OrdersPage({
             <div key={o.id} className="bg-paper border border-line rounded-card p-4 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium">{o.buyerName}</p>
-                    <Badge className={statusStyle(o.status)}>{o.status}</Badge>
+                    <Badge className={statusStyle(o.status)}>{orderStatusLabel(o.status)}</Badge>
+                    <Badge className={paymentStyle(o.paymentStatus)}>{paymentLabel(o.paymentStatus)}</Badge>
+                    {o.source === "live" && <Badge className="bg-quad/15 text-tertiary">live</Badge>}
                   </div>
                   <p className="text-xs text-muted mt-0.5">
                     {o.buyerEmail}

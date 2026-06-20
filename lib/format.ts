@@ -61,7 +61,9 @@ const STATUS_STYLES: Record<string, string> = {
   closed: "bg-brand-tint text-brand-dark",
   pending: "bg-line text-muted",
   new: "bg-grey-tint text-[#3f434b]",
+  in_progress: "bg-quad/15 text-tertiary",
   ready: "bg-sage-tint text-sage",
+  completed: "bg-line text-muted",
   fulfilled: "bg-line text-muted",
   canceled: "bg-brand-tint text-brand-dark",
 };

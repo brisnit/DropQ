@@ -15,7 +15,7 @@ import {
   type Plan,
 } from "@/lib/plans";
 
-const PAID = ["new", "ready", "fulfilled"];
+const PAID = ["new", "in_progress", "ready", "completed", "fulfilled"];
 
 const PLAN_BADGE: Record<Plan, string> = {
   starter: "bg-line text-ink-soft",
