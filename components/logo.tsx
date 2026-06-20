@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export function Mark({ size = 28 }: { size?: number }) {
@@ -35,15 +36,17 @@ export function Logo({
   light?: boolean;
 }) {
   return (
-    <Link href={href} className="inline-flex items-center gap-2 group">
-      <Mark />
-      <span
-        className={`font-display text-[1.35rem] font-semibold tracking-tight ${
-          light ? "text-cream" : "text-secondary"
-        }`}
-      >
-        Drop<span className="text-brand">Q</span>
-      </span>
+    <Link href={href} className="inline-flex items-center" aria-label="DropQ">
+      <Image
+        src="/brand/dropq-logo.png"
+        alt="DropQ"
+        width={1352}
+        height={378}
+        priority
+        // Artwork is dark olive + red, so on dark surfaces render it as a
+        // clean white silhouette instead of an invisible olive.
+        className={`h-7 sm:h-8 w-auto ${light ? "brightness-0 invert" : ""}`}
+      />
     </Link>
   );
 }
