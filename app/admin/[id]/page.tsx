@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { setAdminAction, setPlanAction, deleteVendorAction } from "@/lib/actions/admin";
+import { setAdminAction, setPlanAction, deleteVendorAction, setSellerDisabledAction } from "@/lib/actions/admin";
 import { formatMoney, formatDate, relativeTime, statusStyle } from "@/lib/format";
 import { Stat } from "@/components/dashboard-ui";
 import { Badge, Button, Select } from "@/components/ui";
@@ -30,10 +30,10 @@ export default async function AdminClientPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ plan?: string }>;
+  searchParams: Promise<{ plan?: string; suspend?: string }>;
 }) {
   const { id } = await params;
-  const { plan: planUpdated } = await searchParams;
+  const { plan: planUpdated, suspend } = await searchParams;
   const me = await requireAdmin();
   const seller = await prisma.seller.findUnique({
     where: { id },
@@ -76,6 +76,7 @@ export default async function AdminClientPage({
             <Badge className={PLAN_BADGE[effectivePlan(seller)]}>{planLabel(effectivePlan(seller))}</Badge>
             {seller.isAdmin && <Badge className="bg-ink text-cream">admin</Badge>}
             {seller.stripeChargesEnabled && <Badge className="bg-sage-tint text-sage">payouts on</Badge>}
+            {seller.disabledAt && <Badge className="bg-brand-tint text-brand-dark">suspended</Badge>}
           </div>
           <p className="text-muted mt-1">
             {seller.email} · /s/{seller.slug} · joined {formatDate(seller.createdAt)}
@@ -192,23 +193,59 @@ export default async function AdminClientPage({
       </div>
 
       {/* Danger zone — remove a vendor entirely */}
+      {suspend === "on" && (
+        <p className="mt-6 text-sm bg-brand-tint text-brand-dark rounded-lg px-3 py-2">🚫 Vendor suspended — they can no longer log in and their storefront is offline.</p>
+      )}
+      {suspend === "off" && (
+        <p className="mt-6 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">✓ Vendor reinstated.</p>
+      )}
+
       {seller.id !== me.id && (
-        <div className="mt-10 pt-6 border-t border-line flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p className="font-semibold text-brand-dark">Delete this vendor</p>
-            <p className="text-sm text-muted">
-              Permanently removes {seller.storeName}, their storefront, drops, products, orders, and reviews. This cannot be undone.
-            </p>
+        <div className="mt-10 pt-6 border-t border-line space-y-5">
+          {/* Suspend / reinstate */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold">{seller.disabledAt ? "Reinstate this vendor" : "Suspend this vendor"}</p>
+              <p className="text-sm text-muted">
+                {seller.disabledAt
+                  ? `Suspended ${formatDate(seller.disabledAt)}. Reinstating restores login and brings their storefront back online.`
+                  : "Blocks login and takes their storefront offline. Reversible — their data is kept."}
+              </p>
+            </div>
+            <form action={setSellerDisabledAction}>
+              <input type="hidden" name="targetId" value={seller.id} />
+              <input type="hidden" name="disable" value={seller.disabledAt ? "false" : "true"} />
+              {seller.disabledAt ? (
+                <Button type="submit" variant="dark">Reinstate</Button>
+              ) : (
+                <ConfirmSubmit
+                  message={`Suspend ${seller.storeName}? They'll be logged out and their storefront goes offline until you reinstate them.`}
+                  className="text-sm font-semibold px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-brand hover:text-brand transition"
+                >
+                  Suspend access
+                </ConfirmSubmit>
+              )}
+            </form>
           </div>
-          <form action={deleteVendorAction}>
-            <input type="hidden" name="targetId" value={seller.id} />
-            <ConfirmSubmit
-              message={`Are you sure? This permanently deletes ${seller.storeName} and ALL of their drops, orders, products, and reviews. This cannot be undone.`}
-              className="text-sm font-semibold px-4 py-2.5 rounded-xl bg-brand text-white hover:bg-brand-dark transition"
-            >
-              Delete vendor
-            </ConfirmSubmit>
-          </form>
+
+          {/* Delete */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-5 border-t border-line">
+            <div>
+              <p className="font-semibold text-brand-dark">Delete this vendor</p>
+              <p className="text-sm text-muted">
+                Permanently removes {seller.storeName}, their storefront, drops, products, orders, and reviews. This cannot be undone.
+              </p>
+            </div>
+            <form action={deleteVendorAction}>
+              <input type="hidden" name="targetId" value={seller.id} />
+              <ConfirmSubmit
+                message={`Are you sure? This permanently deletes ${seller.storeName} and ALL of their drops, orders, products, and reviews. This cannot be undone.`}
+                className="text-sm font-semibold px-4 py-2.5 rounded-xl bg-brand text-white hover:bg-brand-dark transition"
+              >
+                Delete vendor
+              </ConfirmSubmit>
+            </form>
+          </div>
         </div>
       )}
     </div>

@@ -41,6 +41,15 @@ export async function placeOrderAction(
   });
   if (!drop) return { error: "This drop no longer exists." };
   if (drop.status !== "live") return { error: "Ordering for this drop is closed." };
+  // Enforce the drop's own ordering window (status alone isn't enough).
+  const orderNow = new Date();
+  if (drop.opensAt && orderNow < drop.opensAt)
+    return { error: "Ordering hasn't opened yet for this drop." };
+  if (drop.closesAt && orderNow > drop.closesAt)
+    return { error: "Ordering for this drop has closed." };
+  // A suspended vendor can't take orders.
+  if (drop.seller.disabledAt)
+    return { error: "This store is currently unavailable." };
   // The marketing showcase is a visual demo only — never takes real orders.
   if (isDemoStore(drop.seller))
     return { error: "This is a demo storefront. Sign up free to open your own store and take real orders!" };
@@ -140,6 +149,9 @@ export async function placeOrderAction(
         metadata: { orderId: order.id },
       },
       metadata: { orderId: order.id },
+      // Bound how long the order can sit "pending" so reconciliation can
+      // definitively release/cancel abandoned checkouts (min 30 min).
+      expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
       success_url: `${base}/order/${order.id}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${base}/s/${drop.seller.slug}/${drop.id}?canceled=1`,
     },
@@ -157,17 +169,13 @@ export async function placeOrderAction(
   // ----- Demo mode (no Stripe configured): finalize immediately -----
   const order = await prisma
     .$transaction(async (tx) => {
+      // Atomic conditional claim per item — no read-then-write race. If any
+      // item can't be claimed, throw to roll back every increment.
       for (const l of lines) {
-        const fresh = await tx.product.findUnique({ where: { id: l.product.id } });
-        if (!fresh || fresh.sold + l.qty > fresh.inventory) {
-          throw new Error(`SOLD_OUT:${l.product.name}`);
-        }
-      }
-      for (const l of lines) {
-        await tx.product.update({
-          where: { id: l.product.id },
-          data: { sold: { increment: l.qty } },
-        });
+        const n = await tx.$executeRaw`
+          UPDATE "Product" SET sold = sold + ${l.qty}
+          WHERE id = ${l.product.id} AND sold + ${l.qty} <= inventory`;
+        if (n === 0) throw new Error(`SOLD_OUT:${l.product.name}`);
       }
       return tx.order.create({
         data: {

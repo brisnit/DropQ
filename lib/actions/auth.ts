@@ -18,7 +18,7 @@ import { sendEmail, verificationEmail, resetEmail } from "@/lib/email";
 import { TERMS_VERSION } from "@/lib/terms";
 import { PARTNER_INVITE_CODE, partnerExpiryFrom } from "@/lib/plans";
 import { CATEGORY_VALUES } from "@/lib/category";
-import { recordReferralAndReward } from "@/lib/referral";
+import { recordReferral } from "@/lib/referral";
 import { createGrowthCheckoutUrl } from "@/lib/billing";
 
 export type AuthState = { error?: string };
@@ -109,7 +109,7 @@ export async function signupAction(
 
   // If they came through a referral link, credit the referrer (background).
   const ref = String(formData.get("ref") ?? "").trim();
-  if (ref) after(() => recordReferralAndReward(ref, seller.id));
+  if (ref) after(() => recordReferral(ref, seller.id));
 
   // Send the verification email in the background so signup feels instant.
   after(() => sendVerification(seller.id, seller.email));
@@ -146,6 +146,9 @@ export async function loginAction(
   const seller = await prisma.seller.findUnique({ where: { email } });
   if (!seller || !(await verifyPassword(password, seller.passwordHash))) {
     return { error: "Wrong email or password." };
+  }
+  if (seller.disabledAt) {
+    return { error: "This account has been suspended. Contact support if you think this is a mistake." };
   }
 
   await createSession(seller.id);

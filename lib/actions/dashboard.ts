@@ -274,8 +274,9 @@ export async function updateDropFullAction(formData: FormData) {
     if (id) {
       submittedIds.add(id);
       const keptImage = (keepImages[i] ?? "") || null;
-      await prisma.product.update({
-        where: { id },
+      // Scope to this drop so a crafted p_id can't overwrite another vendor's product.
+      await prisma.product.updateMany({
+        where: { id, dropId },
         data: { ...base, imageUrl: newImage ?? keptImage },
       });
     } else {
@@ -283,7 +284,7 @@ export async function updateDropFullAction(formData: FormData) {
     }
   }
   const removed = drop.products.filter((p) => !submittedIds.has(p.id)).map((p) => p.id);
-  if (removed.length) await prisma.product.deleteMany({ where: { id: { in: removed } } });
+  if (removed.length) await prisma.product.deleteMany({ where: { id: { in: removed }, dropId } });
 
   revalidatePath(`/dashboard/drops/${dropId}`);
   revalidatePath("/dashboard/drops");

@@ -22,7 +22,7 @@ export default async function DropOrderPage({
       seller: true,
     },
   });
-  if (!drop || drop.seller.slug !== slug) notFound();
+  if (!drop || drop.seller.slug !== slug || drop.seller.disabledAt) notFound();
 
   const accent = drop.seller.accent || "#cd1718";
   const isLive = drop.status === "live";

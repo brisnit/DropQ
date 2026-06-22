@@ -45,8 +45,9 @@ function addMonths(d: Date, n: number): Date {
 /**
  * Reward the referrer with 1 free month of Growth. Paying (Stripe) vendors get a
  * billing credit; everyone else gets bonus Growth-level access in the database.
+ * `referralId` keys the Stripe credit so it can never be applied twice.
  */
-async function grantReferralReward(referrerId: string): Promise<void> {
+async function grantReferralReward(referrerId: string, referralId: string): Promise<void> {
   const referrer = await prisma.seller.findUnique({ where: { id: referrerId } });
   if (!referrer) return;
 
@@ -55,11 +56,15 @@ async function grantReferralReward(referrerId: string): Promise<void> {
     const stripe = getStripe();
     if (stripe) {
       try {
-        await stripe.customers.createBalanceTransaction(referrer.stripeCustomerId, {
-          amount: -GROWTH_PRICE_CENTS, // negative = credit toward future invoices
-          currency: "usd",
-          description: "DropQ referral reward — 1 month of Growth",
-        });
+        await stripe.customers.createBalanceTransaction(
+          referrer.stripeCustomerId,
+          {
+            amount: -GROWTH_PRICE_CENTS, // negative = credit toward future invoices
+            currency: "usd",
+            description: "DropQ referral reward — 1 month of Growth",
+          },
+          { idempotencyKey: `referral-credit-${referralId}` }
+        );
         creditApplied = true;
       } catch (e) {
         console.error("Referral Stripe credit failed:", e);
@@ -81,13 +86,12 @@ async function grantReferralReward(referrerId: string): Promise<void> {
 }
 
 /**
- * Record that a newly-signed-up vendor used refCode, then reward the referrer.
+ * Record (only) that a newly-signed-up vendor used refCode. The reward is NOT
+ * granted here — it's gated on the referred vendor converting to paid Growth
+ * (see grantReferralRewardForConversion) to prevent fake-signup farming.
  * Idempotent (referredId is unique) and guards against self-referral.
  */
-export async function recordReferralAndReward(
-  refCode: string,
-  newSellerId: string
-): Promise<void> {
+export async function recordReferral(refCode: string, newSellerId: string): Promise<void> {
   const code = (refCode || "").trim();
   if (!code) return;
 
@@ -97,18 +101,25 @@ export async function recordReferralAndReward(
   });
   if (!referrer || referrer.id === newSellerId) return;
 
-  let referral;
   try {
-    referral = await prisma.referral.create({
+    await prisma.referral.create({
       data: { referrerId: referrer.id, referredId: newSellerId, status: "signed_up" },
     });
   } catch {
-    return; // already recorded for this referred account
+    // already recorded for this referred account
   }
+}
 
-  await grantReferralReward(referrer.id);
+/**
+ * Called when a referred vendor actually subscribes to Growth. Rewards the
+ * referrer exactly once (status flips signed_up → rewarded).
+ */
+export async function grantReferralRewardForConversion(referredSellerId: string): Promise<void> {
+  const ref = await prisma.referral.findUnique({ where: { referredId: referredSellerId } });
+  if (!ref || ref.status === "rewarded") return;
+  await grantReferralReward(ref.referrerId, ref.id);
   await prisma.referral.update({
-    where: { id: referral.id },
+    where: { id: ref.id },
     data: { status: "rewarded", rewardGrantedAt: new Date() },
   });
 }

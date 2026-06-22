@@ -35,7 +35,7 @@ export default async function StorePage({
       gallery: { orderBy: { sortOrder: "asc" } },
     },
   });
-  if (!seller) notFound();
+  if (!seller || seller.disabledAt) notFound();
 
   const accent = seller.accent || "#cd1718";
   const liveDrops = seller.drops.filter((d) => d.status === "live");

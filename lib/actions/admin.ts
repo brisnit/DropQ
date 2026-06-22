@@ -45,6 +45,21 @@ export async function setAdminAction(formData: FormData) {
   revalidatePath("/admin");
 }
 
+/** Suspend or un-suspend a vendor (admins only). Suspending blocks login + storefront. */
+export async function setSellerDisabledAction(formData: FormData) {
+  const me = await requireAdmin();
+  const targetId = String(formData.get("targetId") ?? "");
+  const disable = String(formData.get("disable")) === "true";
+  if (!targetId || (targetId === me.id && disable)) return; // never suspend yourself
+  await prisma.seller.update({
+    where: { id: targetId },
+    data: { disabledAt: disable ? new Date() : null },
+  });
+  revalidatePath(`/admin/${targetId}`);
+  revalidatePath("/admin");
+  redirect(`/admin/${targetId}?suspend=${disable ? "on" : "off"}`);
+}
+
 /** Permanently delete a vendor and everything they own (admins only). */
 export async function deleteVendorAction(formData: FormData) {
   const me = await requireAdmin();

@@ -150,7 +150,7 @@ export default async function OverviewPage() {
         <h2 className="font-display text-2xl font-semibold mt-1">Invite a vendor. Earn free Growth.</h2>
         <p className="text-cream/75 mt-1.5 max-w-xl text-sm">
           Know another vendor who could use DropQ? Share your referral link. When they
-          sign up, you&apos;ll get one free month of Growth-level features.
+          sign up and subscribe to Growth, you&apos;ll get one free month of Growth — on us.
         </p>
         <div className="mt-4 flex flex-col sm:flex-row gap-2">
           <input

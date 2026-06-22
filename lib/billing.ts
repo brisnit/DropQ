@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { getStripe, ensureGrowthPriceId } from "@/lib/stripe";
+import { grantReferralRewardForConversion } from "@/lib/referral";
 
 /**
  * Create a Stripe Checkout subscription URL for the Growth plan for a given
@@ -56,6 +57,8 @@ export async function activateGrowth(
       ...(data.customerId ? { stripeCustomerId: data.customerId } : {}),
     },
   });
+  // A referred vendor converting to paid Growth is what unlocks the referrer's reward.
+  await grantReferralRewardForConversion(sellerId);
 }
 
 /**

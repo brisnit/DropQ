@@ -37,6 +37,7 @@ model Seller {
   category     String   @default("food") // food | collectibles | apparel | art | other
   emailVerified Boolean @default(false)
   isAdmin      Boolean  @default(false) // DropQ internal admin
+  disabledAt   DateTime? // set when an admin suspends the vendor (blocks login + storefront)
   termsAcceptedAt DateTime? // when the vendor accepted the Vendor Agreement
   termsVersion    String?   // which version they accepted
   createdAt    DateTime @default(now())

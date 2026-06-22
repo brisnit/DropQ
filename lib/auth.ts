@@ -67,7 +67,10 @@ export async function getSessionSellerId(): Promise<string | null> {
 export async function getCurrentSeller() {
   const id = await getSessionSellerId();
   if (!id) return null;
-  return prisma.seller.findUnique({ where: { id } });
+  const seller = await prisma.seller.findUnique({ where: { id } });
+  // Suspended (or deleted) sellers get no access — effectively a force-logout.
+  if (!seller || seller.disabledAt) return null;
+  return seller;
 }
 
 export async function requireSeller() {
