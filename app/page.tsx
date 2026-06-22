@@ -156,12 +156,12 @@ export default function Home() {
       <Section className="pt-16 pb-20 sm:pt-24 grid lg:grid-cols-2 gap-14 items-center">
         <div className="animate-in">
           <Badge className="bg-grey-tint text-[#3f434b] mb-5">
-            The operating system for independent sellers
+            Que the hype
           </Badge>
           <h1 className="font-display text-[2.6rem] sm:text-6xl leading-[1.02] font-semibold tracking-tight">
-            Sell anything in drops
+            Organized Drops.
             <br />
-            <span className="text-brand">the way you actually sell it.</span>
+            <span className="text-brand">Happy Customers.</span>
           </h1>
           <p className="mt-6 text-lg text-ink-soft max-w-lg">
             Run timed drops, take orders, manage pickup &amp; local delivery,
