@@ -25,7 +25,7 @@ model Seller {
   location     String?
   logoUrl      String?  // uploaded store logo (storefront avatar)
   headerImageUrl String? // uploaded storefront header/banner background
-  accent       String   @default("#ff666c") // brand accent for storefront
+  accent       String   @default("#ff934b") // brand accent for storefront
 
   // Social media links (stored as full URLs)
   instagram String?

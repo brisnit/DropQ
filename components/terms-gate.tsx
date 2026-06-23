@@ -43,7 +43,7 @@ export function TermsGate({
 
           <form action={action} className="mt-5 space-y-4">
             <label className="flex items-start gap-2.5 text-sm text-ink-soft">
-              <input type="checkbox" name="accept" required className="mt-0.5 w-4 h-4 accent-[#ff666c] shrink-0" />
+              <input type="checkbox" name="accept" required className="mt-0.5 w-4 h-4 accent-[#ff934b] shrink-0" />
               <span>
                 I have read and agree to the DropQ Vendor Agreement &amp; Terms (v{TERMS_VERSION}).
               </span>

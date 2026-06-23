@@ -275,7 +275,7 @@ export default function Home() {
             ))}
           </div>
           <div className="mt-12">
-            <LinkButton href="/signup" variant="primary" size="lg">
+            <LinkButton href="/signup" variant="brand" size="lg">
               Build your first drop
             </LinkButton>
           </div>

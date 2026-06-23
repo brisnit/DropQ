@@ -42,8 +42,8 @@ function layout(heading: string, body: string, cta: { href: string; label: strin
       <div style="padding:28px 24px;color:#1a1a1a">
         <h1 style="font-size:20px;margin:0 0 12px">${heading}</h1>
         <p style="font-size:15px;line-height:1.55;color:#3d3d3d;margin:0 0 22px">${body}</p>
-        <a href="${cta.href}" style="display:inline-block;background:#ff666c;color:#fff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:12px">${cta.label}</a>
-        <p style="font-size:12px;color:#6b6b6b;margin:22px 0 0">If the button doesn't work, copy this link:<br><span style="color:#ff666c;word-break:break-all">${cta.href}</span></p>
+        <a href="${cta.href}" style="display:inline-block;background:#1a1a1a;color:#fff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:12px">${cta.label}</a>
+        <p style="font-size:12px;color:#6b6b6b;margin:22px 0 0">If the button doesn't work, copy this link:<br><span style="color:#ff934b;word-break:break-all">${cta.href}</span></p>
       </div>
     </div>
     <p style="text-align:center;color:#6b6b6b;font-size:12px;margin-top:16px">DropQ — the operating system for modern food businesses</p>

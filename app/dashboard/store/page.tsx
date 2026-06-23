@@ -75,7 +75,7 @@ export default async function StorePage() {
               monthly fee. You&apos;ll enter your details securely on Stripe.
             </p>
             <form action={connectStripeAction} className="mt-4">
-              <Button type="submit">
+              <Button type="submit" variant="brand">
                 {started ? "Finish setting up payouts" : "Set up payouts"}
               </Button>
             </form>

@@ -7,7 +7,7 @@ import { updateStoreAction, type StoreSaveState } from "@/lib/actions/dashboard"
 import { SOCIALS } from "@/lib/social";
 import { compressImage, setInputFiles } from "@/lib/compress-image";
 
-const ACCENTS = ["#ff666c", "#3a8895", "#3F7D5B", "#8A2D52", "#2B6CB0", "#1C1916"];
+const ACCENTS = ["#ff934b", "#3a8895", "#3F7D5B", "#8A2D52", "#2B6CB0", "#1C1916"];
 const isHex = (v: string) => /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(v);
 
 export type StoreFormData = {
@@ -225,7 +225,7 @@ export function StoreSettingsForm({
             >
               <input
                 type="color"
-                value={isHex(accent) ? accent : "#ff666c"}
+                value={isHex(accent) ? accent : "#ff934b"}
                 onChange={(e) => pickAccent(e.target.value)}
                 className="absolute -inset-2 opacity-0 cursor-pointer"
               />
@@ -240,11 +240,11 @@ export function StoreSettingsForm({
             <input
               value={accent}
               onChange={(e) => pickAccent(e.target.value)}
-              placeholder="#ff666c"
+              placeholder="#ff934b"
               aria-label="Custom hex color"
               className="w-32 bg-paper border border-line-strong rounded-lg px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
             />
-            {!isHex(accent) && <span className="text-xs text-brand-dark">Enter a hex like #ff666c</span>}
+            {!isHex(accent) && <span className="text-xs text-brand-dark">Enter a hex like #ff934b</span>}
           </div>
         </Field>
       </div>
@@ -303,7 +303,7 @@ export function StoreSettingsForm({
             name="geofenceEnabled"
             defaultChecked={seller.geofenceEnabled}
             onChange={(e) => setGeo(e.target.checked)}
-            className="mt-1 w-4 h-4 accent-[#ff666c]"
+            className="mt-1 w-4 h-4 accent-[#ff934b]"
           />
           <div>
             <p className="font-semibold">Geofencing notifications <span className="text-xs font-normal text-muted">(beta)</span></p>
