@@ -74,11 +74,10 @@ function Section({
 }
 
 const SELL_CATEGORIES = [
-  { emoji: "🍪", label: "Food & Beverage", eg: "Bakers, cottage food, popups" },
-  { emoji: "🃏", label: "Collectibles", eg: "Cards, toys, antiques, vintage" },
-  { emoji: "👕", label: "Apparel & Merch", eg: "Limited runs & branded merch" },
-  { emoji: "🎨", label: "Art & Handmade", eg: "Prints, ceramics, makers" },
-  { emoji: "✨", label: "& anything else", eg: "Hobby goods, oddities & more" },
+  { img: "/categories/food.png", label: "Food & Beverage", eg: "Bakers, cottage food, popups" },
+  { img: "/categories/collectibles.png", label: "Collectibles", eg: "Cards, toys, antiques, vintage" },
+  { img: "/categories/apparel.png", label: "Apparel & Merch", eg: "Limited runs and branded merch" },
+  { img: "/categories/art.png", label: "Art & Handmade", eg: "Prints, ceramics, makers" },
 ];
 
 const STEPS = [
@@ -213,14 +212,36 @@ export default function Home() {
             your language.
           </p>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mt-10">
+        <div className="grid sm:grid-cols-3 gap-4 sm:gap-5 mt-10">
           {SELL_CATEGORIES.map((c) => (
-            <div key={c.label} className="bg-paper border border-line rounded-card p-5 text-center">
-              <div className="text-4xl">{c.emoji}</div>
-              <h3 className="font-semibold mt-3">{c.label}</h3>
-              <p className="text-xs text-muted mt-1">{c.eg}</p>
+            <div key={c.label} className="bg-paper border border-line rounded-card overflow-hidden">
+              <div className="aspect-[5/4] overflow-hidden bg-cream">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={c.img} alt={c.label} className="w-full h-full object-cover" />
+              </div>
+              <div className="p-4">
+                <h3 className="font-semibold">{c.label}</h3>
+                <p className="text-xs text-muted mt-1">{c.eg}</p>
+              </div>
             </div>
           ))}
+
+          {/* And everything else — spans two columns, image with overlay text */}
+          <div className="sm:col-span-2 relative rounded-card overflow-hidden min-h-[260px] sm:min-h-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/categories/everything.png"
+              alt="And everything else"
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+            <div className="relative h-full flex flex-col justify-end p-6">
+              <h3 className="font-display text-2xl sm:text-3xl font-semibold text-white">
+                And everything else…
+              </h3>
+              <p className="text-white/85 mt-1">Sell whatever you sell in drops</p>
+            </div>
+          </div>
         </div>
       </Section>
 
