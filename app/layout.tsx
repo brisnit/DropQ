@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { Bree_Serif, Google_Sans_Flex } from "next/font/google";
+import { Madimi_One, Google_Sans_Flex } from "next/font/google";
 import "./globals.css";
 
 // Primary / display font
-const breeSerif = Bree_Serif({
-  variable: "--font-bree-serif",
+const madimiOne = Madimi_One({
+  variable: "--font-madimi-one",
   subsets: ["latin"],
   weight: ["400"],
   display: "swap",
@@ -27,7 +27,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${breeSerif.variable} ${googleSans.variable} h-full`}>
+    <html lang="en" className={`${madimiOne.variable} ${googleSans.variable} h-full`}>
       <body className="min-h-full antialiased">{children}</body>
     </html>
   );

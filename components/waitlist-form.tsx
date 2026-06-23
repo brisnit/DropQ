@@ -61,12 +61,12 @@ export function WaitlistForm({
       <input name="phone" type="tel" placeholder="Phone (for text alerts)" className={inputCls} />
 
       <label className="flex items-start gap-2.5 text-sm text-ink-soft">
-        <input type="checkbox" name="optIn" defaultChecked className="mt-0.5 w-4 h-4 accent-[#cd1718]" />
+        <input type="checkbox" name="optIn" defaultChecked className="mt-0.5 w-4 h-4 accent-[#ff666c]" />
         <span>Yes, notify me about future drops by email{" "}{/* */}and/or text. I can opt out anytime.</span>
       </label>
       {geofence && (
         <label className="flex items-start gap-2.5 text-sm text-ink-soft">
-          <input type="checkbox" name="optInGeofence" className="mt-0.5 w-4 h-4 accent-[#cd1718]" />
+          <input type="checkbox" name="optInGeofence" className="mt-0.5 w-4 h-4 accent-[#ff666c]" />
           <span>Also alert me when I&apos;m near {storeName} during a live drop.</span>
         </label>
       )}

@@ -1,14 +1,17 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 
-type Variant = "primary" | "secondary" | "ghost" | "dark";
+type Variant = "primary" | "secondary" | "tertiary" | "ghost" | "dark";
 type Size = "sm" | "md" | "lg";
 
 const VARIANTS: Record<Variant, string> = {
+  // Primary — coral, the main action
   primary:
-    "bg-brand text-white hover:bg-brand-dark shadow-[0_8px_20px_-8px_rgba(205,23,24,0.5)]",
-  secondary:
-    "bg-paper text-ink border border-line-strong hover:border-ink/30 hover:bg-cream",
+    "bg-brand text-white hover:bg-brand-dark shadow-[0_8px_20px_-8px_rgba(255,102,108,0.55)]",
+  // Secondary — solid grey
+  secondary: "bg-secondary text-ink hover:bg-[#cfcfcf]",
+  // Tertiary — grey outline
+  tertiary: "bg-transparent text-ink border border-secondary hover:bg-secondary/50",
   ghost: "text-ink-soft hover:text-ink hover:bg-line/60",
   dark: "bg-ink text-cream hover:bg-ink-soft",
 };

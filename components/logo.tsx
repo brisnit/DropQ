@@ -11,7 +11,7 @@ export function Mark({ size = 28 }: { size?: number }) {
       aria-hidden="true"
       className="shrink-0"
     >
-      <rect width="32" height="32" rx="9" fill="#cd1718" />
+      <rect width="32" height="32" rx="9" fill="#ff666c" />
       {/* droplet */}
       <path
         d="M16 6c0 0 6.2 6.6 6.2 11.2A6.2 6.2 0 0 1 16 23.4a6.2 6.2 0 0 1-6.2-6.2C9.8 12.6 16 6 16 6z"
@@ -20,7 +20,7 @@ export function Mark({ size = 28 }: { size?: number }) {
       {/* the 'Q' tail — a queue tick */}
       <path
         d="M18.6 19.6l3 3"
-        stroke="#cd1718"
+        stroke="#ff666c"
         strokeWidth="2.1"
         strokeLinecap="round"
       />

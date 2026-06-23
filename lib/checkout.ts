@@ -109,7 +109,7 @@ async function refundOversoldOrder(orderId: string) {
     await sendEmail({
       to: order.buyerEmail,
       subject: `Your ${store} order was refunded`,
-      html: `<div style="font-family:sans-serif;color:#1c1a12"><p>Hi ${first},</p><p>${msg}</p></div>`,
+      html: `<div style="font-family:sans-serif;color:#1a1a1a"><p>Hi ${first},</p><p>${msg}</p></div>`,
     });
   } catch (e) {
     console.error("Oversold notify failed:", e);

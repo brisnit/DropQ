@@ -75,8 +75,8 @@ export async function notify(
         await sendEmail({
           to: target.email,
           subject: message.subject,
-          html: `<div style="font-family:sans-serif;color:#1c1a12"><p>${message.body}</p>${
-            message.url ? `<p><a href="${message.url}" style="color:#cd1718">${message.url}</a></p>` : ""
+          html: `<div style="font-family:sans-serif;color:#1a1a1a"><p>${message.body}</p>${
+            message.url ? `<p><a href="${message.url}" style="color:#ff666c">${message.url}</a></p>` : ""
           }</div>`,
         });
       } else if (channel === "sms" && target.phone) {

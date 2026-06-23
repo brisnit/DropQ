@@ -1,45 +1,45 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   DropQ Design System — modern, premium, food-forward.
-   Brand palette: red primary (the "Q"), olive secondary (the "Drop"),
-   orange + amber as warm accents.
+   DropQ Design System.
+   Palette: Primary #FF666C (coral), Secondary/Tertiary #D9D9D9 (grey),
+   Quad #FFBC00 (amber), White #FFFFFF, Black #1A1A1A.
 --------------------------------------------------------------------------- */
 @theme {
-  --color-cream: #faf8f5;
+  --color-cream: #fafafa;
   --color-paper: #ffffff;
-  --color-ink: #1c1a12;
-  --color-ink-soft: #3f3c30;
-  --color-muted: #726f60;
+  --color-ink: #1a1a1a;
+  --color-ink-soft: #3d3d3d;
+  --color-muted: #6b6b6b;
 
-  /* Primary — brand red (the Q) */
-  --color-brand: #cd1718;
-  --color-brand-dark: #a11213;
-  --color-brand-tint: #fbe5e5;
-  /* Secondary — olive (the "Drop" wordmark / dark accents) */
-  --color-secondary: #353a0d;
-  --color-secondary-tint: #ecefdd;
-  /* Tertiary + Quadrinary — warm accents */
-  --color-tertiary: #f56100;
-  --color-quad: #ff9c00;
-  --color-grey: #6b7280;
-  --color-grey-tint: #edeef1;
-  --color-grey-dark: #3f434b;
+  /* Primary — coral */
+  --color-brand: #ff666c;
+  --color-brand-dark: #ed4d55;
+  --color-brand-tint: #ffe5e6;
+  /* Secondary + Tertiary — grey */
+  --color-secondary: #d9d9d9;
+  --color-secondary-tint: #f0f0f0;
+  --color-tertiary: #d9d9d9;
+  /* Quadrinary — amber */
+  --color-quad: #ffbc00;
+  --color-grey: #6b6b6b;
+  --color-grey-tint: #ededed;
+  --color-grey-dark: #3d3d3d;
   --color-sage: #3f7d5b;
   --color-sage-tint: #e2efe7;
   --color-berry: #8a2d52;
 
-  --color-line: #ece8e0;
-  --color-line-strong: #dcd6c9;
+  --color-line: #e8e8e8;
+  --color-line-strong: #d9d9d9;
 
-  --font-display: var(--font-bree-serif), Georgia, serif;
+  --font-display: var(--font-madimi-one), system-ui, sans-serif;
   --font-sans: var(--font-google-sans), system-ui, sans-serif;
 
   --radius-card: 1.25rem;
   --radius-pill: 999px;
 
-  --shadow-soft: 0 1px 2px rgba(27, 23, 38, 0.04), 0 8px 24px -12px rgba(27, 23, 38, 0.16);
-  --shadow-lift: 0 2px 4px rgba(27, 23, 38, 0.06), 0 24px 48px -20px rgba(27, 23, 38, 0.28);
+  --shadow-soft: 0 1px 2px rgba(26, 26, 26, 0.04), 0 8px 24px -12px rgba(26, 26, 26, 0.16);
+  --shadow-lift: 0 2px 4px rgba(26, 26, 26, 0.06), 0 24px 48px -20px rgba(26, 26, 26, 0.28);
 }
 
 html {
@@ -65,8 +65,8 @@ body {
   color: #fff;
 }
 
-/* Display font (Bree Serif) always renders at regular weight (400), overriding
-   any font-bold/font-semibold utilities on headings. Also disable faux-bold. */
+/* Display font (Madimi One) is a single-weight (400) display face — pin it so
+   font-bold/font-semibold utilities on headings don't trigger faux-bold. */
 .font-display {
   font-weight: 400 !important;
   font-synthesis-weight: none;
@@ -74,16 +74,16 @@ body {
 
 .bg-grid {
   background-image:
-    linear-gradient(to right, rgba(27, 23, 38, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(27, 23, 38, 0.04) 1px, transparent 1px);
+    linear-gradient(to right, rgba(26, 26, 26, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(26, 26, 26, 0.04) 1px, transparent 1px);
   background-size: 28px 28px;
 }
 
 .hero-glow {
   background:
-    radial-gradient(60% 50% at 75% 18%, rgba(205, 23, 24, 0.16), transparent 60%),
-    radial-gradient(52% 46% at 12% 82%, rgba(245, 97, 0, 0.16), transparent 60%),
-    radial-gradient(40% 38% at 45% 50%, rgba(255, 156, 0, 0.10), transparent 60%);
+    radial-gradient(60% 50% at 75% 18%, rgba(255, 102, 108, 0.20), transparent 60%),
+    radial-gradient(52% 46% at 12% 82%, rgba(255, 188, 0, 0.16), transparent 60%),
+    radial-gradient(40% 38% at 45% 50%, rgba(255, 102, 108, 0.10), transparent 60%);
 }
 
 @keyframes float-in {

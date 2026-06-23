@@ -37,7 +37,7 @@ export default async function StorePage({
   });
   if (!seller || seller.disabledAt) notFound();
 
-  const accent = seller.accent || "#cd1718";
+  const accent = seller.accent || "#ff666c";
   const liveDrops = seller.drops.filter((d) => d.status === "live");
   const pastDrops = seller.drops.filter((d) => d.status === "closed");
 
