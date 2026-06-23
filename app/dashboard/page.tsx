@@ -4,6 +4,7 @@ import { requireSeller } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { formatMoney, formatDate, relativeTime, statusStyle } from "@/lib/format";
 import { hasGrowthBonus } from "@/lib/plans";
+import { isStripeEnabled } from "@/lib/stripe";
 import { getOrCreateReferralCode } from "@/lib/referral";
 import { Stat, Section } from "@/components/dashboard-ui";
 import { LinkButton, Badge } from "@/components/ui";
@@ -107,8 +108,25 @@ export default async function OverviewPage() {
     };
   }
 
+  // Show a setup alert until the vendor can actually accept card payments.
+  const stripeNeedsSetup = isStripeEnabled() && !seller.stripeChargesEnabled;
+
   return (
     <Section>
+      {stripeNeedsSetup && (
+        <div className="mb-6 rounded-card bg-brand-tint border border-brand/30 p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-semibold text-ink">⚠️ Finish setting up payments to start selling</p>
+            <p className="text-sm text-ink-soft mt-0.5">
+              Connect Stripe so you can accept card payments and get paid. It only takes a minute.
+            </p>
+          </div>
+          <LinkButton href="/dashboard/payments" className="shrink-0">
+            Complete Stripe setup →
+          </LinkButton>
+        </div>
+      )}
+
       {/* Header: store name + dominant New Drop action */}
       <div className="mb-6">
         <div className="flex items-center justify-between gap-3">
