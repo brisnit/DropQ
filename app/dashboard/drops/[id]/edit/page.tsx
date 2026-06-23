@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSeller } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { updateDropFullAction } from "@/lib/actions/dashboard";
 import { DropEditor } from "@/components/drop-editor";
 import { Section } from "@/components/dashboard-ui";
+import { BackLink } from "@/components/back-link";
 
 export const metadata = { title: "Edit drop — DropQ" };
 
@@ -27,9 +27,7 @@ export default async function EditDropPage({
 
   return (
     <Section>
-      <Link href={`/dashboard/drops/${drop.id}`} className="text-sm text-muted hover:text-ink">
-        ← Back to drop
-      </Link>
+      <BackLink href={`/dashboard/drops/${drop.id}`}>Back to drop</BackLink>
       <h1 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight mt-3 mb-7">
         Edit drop
       </h1>

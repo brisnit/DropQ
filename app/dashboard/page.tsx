@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { formatMoney, formatDate, relativeTime, statusStyle } from "@/lib/format";
 import { hasGrowthBonus } from "@/lib/plans";
 import { getOrCreateReferralCode } from "@/lib/referral";
-import { Stat, PageHeader, Section } from "@/components/dashboard-ui";
+import { Stat, Section } from "@/components/dashboard-ui";
 import { LinkButton, Badge } from "@/components/ui";
 import { CopyLinkButton } from "@/components/copy-link-button";
 
@@ -109,11 +109,24 @@ export default async function OverviewPage() {
 
   return (
     <Section>
-      <PageHeader
-        title={`Welcome back, ${seller.storeName}`}
-        subtitle="Here's what's happening with your store today."
-        action={<LinkButton href="/dashboard/drops/new">+ New drop</LinkButton>}
-      />
+      {/* Header: store name is the page title, New Drop is the dominant action */}
+      <div className="flex flex-wrap items-end justify-between gap-4 mb-7">
+        <div className="min-w-0">
+          <p className="text-sm text-muted">Welcome back</p>
+          <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight truncate">
+            {seller.storeName}
+          </h1>
+          <p className="text-muted mt-1">Here&apos;s what&apos;s happening with your store today.</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <LinkButton href={`/s/${seller.slug}`} target="_blank" variant="secondary">
+            View Your Store ↗
+          </LinkButton>
+          <LinkButton href="/dashboard/drops/new" size="lg">
+            + New Drop
+          </LinkButton>
+        </div>
+      </div>
 
       {/* Next action */}
       <div className={`rounded-card p-6 sm:p-7 mb-7 flex flex-wrap items-center justify-between gap-4 ${next.tone}`}>

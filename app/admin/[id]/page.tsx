@@ -7,6 +7,7 @@ import { formatMoney, formatDate, relativeTime, statusStyle } from "@/lib/format
 import { Stat } from "@/components/dashboard-ui";
 import { Badge, Button, Select } from "@/components/ui";
 import { ConfirmSubmit } from "@/components/confirm-submit";
+import { BackLink } from "@/components/back-link";
 import {
   effectivePlan,
   planLabel,
@@ -67,7 +68,7 @@ export default async function AdminClientPage({
 
   return (
     <div>
-      <Link href="/admin" className="text-sm text-muted hover:text-ink">← All vendors</Link>
+      <BackLink href="/admin">All vendors</BackLink>
 
       <div className="flex flex-wrap items-start justify-between gap-4 mt-3 mb-6">
         <div>

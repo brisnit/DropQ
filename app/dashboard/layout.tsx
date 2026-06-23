@@ -43,24 +43,27 @@ export default async function DashboardLayout({
           )}
         </div>
         <div className="p-4 border-t border-line/70 space-y-3">
+          {/* View Your Store — single, prominent storefront CTA */}
           <Link
             href={`/s/${seller.slug}`}
             target="_blank"
-            className="block rounded-xl border border-line bg-paper px-3 py-2.5 hover:border-ink/30 transition"
+            className="block rounded-xl bg-ink text-cream px-4 py-3 hover:bg-ink-soft transition"
           >
-            <span className="block text-xs text-muted">Your storefront</span>
-            <span className="block text-sm font-medium truncate">
-              /s/{seller.slug} ↗
+            <span className="flex items-center justify-between text-sm font-semibold">
+              View Your Store <span aria-hidden>↗</span>
+            </span>
+            <span className="block text-xs text-cream/70 mt-0.5">
+              See your storefront exactly as customers see it.
             </span>
           </Link>
-          <div className="flex items-center justify-between">
-            <div className="min-w-0">
-              <p className="text-sm font-medium truncate">{seller.storeName}</p>
-              <p className="text-xs text-muted truncate">{seller.email}</p>
-            </div>
+
+          {/* Account + logout (always the last item) */}
+          <div className="pt-1">
+            <p className="text-sm font-medium truncate">{seller.storeName}</p>
+            <p className="text-xs text-muted truncate mb-2">{seller.email}</p>
             <form action={logoutAction}>
-              <button className="text-xs text-muted hover:text-brand transition px-2 py-1">
-                Log out
+              <button className="w-full inline-flex items-center gap-2 text-sm font-medium text-ink-soft hover:text-brand hover:bg-line/60 rounded-lg px-3 py-2.5 transition">
+                <span aria-hidden className="text-base leading-none">↩</span> Log out
               </button>
             </form>
           </div>

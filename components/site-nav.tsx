@@ -30,12 +30,9 @@ export async function SiteNav() {
             </LinkButton>
           ) : (
             <>
-              <Link
-                href="/login"
-                className="hidden sm:inline text-sm font-medium text-ink-soft hover:text-ink px-3 py-2"
-              >
+              <LinkButton href="/login" variant="secondary" size="sm">
                 Log in
-              </Link>
+              </LinkButton>
               <LinkButton href="/signup" size="sm">
                 Start selling
               </LinkButton>

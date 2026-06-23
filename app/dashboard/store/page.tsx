@@ -34,7 +34,7 @@ export default async function StorePage() {
             target="_blank"
             className="text-sm font-medium px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
           >
-            View storefront ↗
+            View Your Store ↗
           </Link>
         }
       />

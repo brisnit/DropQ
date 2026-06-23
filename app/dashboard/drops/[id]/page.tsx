@@ -17,6 +17,7 @@ import { ShareButton } from "@/components/share-button";
 import { StatusSelect } from "@/components/status-select";
 import { LiveOrders } from "@/components/live-orders";
 import { ConfirmSubmit } from "@/components/confirm-submit";
+import { BackLink } from "@/components/back-link";
 
 export default async function DropDetailPage({
   params,
@@ -72,9 +73,7 @@ export default async function DropDetailPage({
 
   return (
     <Section>
-      <Link href="/dashboard/drops" className="text-sm text-muted hover:text-ink">
-        ← Back to drops
-      </Link>
+      <BackLink href="/dashboard/drops">Back to drops</BackLink>
 
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4 mt-3 mb-6">

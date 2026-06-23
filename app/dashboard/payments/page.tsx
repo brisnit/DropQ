@@ -9,6 +9,7 @@ import {
 import { formatMoney } from "@/lib/format";
 import { PageHeader, Stat, Section } from "@/components/dashboard-ui";
 import { Button, Badge } from "@/components/ui";
+import { StripeMark } from "@/components/stripe-mark";
 
 export const metadata = { title: "Payments — DropQ" };
 
@@ -109,21 +110,27 @@ export default async function PaymentsPage({
           </p>
         </div>
       ) : connected && chargesEnabled ? (
-        <div className="bg-paper border border-line rounded-card p-6">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div>
-              <Badge className="bg-sage-tint text-sage mb-2">● Connected</Badge>
-              <h2 className="font-semibold text-lg">You&apos;re ready to accept payments</h2>
-              <p className="text-muted mt-1 max-w-xl">
-                Card payments go straight to your Stripe account and pay out to your
-                bank on your schedule. DropQ keeps a{" "}
-                <span className="text-ink font-medium">{fee}%</span> fee per order —
-                no monthly cost. Standard Stripe card-processing fees also apply, just
-                like anywhere you take card payments.
-              </p>
+        <div className="bg-sage-tint/50 border-2 border-sage/30 rounded-card p-6 sm:p-7 shadow-[var(--shadow-lift)]">
+          <div className="flex flex-wrap items-start justify-between gap-5">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="w-11 h-11 rounded-full bg-sage text-white grid place-items-center text-xl shrink-0">✓</div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-sage text-white">Connected</Badge>
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
+                    <StripeMark size={18} /> Powered by Stripe
+                  </span>
+                </div>
+                <h2 className="font-display text-xl font-semibold mt-2">Payments are connected</h2>
+                <p className="text-ink-soft mt-1 max-w-xl">
+                  Card payments go straight to your Stripe account and pay out to your bank on
+                  your schedule. Manage payouts, balances, and bank details in Stripe. DropQ keeps
+                  a <span className="text-ink font-medium">{fee}%</span> fee per order — no monthly cost.
+                </p>
+              </div>
             </div>
-            <form action={stripeDashboardAction}>
-              <Button type="submit" variant="secondary">Open Stripe dashboard ↗</Button>
+            <form action={stripeDashboardAction} className="shrink-0">
+              <Button type="submit" size="lg">Open Stripe Dashboard ↗</Button>
             </form>
           </div>
         </div>
@@ -146,22 +153,39 @@ export default async function PaymentsPage({
           </div>
         </div>
       ) : (
-        <div className="bg-ink text-cream rounded-card p-7">
-          <div className="max-w-xl">
-            <h2 className="font-display text-2xl font-semibold">Get paid for your drops</h2>
-            <p className="text-cream/75 mt-2">
-              Connect a Stripe account to accept credit cards at checkout. Payouts land in your
-              bank automatically. DropQ keeps a small{" "}
-              <span className="text-white font-medium">{fee}%</span> fee per transaction — no
-              monthly cost.
-            </p>
-            <form action={connectStripeAction} className="mt-5">
+        <div className="bg-paper border border-line rounded-card p-6 sm:p-7 shadow-[var(--shadow-soft)]">
+          <div className="flex items-center gap-2 mb-3">
+            <StripeMark />
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted">Powered by Stripe</span>
+          </div>
+          <h2 className="font-display text-2xl font-semibold">How do you receive payments?</h2>
+          <p className="text-ink-soft mt-2 max-w-2xl">
+            DropQ uses Stripe, the industry-standard payment platform trusted by millions of
+            businesses worldwide. Stripe securely processes payments and deposits funds directly
+            into your bank account.
+          </p>
+          <p className="text-muted text-sm mt-3 max-w-2xl">
+            If you don&apos;t already have a Stripe account, you&apos;ll need to create one before you
+            can receive payments through DropQ. DropQ keeps a small{" "}
+            <span className="text-ink font-medium">{fee}%</span> fee per order — no monthly cost.
+          </p>
+          <div className="flex flex-wrap items-center gap-3 mt-5">
+            <form action={connectStripeAction}>
               <Button type="submit" size="lg">Connect with Stripe</Button>
             </form>
-            <p className="text-xs text-cream/50 mt-3">
-              You&apos;ll be redirected to Stripe to securely set up payouts.
-            </p>
+            <a
+              href="https://stripe.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-[0.95rem] font-medium px-5 py-2.5 rounded-xl border border-line-strong bg-paper hover:bg-cream hover:border-ink/30 transition"
+            >
+              Learn More About Stripe ↗
+            </a>
           </div>
+          <p className="text-xs text-muted mt-3">
+            You&apos;ll be securely redirected to Stripe to create a new account or connect an
+            existing one and set up payouts.
+          </p>
         </div>
       )}
 
