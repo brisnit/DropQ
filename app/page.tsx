@@ -12,7 +12,7 @@ function DropMockup() {
   return (
     <div className="relative">
       <div className="absolute -inset-6 hero-glow blur-2xl" aria-hidden />
-      <Card className="relative p-0 overflow-hidden w-full max-w-sm mx-auto rotate-[0.6deg]">
+      <Card className="relative p-0 overflow-hidden w-full max-w-sm mx-auto lg:mx-0 lg:ml-auto">
         {/* storefront header */}
         <div className="bg-ink text-cream px-5 pt-5 pb-6">
           <div className="flex items-center justify-between">
