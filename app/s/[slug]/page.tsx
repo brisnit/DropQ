@@ -7,6 +7,7 @@ import { ReviewForm } from "@/components/review-form";
 import { SocialLinks } from "@/components/social-links";
 import { formatMoney, formatDate } from "@/lib/format";
 import { isDemoStore } from "@/lib/demo";
+import { getCurrentSeller } from "@/lib/auth";
 
 export async function generateMetadata({
   params,
@@ -36,6 +37,12 @@ export default async function StorePage({
     },
   });
   if (!seller || seller.disabledAt) notFound();
+
+  // If the vendor is previewing their own store, "Back" returns to their dashboard.
+  const viewer = await getCurrentSeller();
+  const isOwner = viewer?.id === seller.id;
+  const backHref = isOwner ? "/dashboard" : "/";
+  const backLabel = isOwner ? "Back to dashboard" : "Back";
 
   const accent = seller.accent || "#cd1718";
   const liveDrops = seller.drops.filter((d) => d.status === "live");
@@ -71,10 +78,10 @@ export default async function StorePage({
           />
         )}
         <Link
-          href="/"
+          href={backHref}
           className="absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-pill bg-black/25 hover:bg-black/40 text-white text-sm font-medium px-3.5 py-2 backdrop-blur-sm transition"
         >
-          <span aria-hidden>←</span> Back
+          <span aria-hidden>←</span> {backLabel}
         </Link>
       </div>
       {/* relative z-10 so the avatar overlaps the banner instead of being painted over by it */}
