@@ -10,7 +10,7 @@ const VARIANTS: Record<Variant, string> = {
     "bg-ink text-white hover:bg-ink-soft shadow-[0_8px_20px_-8px_rgba(26,26,26,0.45)]",
   // Brand — orange accent button (use on dark surfaces where black would vanish)
   brand:
-    "bg-brand text-white hover:bg-brand-dark shadow-[0_8px_20px_-8px_rgba(255,147,75,0.55)]",
+    "bg-brand text-white hover:bg-brand-dark shadow-[0_8px_20px_-8px_rgba(255,102,108,0.55)]",
   // Secondary — solid grey
   secondary: "bg-secondary text-ink hover:bg-[#cfcfcf]",
   // Tertiary — grey outline
