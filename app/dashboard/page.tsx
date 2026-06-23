@@ -109,23 +109,32 @@ export default async function OverviewPage() {
 
   return (
     <Section>
-      {/* Header: store name is the page title, New Drop is the dominant action */}
-      <div className="flex flex-wrap items-end justify-between gap-4 mb-7">
-        <div className="min-w-0">
-          <p className="text-sm text-muted">Welcome back</p>
-          <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight truncate">
-            {seller.storeName}
-          </h1>
-          <p className="text-muted mt-1">Here&apos;s what&apos;s happening with your store today.</p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <LinkButton href={`/s/${seller.slug}`} target="_blank" variant="secondary">
-            View Your Store ↗
-          </LinkButton>
-          <LinkButton href="/dashboard/drops/new" size="lg">
-            + New Drop
+      {/* Header: store name + dominant New Drop action */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm text-muted hidden sm:block">Welcome back</p>
+            <h1 className="font-display text-2xl sm:text-4xl font-semibold tracking-tight truncate">
+              {seller.storeName}
+            </h1>
+          </div>
+          <LinkButton href="/dashboard/drops/new" className="shrink-0">
+            + New drop
           </LinkButton>
         </div>
+        {/* View Your Store — shown on mobile (desktop has it in the sidebar) */}
+        <Link
+          href={`/s/${seller.slug}`}
+          target="_blank"
+          className="md:hidden block mt-3 rounded-xl bg-ink text-cream px-4 py-3 hover:bg-ink-soft transition"
+        >
+          <span className="flex items-center justify-between text-sm font-semibold">
+            View Your Store <span aria-hidden>↗</span>
+          </span>
+          <span className="block text-xs text-cream/70 mt-0.5">
+            See your storefront exactly as customers see it.
+          </span>
+        </Link>
       </div>
 
       {/* Next action */}

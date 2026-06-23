@@ -4,10 +4,10 @@ import { requireSeller, isAdminEmail } from "@/lib/auth";
 import { logoutAction, acceptTermsAction } from "@/lib/actions/auth";
 import { Logo } from "@/components/logo";
 import { DashboardNav } from "@/components/dashboard-nav";
+import { MobileNav } from "@/components/mobile-nav";
 import { VerifyBanner } from "@/components/verify-banner";
 import { TermsGate } from "@/components/terms-gate";
 import { TERMS_VERSION } from "@/lib/terms";
-import { LinkButton } from "@/components/ui";
 
 export default async function DashboardLayout({
   children,
@@ -26,10 +26,10 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[260px_1fr]">
-      {/* Sidebar */}
-      <aside className="border-b md:border-b-0 md:border-r border-line bg-cream md:h-screen md:sticky md:top-0 flex flex-col">
+      {/* Sidebar — desktop only */}
+      <aside className="hidden md:flex md:border-r border-line bg-cream md:h-screen md:sticky md:top-0 flex-col">
         <div className="px-5 py-4 border-b border-line/70">
-          <Logo />
+          <Logo href="/dashboard" />
         </div>
         <div className="p-4 flex-1">
           <DashboardNav />
@@ -72,15 +72,16 @@ export default async function DashboardLayout({
 
       {/* Main */}
       <main className="min-w-0">
+        {/* Mobile top bar — logo + hamburger (replaces the scrolling nav) */}
+        <div className="md:hidden sticky top-0 z-30 bg-cream/95 backdrop-blur border-b border-line">
+          <div className="flex items-center justify-between px-5 h-14">
+            <Logo href="/dashboard" />
+            <MobileNav admin={admin} slug={seller.slug} />
+          </div>
+        </div>
         <Suspense fallback={null}>
           <VerifyBanner verified={seller.emailVerified} />
         </Suspense>
-        <div className="md:hidden flex items-center justify-between px-5 py-3 border-b border-line">
-          <span className="font-display font-semibold">{seller.storeName}</span>
-          <LinkButton href="/dashboard/drops/new" size="sm">
-            + New drop
-          </LinkButton>
-        </div>
         {children}
       </main>
     </div>
