@@ -32,7 +32,7 @@
   --color-line: #e8e8e8;
   --color-line-strong: #d9d9d9;
 
-  --font-display: var(--font-madimi-one), system-ui, sans-serif;
+  --font-display: var(--font-sora), system-ui, sans-serif;
   --font-sans: var(--font-google-sans), system-ui, sans-serif;
 
   --radius-card: 1.25rem;
@@ -65,10 +65,9 @@ body {
   color: #fff;
 }
 
-/* Display font (Madimi One) is a single-weight (400) display face — pin it so
-   font-bold/font-semibold utilities on headings don't trigger faux-bold. */
+/* Display font (Sora) is a true variable face — let headings use the real
+   font-bold/font-semibold weights. */
 .font-display {
-  font-weight: 400 !important;
   font-synthesis-weight: none;
 }
 

@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
-import { Madimi_One, Google_Sans_Flex } from "next/font/google";
+import { Sora, Google_Sans_Flex } from "next/font/google";
 import "./globals.css";
 
-// Primary / display font
-const madimiOne = Madimi_One({
-  variable: "--font-madimi-one",
+// Primary / display font (variable weight)
+const sora = Sora({
+  variable: "--font-sora",
   subsets: ["latin"],
-  weight: ["400"],
   display: "swap",
 });
 
@@ -27,7 +26,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${madimiOne.variable} ${googleSans.variable} h-full`}>
+    <html lang="en" className={`${sora.variable} ${googleSans.variable} h-full`}>
       <body className="min-h-full antialiased">{children}</body>
     </html>
   );
