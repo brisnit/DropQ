@@ -100,7 +100,7 @@ export default async function OrderConfirmationPage({
               ))}
               {serviceFee > 0 && (
                 <div className="flex justify-between px-4 py-2.5 text-sm text-muted">
-                  <span>DropQ service fee</span>
+                  <span>Service fee</span>
                   <span>{formatMoney(serviceFee)}</span>
                 </div>
               )}
@@ -133,13 +133,20 @@ export default async function OrderConfirmationPage({
           </div>
         </div>
 
-        <p className="text-center text-xs text-muted mt-5 flex items-center justify-center gap-1.5">
-          <Mark size={16} />
+        <p className="text-center text-xs text-muted mt-5">
           {paidWithStripe
-            ? "Paid securely with Stripe · Powered by DropQ"
+            ? "Paid securely with Stripe."
             : payInPerson
-              ? "Pay the seller in person · Powered by DropQ"
-              : "Powered by DropQ · Demo order, no payment taken"}
+              ? "Pay the seller in person."
+              : "Demo order — no payment taken."}
+        </p>
+
+        {/* Subtle post-order upsell — the only place we mention DropQ to a buyer */}
+        <p className="text-center text-sm text-muted mt-6 flex items-center justify-center gap-1.5">
+          <Mark size={15} /> Want a store like this?{" "}
+          <Link href="/" className="text-ink font-medium hover:underline">
+            Start your own free →
+          </Link>
         </p>
       </div>
     </main>

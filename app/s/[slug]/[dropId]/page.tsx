@@ -2,9 +2,21 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { isStripeEnabled, feePercent } from "@/lib/stripe";
-import { Mark } from "@/components/logo";
 import { StorefrontOrder } from "@/components/storefront-order";
 import { WaitlistForm } from "@/components/waitlist-form";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string; dropId: string }>;
+}) {
+  const { dropId } = await params;
+  const drop = await prisma.drop.findUnique({
+    where: { id: dropId },
+    select: { title: true, seller: { select: { storeName: true } } },
+  });
+  return { title: drop ? `${drop.title} — ${drop.seller.storeName}` : "Order" };
+}
 
 export default async function DropOrderPage({
   params,
@@ -40,15 +52,28 @@ export default async function DropOrderPage({
 
   return (
     <main className="min-h-screen">
-      {/* Top bar */}
+      {/* Top bar — the vendor's identity (no DropQ branding) */}
       <div className="border-b border-line bg-cream/80 backdrop-blur sticky top-0 z-30">
-        <div className="max-w-4xl mx-auto px-5 h-14 flex items-center justify-between">
-          <Link href={`/s/${slug}`} className="text-sm text-muted hover:text-ink">
-            ← {drop.seller.storeName}
+        <div className="max-w-4xl mx-auto px-5 h-14 flex items-center">
+          <Link href={`/s/${slug}`} className="flex items-center gap-2.5 min-w-0 hover:opacity-80 transition">
+            <span aria-hidden className="text-muted text-base leading-none">←</span>
+            {drop.seller.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={drop.seller.logoUrl}
+                alt={drop.seller.storeName}
+                className="w-8 h-8 rounded-lg object-cover border border-line shrink-0"
+              />
+            ) : (
+              <span
+                className="w-8 h-8 rounded-lg grid place-items-center font-display text-sm font-semibold text-white shrink-0"
+                style={{ backgroundColor: accent }}
+              >
+                {drop.seller.storeName.charAt(0)}
+              </span>
+            )}
+            <span className="font-display font-semibold truncate">{drop.seller.storeName}</span>
           </Link>
-          <span className="text-xs text-muted flex items-center gap-1.5">
-            <Mark size={16} /> DropQ
-          </span>
         </div>
       </div>
 

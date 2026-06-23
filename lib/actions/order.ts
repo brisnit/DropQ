@@ -136,7 +136,7 @@ export async function placeOrderAction(
                 price_data: {
                   currency: "usd" as const,
                   unit_amount: feeCents,
-                  product_data: { name: "DropQ service fee" },
+                  product_data: { name: "Service fee" },
                 },
               },
             ]
