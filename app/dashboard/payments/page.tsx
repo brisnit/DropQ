@@ -169,6 +169,9 @@ export default async function PaymentsPage({
             can receive payments through DropQ. DropQ keeps a small{" "}
             <span className="text-ink font-medium">{fee}%</span> fee per order — no monthly cost.
           </p>
+          <p className="mt-4 max-w-2xl bg-brand-tint text-ink font-semibold rounded-xl px-4 py-3">
+            Select &ldquo;Connect with Stripe&rdquo; and enter your email to get started.
+          </p>
           <div className="flex flex-wrap items-center gap-3 mt-5">
             <form action={connectStripeAction}>
               <Button type="submit" size="lg">Connect with Stripe</Button>
