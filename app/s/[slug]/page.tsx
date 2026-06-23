@@ -38,11 +38,10 @@ export default async function StorePage({
   });
   if (!seller || seller.disabledAt) notFound();
 
-  // If the vendor is previewing their own store, "Back" returns to their dashboard.
+  // Only the vendor previewing their own store gets a "Back to dashboard" link.
+  // Customers have no back button — they stay on the store.
   const viewer = await getCurrentSeller();
   const isOwner = viewer?.id === seller.id;
-  const backHref = isOwner ? "/dashboard" : "/";
-  const backLabel = isOwner ? "Back to dashboard" : "Back";
 
   const accent = seller.accent || "#cd1718";
   const liveDrops = seller.drops.filter((d) => d.status === "live");
@@ -77,12 +76,14 @@ export default async function StorePage({
             className="absolute inset-0 w-full h-full object-cover"
           />
         )}
-        <Link
-          href={backHref}
-          className="absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-pill bg-black/25 hover:bg-black/40 text-white text-sm font-medium px-3.5 py-2 backdrop-blur-sm transition"
-        >
-          <span aria-hidden>←</span> {backLabel}
-        </Link>
+        {isOwner && (
+          <Link
+            href="/dashboard"
+            className="absolute top-4 left-4 inline-flex items-center gap-1.5 rounded-pill bg-black/25 hover:bg-black/40 text-white text-sm font-medium px-3.5 py-2 backdrop-blur-sm transition"
+          >
+            <span aria-hidden>←</span> Back to dashboard
+          </Link>
+        )}
       </div>
       {/* relative z-10 so the avatar overlaps the banner instead of being painted over by it */}
       <div className="relative z-10 max-w-3xl mx-auto px-5">
