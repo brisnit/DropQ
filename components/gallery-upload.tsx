@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { compressImage, setInputFiles } from "@/lib/compress-image";
 
 function UploadButton({ count }: { count: number }) {
   const { pending } = useFormStatus();
@@ -28,10 +29,17 @@ export function GalleryUpload({
   const ref = useRef<HTMLInputElement>(null);
   const [previews, setPreviews] = useState<string[]>([]);
 
-  const onChange = (files: FileList | null) => {
+  const onChange = async (input: HTMLInputElement) => {
     previews.forEach((p) => URL.revokeObjectURL(p));
-    const arr = Array.from(files ?? []).filter((f) => f.type.startsWith("image/"));
-    setPreviews(arr.map((f) => URL.createObjectURL(f)));
+    const arr = Array.from(input.files ?? []).filter((f) => f.type.startsWith("image/"));
+    if (!arr.length) {
+      setPreviews([]);
+      return;
+    }
+    // Compress each in the browser, then submit the compressed versions.
+    const compressed = await Promise.all(arr.map((f) => compressImage(f)));
+    setInputFiles(input, compressed);
+    setPreviews(compressed.map((f) => URL.createObjectURL(f)));
   };
 
   return (
@@ -44,7 +52,7 @@ export function GalleryUpload({
           accept="image/png,image/jpeg,image/webp,image/avif"
           multiple
           className="sr-only"
-          onChange={(e) => onChange(e.target.files)}
+          onChange={(e) => onChange(e.currentTarget)}
         />
         <span className="text-sm font-medium text-ink-soft">📷 Choose photos</span>
         <p className="text-xs text-muted mt-1">

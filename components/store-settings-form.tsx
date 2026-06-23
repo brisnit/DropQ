@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { Button, Field, Input, Textarea } from "@/components/ui";
 import { updateStoreAction, type StoreSaveState } from "@/lib/actions/dashboard";
 import { SOCIALS } from "@/lib/social";
+import { compressImage, setInputFiles } from "@/lib/compress-image";
 
 const ACCENTS = ["#cd1718", "#3a8895", "#3F7D5B", "#8A2D52", "#2B6CB0", "#1C1916"];
 const isHex = (v: string) => /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(v);
@@ -61,10 +62,13 @@ export function StoreSettingsForm({
   const [logoRemoved, setLogoRemoved] = useState(false);
   const shownLogo = logoPreview || (logoRemoved ? null : seller.logoUrl);
 
-  const onLogoFile = (file: File | undefined) => {
+  const onLogoFile = async (input: HTMLInputElement) => {
+    const file = input.files?.[0];
     if (!file || !file.type.startsWith("image/")) return;
+    const compressed = await compressImage(file);
+    setInputFiles(input, [compressed]);
     if (logoPreview) URL.revokeObjectURL(logoPreview);
-    setLogoPreview(URL.createObjectURL(file));
+    setLogoPreview(URL.createObjectURL(compressed));
     setLogoRemoved(false);
     setDirty(true);
   };
@@ -81,10 +85,13 @@ export function StoreSettingsForm({
   const [headerRemoved, setHeaderRemoved] = useState(false);
   const shownHeader = headerPreview || (headerRemoved ? null : seller.headerImageUrl);
 
-  const onHeaderFile = (file: File | undefined) => {
+  const onHeaderFile = async (input: HTMLInputElement) => {
+    const file = input.files?.[0];
     if (!file || !file.type.startsWith("image/")) return;
+    const compressed = await compressImage(file, 2000);
+    setInputFiles(input, [compressed]);
     if (headerPreview) URL.revokeObjectURL(headerPreview);
-    setHeaderPreview(URL.createObjectURL(file));
+    setHeaderPreview(URL.createObjectURL(compressed));
     setHeaderRemoved(false);
     setDirty(true);
   };
@@ -127,7 +134,7 @@ export function StoreSettingsForm({
                 name="logo"
                 accept="image/*"
                 className="sr-only"
-                onChange={(e) => onLogoFile(e.target.files?.[0])}
+                onChange={(e) => onLogoFile(e.currentTarget)}
               />
             </label>
             <div className="text-sm">
@@ -161,7 +168,7 @@ export function StoreSettingsForm({
               name="headerImage"
               accept="image/png,image/jpeg,image/webp,image/avif"
               className="sr-only"
-              onChange={(e) => onHeaderFile(e.target.files?.[0])}
+              onChange={(e) => onHeaderFile(e.currentTarget)}
             />
           </label>
           <div className="mt-2 flex items-center justify-between gap-3 text-sm">

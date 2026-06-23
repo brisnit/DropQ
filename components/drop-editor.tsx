@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button, Field, Input, Textarea, Select } from "@/components/ui";
 import { vocab, showItemMeta, isFood } from "@/lib/category";
+import { compressImage, setInputFiles } from "@/lib/compress-image";
 
 export type DropDefaults = {
   title?: string;
@@ -156,13 +157,16 @@ export function DropEditor({
       return rs.filter((r) => r.key !== key);
     });
 
-  const handleFile = (key: number, file: File | undefined) => {
+  const handleFile = async (key: number, input: HTMLInputElement) => {
+    const file = input.files?.[0];
     if (!file || !file.type.startsWith("image/")) return;
+    const compressed = await compressImage(file);
+    setInputFiles(input, [compressed]);
     setRows((rs) =>
       rs.map((r) => {
         if (r.key !== key) return r;
         if (r.imagePreview) URL.revokeObjectURL(r.imagePreview);
-        return { ...r, imagePreview: URL.createObjectURL(file) };
+        return { ...r, imagePreview: URL.createObjectURL(compressed) };
       })
     );
   };
@@ -303,7 +307,7 @@ export function DropEditor({
                         name="p_image"
                         accept="image/*"
                         className="sr-only"
-                        onChange={(e) => handleFile(row.key, e.target.files?.[0])}
+                        onChange={(e) => handleFile(row.key, e.currentTarget)}
                       />
                     </label>
                     {shownImage ? (
