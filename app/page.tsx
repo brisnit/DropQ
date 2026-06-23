@@ -155,9 +155,9 @@ export default function Home() {
       {/* HERO */}
       <Section className="pt-16 pb-20 sm:pt-24 grid lg:grid-cols-2 gap-14 items-center">
         <div className="animate-in">
-          <Badge className="bg-grey-tint text-[#3f434b] mb-5">
+          <p className="text-lg sm:text-xl font-semibold text-brand mb-5">
             Que the hype
-          </Badge>
+          </p>
           <h1 className="font-display text-[2.6rem] sm:text-6xl leading-[1.02] font-semibold tracking-tight">
             Organized Drops.
             <br />
