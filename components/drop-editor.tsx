@@ -218,8 +218,8 @@ export function DropEditor({
       <div className="bg-paper border border-line rounded-card p-6 space-y-5">
         <h2 className="font-semibold text-lg">{live ? "Live drop details" : "Drop details"}</h2>
         {live && (
-          <p className="text-sm rounded-xl bg-ink text-tertiary px-4 py-3">
-            🟢 Live selling mode — customers scan your QR and order on the spot. Orders appear in your dashboard in real time.
+          <p className="text-sm rounded-xl bg-ink text-white px-4 py-3">
+            Live selling mode — customers scan your QR and order on the spot. Orders appear in your dashboard in real time.
           </p>
         )}
         <Field label="Title" hint={`What you'd call this ${live ? "live event" : "drop"}.`}>
