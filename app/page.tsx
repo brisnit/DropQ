@@ -213,7 +213,7 @@ export default function Home() {
             your language.
           </p>
         </Reveal>
-        <div className="grid sm:grid-cols-3 gap-4 sm:gap-5 mt-10">
+        <div className="grid sm:grid-cols-3 gap-4 sm:gap-5 mt-20">
           {SELL_CATEGORIES.map((c, i) => (
             <Reveal key={c.label} delay={i * 80}>
               <div className="group bg-paper border border-line rounded-card overflow-hidden shadow-[var(--shadow-soft)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[var(--shadow-lift)] cursor-pointer">

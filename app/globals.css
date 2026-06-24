@@ -34,7 +34,7 @@
   --color-line: #e8e8e8;
   --color-line-strong: #d9d9d9;
 
-  --font-display: var(--font-sora), system-ui, sans-serif;
+  --font-display: var(--font-varela), system-ui, sans-serif;
   --font-sans: var(--font-google-sans), system-ui, sans-serif;
 
   --radius-card: 1.25rem;
@@ -67,10 +67,10 @@ body {
   color: #fff;
 }
 
-/* Display font (Sora) is a true variable face — let headings use the real
-   font-bold/font-semibold weights. */
+/* Display font (Varela Round) ships at a single 400 weight, so let the browser
+   synthesize heavier weights for font-semibold/font-bold headings. */
 .font-display {
-  font-synthesis-weight: none;
+  font-synthesis-weight: auto;
 }
 
 .bg-grid {

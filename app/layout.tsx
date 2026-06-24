@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { Sora, Google_Sans_Flex } from "next/font/google";
+import { Varela_Round, Google_Sans_Flex } from "next/font/google";
 import "./globals.css";
 
-// Primary / display font (variable weight)
-const sora = Sora({
-  variable: "--font-sora",
+// Primary / display font (single weight 400 — bold is synthesized)
+const varela = Varela_Round({
+  variable: "--font-varela",
   subsets: ["latin"],
+  weight: "400",
   display: "swap",
 });
 
@@ -26,7 +27,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${sora.variable} ${googleSans.variable} h-full`}>
+    <html lang="en" className={`${varela.variable} ${googleSans.variable} h-full`}>
       <body className="min-h-full antialiased">{children}</body>
     </html>
   );
