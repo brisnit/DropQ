@@ -461,12 +461,9 @@ export default function Home() {
             “DropQ turned my weekend hobby into a real business. I sold out my
             first drop in 11 minutes and finally have a customer list I own.”
           </blockquote>
-          <div className="mt-7 flex items-center justify-center gap-3">
-            <span className="w-11 h-11 rounded-full bg-brand-tint grid place-items-center text-xl">🃏</span>
-            <div className="text-left">
-              <p className="font-semibold">Matt Jennings</p>
-              <p className="text-sm text-muted">Dope Collectables · La Mesa, CA</p>
-            </div>
+          <div className="mt-7 text-center">
+            <p className="font-semibold">Matt Jennings</p>
+            <p className="text-sm text-muted">Dope Collectables · La Mesa, CA</p>
           </div>
         </Card>
         </Reveal>
