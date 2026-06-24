@@ -214,32 +214,40 @@ export default function Home() {
         </div>
         <div className="grid sm:grid-cols-3 gap-4 sm:gap-5 mt-10">
           {SELL_CATEGORIES.map((c) => (
-            <div key={c.label} className="bg-paper border border-line rounded-card overflow-hidden">
+            <div
+              key={c.label}
+              className="group bg-paper border border-line rounded-card overflow-hidden shadow-[var(--shadow-soft)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[var(--shadow-lift)] cursor-pointer"
+            >
               <div className="aspect-[5/4] overflow-hidden bg-cream">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={c.img} alt={c.label} className="w-full h-full object-cover" />
+                <img
+                  src={c.img}
+                  alt={c.label}
+                  className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                />
               </div>
               <div className="p-4">
-                <h3 className="font-semibold">{c.label}</h3>
+                <h3 className="font-semibold transition-colors group-hover:text-brand">{c.label}</h3>
                 <p className="text-xs text-muted mt-1">{c.eg}</p>
               </div>
             </div>
           ))}
 
-          {/* And everything else — spans two columns, image with overlay text */}
-          <div className="sm:col-span-2 relative rounded-card overflow-hidden min-h-[260px] sm:min-h-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/categories/everything.png"
-              alt="And everything else"
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
-            <div className="relative h-full flex flex-col justify-end p-6">
-              <h3 className="font-display text-2xl sm:text-3xl font-semibold text-white">
-                And everything else…
-              </h3>
-              <p className="text-white/85 mt-1">Sell whatever you sell in drops</p>
+          {/* And everything else — spans two columns, same white card style, image on top */}
+          <div className="group sm:col-span-2 flex flex-col bg-paper border border-line rounded-card overflow-hidden shadow-[var(--shadow-soft)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[var(--shadow-lift)] cursor-pointer">
+            <div className="flex-1 min-h-[160px] overflow-hidden bg-cream">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/categories/everything.png"
+                alt="And everything else"
+                className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+              />
+            </div>
+            <div className="p-4">
+              <h3 className="font-semibold transition-colors group-hover:text-brand">And everything else…</h3>
+              <p className="text-xs text-brand underline underline-offset-2 mt-1">
+                Sell whatever you sell in drops
+              </p>
             </div>
           </div>
         </div>
