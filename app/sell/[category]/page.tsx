@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteNav } from "@/components/site-nav";
 import { SiteFooter } from "@/components/site-footer";
-import { LinkButton, Card } from "@/components/ui";
+import { LinkButton, Card, Eyebrow } from "@/components/ui";
 import { Reveal } from "@/components/reveal";
 
 type Accent = "brand" | "tertiary" | "quad";
@@ -212,9 +212,7 @@ export default async function SellCategoryPage({
       {/* HERO */}
       <section className="max-w-6xl mx-auto px-5 pt-12 pb-16 sm:pt-20 sm:pb-20 grid lg:grid-cols-2 gap-12 items-center">
         <Reveal>
-          <span className={`inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] px-3 py-1.5 rounded-pill ${a.chip}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${a.dot}`} /> DropQ for {c.label}
-          </span>
+          <Eyebrow>DropQ for {c.label}</Eyebrow>
           <h1 className="font-display text-4xl sm:text-5xl font-semibold tracking-tight mt-5 leading-[1.05]">
             {c.headline}
           </h1>
