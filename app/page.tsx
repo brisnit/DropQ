@@ -201,7 +201,7 @@ export default function Home() {
       </div>
 
       {/* CATEGORIES — DropQ is for every kind of seller */}
-      <Section className="py-16 sm:py-20">
+      <Section className="pt-16 pb-6 sm:pt-20 sm:pb-10">
         <Reveal className="max-w-2xl mx-auto text-center">
           <Eyebrow>For every kind of seller</Eyebrow>
           <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-3">
