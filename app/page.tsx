@@ -34,7 +34,7 @@ function DropMockup() {
           </span>
         </div>
         {/* logo avatar overlapping the banner + store identity */}
-        <div className="px-5 -mt-9">
+        <div className="relative z-10 px-5 -mt-9">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/demo/marble-crumb-logo.png"
