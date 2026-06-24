@@ -1,20 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/lib/actions/auth";
 
 const NAV = [
-  { href: "/dashboard", label: "Overview", icon: "◎", exact: true },
-  { href: "/dashboard/drops", label: "Drops", icon: "🔥" },
-  { href: "/dashboard/orders", label: "Orders", icon: "🧾" },
-  { href: "/dashboard/customers", label: "Customers", icon: "👥" },
-  { href: "/dashboard/analytics", label: "Analytics", icon: "📈" },
-  { href: "/dashboard/payments", label: "Payments", icon: "💳" },
-  { href: "/dashboard/billing", label: "Plan", icon: "⭐" },
-  { href: "/dashboard/store", label: "Store", icon: "🏪" },
+  { href: "/dashboard", label: "Overview", exact: true },
+  { href: "/dashboard/drops", label: "Drops" },
+  { href: "/dashboard/orders", label: "Orders" },
+  { href: "/dashboard/customers", label: "Customers" },
+  { href: "/dashboard/analytics", label: "Analytics" },
+  { href: "/dashboard/payments", label: "Payments" },
+  { href: "/dashboard/billing", label: "Plan" },
+  { href: "/dashboard/store", label: "Store" },
 ];
+
+const DIVIDER = "my-1 border-t border-line/70";
 
 function isActive(pathname: string, href: string, exact?: boolean) {
   if (exact) return pathname === href;
@@ -27,7 +29,7 @@ export function MobileNav({ admin, slug }: { admin: boolean; slug: string }) {
   const close = () => setOpen(false);
 
   const itemCls = (active: boolean) =>
-    `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition ${
+    `block px-3 py-2.5 rounded-xl text-sm font-medium transition ${
       active ? "bg-ink text-cream" : "text-ink-soft hover:bg-line/70"
     }`;
 
@@ -62,28 +64,30 @@ export function MobileNav({ admin, slug }: { admin: boolean; slug: string }) {
             className="fixed inset-0 z-40 cursor-default"
           />
           <div className="absolute right-0 top-full mt-2 z-50 w-60 bg-paper border border-line rounded-2xl shadow-[var(--shadow-lift)] p-2">
-            {NAV.map((item) => (
-              <Link key={item.href} href={item.href} onClick={close} className={itemCls(isActive(pathname, item.href, item.exact))}>
-                <span className="text-base leading-none w-5 text-center">{item.icon}</span>
-                {item.label}
-              </Link>
+            {NAV.map((item, i) => (
+              <Fragment key={item.href}>
+                <Link href={item.href} onClick={close} className={itemCls(isActive(pathname, item.href, item.exact))}>
+                  {item.label}
+                </Link>
+                {i < NAV.length - 1 && <div className={DIVIDER} aria-hidden />}
+              </Fragment>
             ))}
             {admin && (
-              <Link href="/admin" onClick={close} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-brand hover:bg-brand-tint/60 transition">
-                <span className="text-base leading-none w-5 text-center">🛡️</span>
-                DropQ Admin
-              </Link>
+              <>
+                <div className={DIVIDER} aria-hidden />
+                <Link href="/admin" onClick={close} className="block px-3 py-2.5 rounded-xl text-sm font-medium text-brand hover:bg-brand-tint/60 transition">
+                  DropQ Admin
+                </Link>
+              </>
             )}
 
-            <div className="my-1.5 border-t border-line" />
+            <div className={DIVIDER} aria-hidden />
 
-            <Link href={`/s/${slug}`} target="_blank" onClick={close} className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-ink-soft hover:bg-line/70 transition">
-              <span className="text-base leading-none w-5 text-center">↗</span>
-              View Your Store
+            <Link href={`/s/${slug}`} target="_blank" onClick={close} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-ink-soft hover:bg-line/70 transition">
+              View Your Store <span aria-hidden>↗</span>
             </Link>
             <form action={logoutAction}>
-              <button type="submit" className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-ink-soft hover:bg-brand-tint/60 hover:text-brand transition">
-                <span className="text-base leading-none w-5 text-center">↩</span>
+              <button type="submit" className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-ink-soft hover:bg-brand-tint/60 hover:text-brand transition">
                 Log out
               </button>
             </form>
