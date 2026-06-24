@@ -38,14 +38,6 @@ function parseDefault(s?: string): { date: Date | null; time: string } {
   return { date: new Date(y, m - 1, d), time: (timePart ?? "").slice(0, 5) };
 }
 
-function sameDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
 /** Strip time so day comparisons are stable. */
 function dayValue(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -75,6 +67,10 @@ export function DateRangePicker({
   const [endDate, setEndDate] = useState<Date | null>(initEnd.date);
   const [startTime, setStartTime] = useState(initStart.time || "09:00");
   const [endTime, setEndTime] = useState(initEnd.time || "17:00");
+
+  // "start" = next click begins a fresh (single-day) selection.
+  // "end"   = next click can extend the current day into a multi-day range.
+  const [phase, setPhase] = useState<"start" | "end">("start");
 
   const [viewYear, setViewYear] = useState(
     (initStart.date ?? today).getFullYear()
@@ -107,18 +103,25 @@ export function DateRangePicker({
 
   function pickDay(day: number) {
     const d = new Date(viewYear, viewMonth, day);
-    // No start yet, or both endpoints already chosen → begin a fresh range.
-    if (!startDate || (startDate && endDate)) {
+
+    // First click selects a single-day drop (opens and closes the same day).
+    // The second click — on a later day — extends it into a multi-day range.
+    if (phase === "start" || !startDate) {
       setStartDate(d);
-      setEndDate(null);
+      setEndDate(d);
+      setPhase("end");
       return;
     }
-    // Have a start, no end. Clicking before the start restarts; after sets end.
-    if (dayValue(d) < dayValue(startDate)) {
-      setStartDate(d);
-      setEndDate(null);
-    } else if (!sameDay(d, startDate)) {
+
+    // phase === "end": a later day extends the range; the same/earlier day
+    // restarts a fresh single-day selection.
+    if (dayValue(d) > dayValue(startDate)) {
       setEndDate(d);
+      setPhase("start");
+    } else {
+      setStartDate(d);
+      setEndDate(d);
+      setPhase("end");
     }
   }
 
