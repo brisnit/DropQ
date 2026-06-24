@@ -20,9 +20,9 @@ const VARIANTS: Record<Variant, string> = {
 };
 
 const SIZES: Record<Size, string> = {
-  sm: "text-sm px-3.5 py-2 rounded-lg gap-1.5",
-  md: "text-[0.95rem] px-5 py-2.5 rounded-xl gap-2",
-  lg: "text-base px-7 py-3.5 rounded-xl gap-2.5",
+  sm: "text-sm px-4 py-2 rounded-pill gap-1.5",
+  md: "text-[0.95rem] px-5 py-2.5 rounded-pill gap-2",
+  lg: "text-base px-7 py-3.5 rounded-pill gap-2.5",
 };
 
 const base =
