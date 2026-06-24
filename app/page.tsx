@@ -389,8 +389,8 @@ export default function Home() {
                   </div>
                   <div className="h-2 rounded-full bg-line overflow-hidden">
                     <div
-                      className="h-full bg-brand rounded-full"
-                      style={{ width: `${pct}%` }}
+                      className="h-full rounded-full"
+                      style={{ width: `${pct}%`, backgroundColor: "#1faa6b" }}
                     />
                   </div>
                 </div>
