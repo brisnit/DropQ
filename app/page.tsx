@@ -213,11 +213,11 @@ export default function Home() {
             your language.
           </p>
         </Reveal>
-        <div className="grid sm:grid-cols-3 gap-4 sm:gap-5 mt-10 items-start">
+        <div className="grid sm:grid-cols-3 gap-4 sm:gap-5 mt-10">
           {SELL_CATEGORIES.map((c, i) => (
             <Reveal key={c.label} delay={i * 80}>
               <div className="group bg-paper border border-line rounded-card overflow-hidden shadow-[var(--shadow-soft)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[var(--shadow-lift)] cursor-pointer">
-                <div className="h-44 sm:h-52 overflow-hidden bg-cream">
+                <div className="aspect-[5/4] overflow-hidden bg-cream">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={c.img}
@@ -233,10 +233,14 @@ export default function Home() {
             </Reveal>
           ))}
 
-          {/* And everything else — spans two columns, same white card style, image on top */}
+          {/* And everything else — spans two columns. The card fills the row
+              height (set by the single card beside it) and its image fills the
+              space above a footer identical to the others, so every white
+              footer lines up at the same height. basis-0 stops the image's
+              intrinsic size from inflating the row. */}
           <Reveal delay={SELL_CATEGORIES.length * 80} className="sm:col-span-2">
-            <div className="group bg-paper border border-line rounded-card overflow-hidden shadow-[var(--shadow-soft)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[var(--shadow-lift)] cursor-pointer">
-              <div className="h-44 sm:h-52 overflow-hidden bg-cream">
+            <div className="group h-full flex flex-col bg-paper border border-line rounded-card overflow-hidden shadow-[var(--shadow-soft)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[var(--shadow-lift)] cursor-pointer">
+              <div className="flex-1 basis-0 min-h-0 overflow-hidden bg-cream">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src="/categories/everything.png"
