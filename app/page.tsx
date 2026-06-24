@@ -280,7 +280,7 @@ export default function Home() {
               </div>
               <div className="p-4">
                 <h3 className="font-semibold transition-colors group-hover:text-brand">And everything else…</h3>
-                <p className="text-xs text-brand underline underline-offset-2 mt-1">
+                <p className="text-xs text-ink underline underline-offset-2 mt-1">
                   Sell whatever you sell in drops
                 </p>
               </div>

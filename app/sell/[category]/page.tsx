@@ -55,7 +55,7 @@ const CATEGORIES: Record<string, Category> = {
     eg: "Cards · toys · antiques · vintage",
     img: "/categories/landing/collectibles-1.png",
     img2: "/categories/landing/collectibles-2.png",
-    accent: "tertiary",
+    accent: "brand",
     headline: "Drop your grails to a line that forms in seconds.",
     sub: "For card breakers, toy sellers, and vintage dealers moving hyped, one-of-a-kind inventory to buyers who move fast.",
     features: [
@@ -84,7 +84,7 @@ const CATEGORIES: Record<string, Category> = {
     eg: "Limited runs · branded merch · streetwear",
     img: "/categories/landing/apparel-1.png",
     img2: "/categories/landing/apparel-2.png",
-    accent: "quad",
+    accent: "brand",
     headline: "Limited runs that actually sell out.",
     sub: "For streetwear labels, bands, and creators dropping merch in timed, finite releases that move on their own schedule.",
     features: [
@@ -142,7 +142,7 @@ const CATEGORIES: Record<string, Category> = {
     eg: "If you can box it, you can drop it",
     img: "/categories/landing/everything-1.png",
     img2: "/categories/landing/everything-2.png",
-    accent: "tertiary",
+    accent: "brand",
     headline: "Whatever you sell, drop it on DropQ.",
     sub: "Plants, candles, coffee, books, gear — if it's a product people line up for, DropQ runs the drop from open to sold-out.",
     features: [
