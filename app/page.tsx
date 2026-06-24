@@ -310,7 +310,7 @@ export default function Home() {
             ["🫥", "Customers you lose", "No list, no way to bring last week's buyers back."],
           ].map(([emoji, t, b], i) => (
             <Reveal key={t} delay={i * 80}>
-              <Card className="p-6">
+              <Card className="p-6 h-full">
                 <div className="text-3xl">{emoji}</div>
                 <h3 className="font-semibold mt-3">{t}</h3>
                 <p className="text-sm text-muted mt-1.5">{b}</p>
