@@ -12,6 +12,7 @@ type Category = {
   label: string;
   eg: string;
   img: string;
+  img2: string;
   accent: Accent;
   headline: string;
   sub: string;
@@ -23,7 +24,8 @@ const CATEGORIES: Record<string, Category> = {
   food: {
     label: "Food & Beverage",
     eg: "Bakers · cottage food · popups · meal prep",
-    img: "/categories/food.png",
+    img: "/categories/landing/food-1.png",
+    img2: "/categories/landing/food-2.png",
     accent: "brand",
     headline: "Sell out Friday's batch before the oven's even warm.",
     sub: "For bakers, cottage-food makers, popups, and meal-preppers who sell fresh, sell fast, and sell out every week.",
@@ -51,7 +53,8 @@ const CATEGORIES: Record<string, Category> = {
   collectibles: {
     label: "Collectibles",
     eg: "Cards · toys · antiques · vintage",
-    img: "/categories/collectibles.png",
+    img: "/categories/landing/collectibles-1.png",
+    img2: "/categories/landing/collectibles-2.png",
     accent: "tertiary",
     headline: "Drop your grails to a line that forms in seconds.",
     sub: "For card breakers, toy sellers, and vintage dealers moving hyped, one-of-a-kind inventory to buyers who move fast.",
@@ -79,7 +82,8 @@ const CATEGORIES: Record<string, Category> = {
   apparel: {
     label: "Apparel & Merch",
     eg: "Limited runs · branded merch · streetwear",
-    img: "/categories/apparel.png",
+    img: "/categories/landing/apparel-1.png",
+    img2: "/categories/landing/apparel-2.png",
     accent: "quad",
     headline: "Limited runs that actually sell out.",
     sub: "For streetwear labels, bands, and creators dropping merch in timed, finite releases that move on their own schedule.",
@@ -107,7 +111,8 @@ const CATEGORIES: Record<string, Category> = {
   art: {
     label: "Art & Handmade",
     eg: "Prints · ceramics · makers · originals",
-    img: "/categories/art.png",
+    img: "/categories/landing/art-1.png",
+    img2: "/categories/landing/art-2.png",
     accent: "brand",
     headline: "One-of-a-kind work, sold the moment you publish.",
     sub: "For artists, ceramicists, and makers selling originals, small editions, and handmade goods to people who collect them.",
@@ -135,7 +140,8 @@ const CATEGORIES: Record<string, Category> = {
   everything: {
     label: "Everything else",
     eg: "If you can box it, you can drop it",
-    img: "/categories/everything.png",
+    img: "/categories/landing/everything-1.png",
+    img2: "/categories/landing/everything-2.png",
     accent: "tertiary",
     headline: "Whatever you sell, drop it on DropQ.",
     sub: "Plants, candles, coffee, books, gear — if it's a product people line up for, DropQ runs the drop from open to sold-out.",
@@ -278,7 +284,7 @@ export default async function SellCategoryPage({
           <Reveal delay={120}>
             <div className="rounded-card overflow-hidden shadow-[var(--shadow-soft)] border border-line">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={c.img} alt={c.label} className="w-full aspect-[5/4] object-cover" />
+              <img src={c.img2} alt={c.label} className="w-full aspect-[5/4] object-cover" />
             </div>
           </Reveal>
         </section>
