@@ -286,15 +286,75 @@ function SummaryRow({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <ClockIcon />
-          <input
-            type="time"
-            aria-label={timeLabel}
-            value={time}
-            onChange={(e) => onTime(e.target.value)}
-            className="bg-paper border border-line rounded-xl px-3 py-2 text-ink font-medium focus:border-brand focus:outline-none"
-          />
+          <TimeSelect value={time} onChange={onTime} label={timeLabel} />
         </div>
       </div>
+    </div>
+  );
+}
+
+const HOURS12 = Array.from({ length: 12 }, (_, i) => i + 1); // 1..12
+const MINUTES = Array.from({ length: 60 }, (_, i) => i); // 0..59
+
+/** Combine a 12-hour selection back into the "HH:mm" 24-hour value we store. */
+function to24(hour12: number, minute: number, mer: "AM" | "PM") {
+  let h = hour12 % 12;
+  if (mer === "PM") h += 12;
+  return `${pad(h)}:${pad(minute)}`;
+}
+
+/* On-brand time picker — three styled selects (hour / minute / AM-PM) instead
+   of the native <input type="time"> spinner, so it matches the rest of the UI. */
+function TimeSelect({
+  value,
+  onChange,
+  label,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  label: string;
+}) {
+  const [hStr = "09", mStr = "00"] = (value || "09:00").split(":");
+  const h24 = Number(hStr) || 0;
+  const minute = Number(mStr) || 0;
+  const mer: "AM" | "PM" = h24 >= 12 ? "PM" : "AM";
+  const hour12 = ((h24 + 11) % 12) + 1;
+
+  const cls =
+    "appearance-none text-center bg-paper border border-line rounded-xl px-2.5 py-2 text-ink font-medium focus:border-brand focus:outline-none cursor-pointer";
+
+  return (
+    <div className="flex items-center gap-1">
+      <select
+        aria-label={`${label} hour`}
+        value={hour12}
+        onChange={(e) => onChange(to24(Number(e.target.value), minute, mer))}
+        className={cls}
+      >
+        {HOURS12.map((h) => (
+          <option key={h} value={h}>{pad(h)}</option>
+        ))}
+      </select>
+      <span className="font-semibold text-muted">:</span>
+      <select
+        aria-label={`${label} minute`}
+        value={minute}
+        onChange={(e) => onChange(to24(hour12, Number(e.target.value), mer))}
+        className={cls}
+      >
+        {MINUTES.map((m) => (
+          <option key={m} value={m}>{pad(m)}</option>
+        ))}
+      </select>
+      <select
+        aria-label={`${label} AM or PM`}
+        value={mer}
+        onChange={(e) => onChange(to24(hour12, minute, e.target.value as "AM" | "PM"))}
+        className={cls}
+      >
+        <option value="AM">AM</option>
+        <option value="PM">PM</option>
+      </select>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useOptimistic, useTransition } from "react";
 import { ORDER_STATUSES, orderStatusLabel } from "@/lib/orders";
 
 export function StatusSelect({
@@ -12,32 +12,44 @@ export function StatusSelect({
   orderId: string;
   value: string;
 }) {
-  // Controlled value so React 19's post-action form reset doesn't snap an
-  // uncontrolled <select> back to its default ("new"). The user's choice sticks.
-  const [status, setStatus] = useState(value);
+  // Optimistic value shows the picked status instantly, then reconciles to the
+  // authoritative server value after revalidation (and reverts if the action
+  // fails). Calling the action directly (no <form>) avoids React 19's
+  // post-action form reset, which was snapping the <select> back to "New".
+  const [optimistic, setOptimistic] = useOptimistic<string, string>(
+    value,
+    (_, next) => next
+  );
+  const [isPending, startTransition] = useTransition();
+
+  const known = ORDER_STATUSES.includes(
+    optimistic as (typeof ORDER_STATUSES)[number]
+  );
 
   return (
-    <form action={action}>
-      <input type="hidden" name="orderId" value={orderId} />
-      <select
-        name="status"
-        value={status}
-        onChange={(e) => {
-          setStatus(e.target.value);
-          e.currentTarget.form?.requestSubmit();
-        }}
-        className="text-xs font-semibold rounded-lg border border-line-strong bg-paper px-2 py-1.5 focus:outline-none focus:border-brand cursor-pointer"
-      >
-        {/* Legacy 'fulfilled' orders still display correctly via the label map. */}
-        {!ORDER_STATUSES.includes(status as (typeof ORDER_STATUSES)[number]) && (
-          <option value={status}>{orderStatusLabel(status)}</option>
-        )}
-        {ORDER_STATUSES.map((s) => (
-          <option key={s} value={s}>
-            {orderStatusLabel(s)}
-          </option>
-        ))}
-      </select>
-    </form>
+    <select
+      name="status"
+      value={optimistic}
+      disabled={isPending}
+      onChange={(e) => {
+        const next = e.target.value;
+        startTransition(async () => {
+          setOptimistic(next);
+          const fd = new FormData();
+          fd.set("orderId", orderId);
+          fd.set("status", next);
+          await action(fd);
+        });
+      }}
+      className="text-xs font-semibold rounded-lg border border-line-strong bg-paper px-2 py-1.5 focus:outline-none focus:border-brand cursor-pointer disabled:opacity-60"
+    >
+      {/* Legacy 'fulfilled' orders still display correctly via the label map. */}
+      {!known && <option value={optimistic}>{orderStatusLabel(optimistic)}</option>}
+      {ORDER_STATUSES.map((s) => (
+        <option key={s} value={s}>
+          {orderStatusLabel(s)}
+        </option>
+      ))}
+    </select>
   );
 }
