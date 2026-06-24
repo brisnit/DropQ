@@ -5,6 +5,9 @@ import { Reveal } from "@/components/reveal";
 
 /* ----------------------------- Hero mockup ----------------------------- */
 function DropMockup() {
+  // Mirrors the live Marble & Crumb demo storefront — its warm brown accent,
+  // header photo, and bakery logo — so the hero previews a real DropQ store.
+  const accent = "#7a5230";
   const items = [
     { emoji: "🍪", name: "Brown Butter Chocolate Chunk", price: "$18", left: 17, total: 40 },
     { emoji: "🥐", name: "Morning Bun", price: "$6.50", left: 6, total: 36 },
@@ -14,18 +17,35 @@ function DropMockup() {
     <div className="relative">
       <div className="absolute -inset-6 hero-glow blur-2xl" aria-hidden />
       <Card className="relative p-0 overflow-hidden w-full max-w-sm mx-auto lg:mx-0 lg:ml-auto">
-        {/* storefront header */}
-        <div className="bg-ink text-cream px-5 pt-5 pb-6">
-          <div className="flex items-center justify-between">
-            <span className="font-display text-lg font-semibold">Marble &amp; Crumb</span>
-            <Badge className="bg-brand text-white">
-              <span className="w-1.5 h-1.5 rounded-full bg-white live-dot" /> Live
-            </Badge>
-          </div>
-          <p className="text-cream/70 text-sm mt-1">Friday Cookie Drop · Pickup 4–6pm</p>
+        {/* branded banner — header photo with a brown wash, like the storefront */}
+        <div className="relative h-24" style={{ backgroundColor: accent }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/demo/marble-crumb-header.png"
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div
+            className="absolute inset-0"
+            style={{ background: `linear-gradient(to top, ${accent}cc, ${accent}33)` }}
+          />
+          <span className="absolute top-3 right-3 inline-flex items-center gap-1.5 bg-white/95 text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-pill" style={{ color: accent }}>
+            <span className="w-1.5 h-1.5 rounded-full live-dot" style={{ backgroundColor: accent }} /> Live
+          </span>
+        </div>
+        {/* logo avatar overlapping the banner + store identity */}
+        <div className="px-5 -mt-9">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/demo/marble-crumb-logo.png"
+            alt="Marble & Crumb"
+            className="w-16 h-16 rounded-2xl object-cover border-4 border-paper bg-white shadow-[var(--shadow-soft)]"
+          />
+          <h3 className="font-display text-lg font-semibold mt-2">Marble &amp; Crumb</h3>
+          <p className="text-xs text-muted">Friday Cookie Drop · Pickup 4–6pm</p>
         </div>
         {/* items */}
-        <div className="p-4 space-y-2.5">
+        <div className="p-4 pt-3 space-y-2.5">
           {items.map((it) => (
             <div
               key={it.name}
@@ -39,7 +59,10 @@ function DropMockup() {
               <span className="text-sm font-semibold">{it.price}</span>
             </div>
           ))}
-          <div className="flex items-center justify-between bg-brand text-white rounded-xl px-4 py-3 mt-1">
+          <div
+            className="flex items-center justify-between text-white rounded-xl px-4 py-3 mt-1"
+            style={{ backgroundColor: accent }}
+          >
             <span className="text-sm font-medium">Checkout · 3 items</span>
             <span className="font-semibold">$40.50</span>
           </div>
