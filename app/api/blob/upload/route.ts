@@ -11,7 +11,12 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB
  * carry many images without 413s. Only signed-in vendors can mint tokens.
  */
 export async function POST(request: Request): Promise<NextResponse> {
-  const body = (await request.json()) as HandleUploadBody;
+  let body: HandleUploadBody;
+  try {
+    body = (await request.json()) as HandleUploadBody;
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
   try {
     const result = await handleUpload({
       body,
