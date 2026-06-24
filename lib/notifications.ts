@@ -76,7 +76,7 @@ export async function notify(
           to: target.email,
           subject: message.subject,
           html: `<div style="font-family:sans-serif;color:#1a1a1a"><p>${message.body}</p>${
-            message.url ? `<p><a href="${message.url}" style="color:#ff666c">${message.url}</a></p>` : ""
+            message.url ? `<p><a href="${message.url}" style="color:#ff6268">${message.url}</a></p>` : ""
           }</div>`,
         });
       } else if (channel === "sms" && target.phone) {

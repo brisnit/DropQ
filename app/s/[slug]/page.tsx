@@ -43,7 +43,7 @@ export default async function StorePage({
   const viewer = await getCurrentSeller();
   const isOwner = viewer?.id === seller.id;
 
-  const accent = seller.accent || "#ff666c";
+  const accent = seller.accent || "#ff6268";
   const liveDrops = seller.drops.filter((d) => d.status === "live");
   const pastDrops = seller.drops.filter((d) => d.status === "closed");
 

@@ -8,13 +8,13 @@ const VARIANTS: Record<Variant, string> = {
   // Primary — black CTA (the default; reads great on white/light surfaces)
   primary:
     "bg-ink text-white hover:bg-ink-soft shadow-[0_8px_20px_-8px_rgba(26,26,26,0.45)]",
-  // Brand — orange accent button (use on dark surfaces where black would vanish)
+  // Brand — coral accent button (use on dark surfaces where black would vanish)
   brand:
-    "bg-brand text-white hover:bg-brand-dark shadow-[0_8px_20px_-8px_rgba(255,102,108,0.55)]",
+    "bg-brand text-white hover:bg-brand-dark shadow-[0_8px_20px_-8px_rgba(255,98,104,0.55)]",
   // Secondary — solid grey
-  secondary: "bg-secondary text-ink hover:bg-[#cfcfcf]",
-  // Tertiary — grey outline
-  tertiary: "bg-transparent text-ink border border-secondary hover:bg-secondary/50",
+  secondary: "bg-secondary text-white hover:bg-[#5b5d5f]",
+  // Tertiary — teal accent button
+  tertiary: "bg-tertiary text-white hover:bg-[#00a8ab]",
   ghost: "text-ink-soft hover:text-ink hover:bg-line/60",
   dark: "bg-ink text-cream hover:bg-ink-soft",
 };

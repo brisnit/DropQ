@@ -38,12 +38,12 @@ function layout(heading: string, body: string, cta: { href: string; label: strin
   return `
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafafa;padding:32px">
     <div style="max-width:480px;margin:0 auto;background:#fff;border:1px solid #e8e8e8;border-radius:18px;overflow:hidden">
-      <div style="background:#1a1a1a;padding:20px 24px;color:#fff;font-size:20px;font-weight:700;letter-spacing:-0.01em">Drop<span style="color:#ffbc00">Q</span></div>
+      <div style="background:#1a1a1a;padding:20px 24px;color:#fff;font-size:20px;font-weight:700;letter-spacing:-0.01em">Drop<span style="color:#ffc500">Q</span></div>
       <div style="padding:28px 24px;color:#1a1a1a">
         <h1 style="font-size:20px;margin:0 0 12px">${heading}</h1>
         <p style="font-size:15px;line-height:1.55;color:#3d3d3d;margin:0 0 22px">${body}</p>
         <a href="${cta.href}" style="display:inline-block;background:#1a1a1a;color:#fff;text-decoration:none;font-weight:600;padding:12px 22px;border-radius:12px">${cta.label}</a>
-        <p style="font-size:12px;color:#6b6b6b;margin:22px 0 0">If the button doesn't work, copy this link:<br><span style="color:#ff666c;word-break:break-all">${cta.href}</span></p>
+        <p style="font-size:12px;color:#6b6b6b;margin:22px 0 0">If the button doesn't work, copy this link:<br><span style="color:#ff6268;word-break:break-all">${cta.href}</span></p>
       </div>
     </div>
     <p style="text-align:center;color:#6b6b6b;font-size:12px;margin-top:16px">DropQ — the operating system for modern food businesses</p>

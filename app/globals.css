@@ -2,37 +2,41 @@
 
 /* ---------------------------------------------------------------------------
    DropQ Design System.
-   Palette: Primary #FF666C (coral), Secondary/Tertiary #D9D9D9 (grey),
-   Green #00CE90, Yellow #FFBC00, White #FFFFFF, Black #1A1A1A.
-   CTA buttons are black on light surfaces; orange/green/yellow are accents.
+   Palette: Primary #FF6268 (coral), Secondary #6D6F71 (grey),
+   Tertiary #00BEC1 (teal), Quad #FFC500 (yellow), White #FAFAFA, Black #1A1A1A.
+   CTA buttons stay black on light surfaces; coral/teal/yellow/grey are spread
+   as accents — avoid leaning on primary alone.
 --------------------------------------------------------------------------- */
 @theme {
   --color-cream: #fafafa;
   --color-paper: #ffffff;
   --color-ink: #1a1a1a;
   --color-ink-soft: #3d3d3d;
-  --color-muted: #6b6b6b;
+  --color-muted: #6d6f71;
 
-  /* Primary accent — coral */
-  --color-brand: #ff666c;
-  --color-brand-dark: #ed4d55;
-  --color-brand-tint: #ffe5e6;
-  /* Secondary + Tertiary — grey */
-  --color-secondary: #d9d9d9;
-  --color-secondary-tint: #f0f0f0;
-  --color-tertiary: #d9d9d9;
+  /* Primary — coral */
+  --color-brand: #ff6268;
+  --color-brand-dark: #e84f57;
+  --color-brand-tint: #ffe4e5;
+  /* Secondary — grey */
+  --color-secondary: #6d6f71;
+  --color-secondary-tint: #ececed;
+  /* Tertiary — teal */
+  --color-tertiary: #00bec1;
+  --color-tertiary-tint: #d2f4f4;
   /* Quadrinary — yellow */
-  --color-quad: #ffbc00;
-  --color-grey: #6b6b6b;
+  --color-quad: #ffc500;
+  --color-quad-tint: #fff1c2;
+  --color-grey: #6d6f71;
   --color-grey-tint: #ededed;
   --color-grey-dark: #3d3d3d;
-  /* Success / positive — green */
-  --color-sage: #00ce90;
-  --color-sage-tint: #d6f7ec;
+  /* Success / positive — teal (matches tertiary, used widely) */
+  --color-sage: #00bec1;
+  --color-sage-tint: #d2f4f4;
   --color-berry: #8a2d52;
 
   --color-line: #e8e8e8;
-  --color-line-strong: #d9d9d9;
+  --color-line-strong: #dcdcdc;
 
   --font-display: var(--font-varela), system-ui, sans-serif;
   --font-sans: var(--font-google-sans), system-ui, sans-serif;
@@ -82,9 +86,9 @@ body {
 
 .hero-glow {
   background:
-    radial-gradient(60% 50% at 75% 18%, rgba(255, 102, 108, 0.22), transparent 60%),
-    radial-gradient(52% 46% at 12% 82%, rgba(0, 206, 144, 0.16), transparent 60%),
-    radial-gradient(40% 38% at 45% 50%, rgba(255, 188, 0, 0.12), transparent 60%);
+    radial-gradient(60% 50% at 75% 18%, rgba(255, 98, 104, 0.22), transparent 60%),
+    radial-gradient(52% 46% at 12% 82%, rgba(0, 190, 193, 0.18), transparent 60%),
+    radial-gradient(40% 38% at 45% 50%, rgba(255, 197, 0, 0.14), transparent 60%);
 }
 
 @keyframes float-in {
