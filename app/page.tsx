@@ -1,6 +1,7 @@
 import { SiteNav } from "@/components/site-nav";
 import { SiteFooter } from "@/components/site-footer";
 import { LinkButton, Eyebrow, Card, Badge } from "@/components/ui";
+import { Reveal } from "@/components/reveal";
 
 /* ----------------------------- Hero mockup ----------------------------- */
 function DropMockup() {
@@ -201,7 +202,7 @@ export default function Home() {
 
       {/* CATEGORIES — DropQ is for every kind of seller */}
       <Section className="py-16 sm:py-20">
-        <div className="max-w-2xl mx-auto text-center">
+        <Reveal className="max-w-2xl mx-auto text-center">
           <Eyebrow>For every kind of seller</Eyebrow>
           <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-3">
             Whatever you sell, drop it on DropQ.
@@ -211,51 +212,52 @@ export default function Home() {
             live sales on DropQ. Pick your category at signup and your store speaks
             your language.
           </p>
-        </div>
-        <div className="grid sm:grid-cols-3 gap-4 sm:gap-5 mt-10">
-          {SELL_CATEGORIES.map((c) => (
-            <div
-              key={c.label}
-              className="group bg-paper border border-line rounded-card overflow-hidden shadow-[var(--shadow-soft)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[var(--shadow-lift)] cursor-pointer"
-            >
-              <div className="aspect-[5/4] overflow-hidden bg-cream">
+        </Reveal>
+        <div className="grid sm:grid-cols-3 gap-4 sm:gap-5 mt-10 items-start">
+          {SELL_CATEGORIES.map((c, i) => (
+            <Reveal key={c.label} delay={i * 80}>
+              <div className="group bg-paper border border-line rounded-card overflow-hidden shadow-[var(--shadow-soft)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[var(--shadow-lift)] cursor-pointer">
+                <div className="h-44 sm:h-52 overflow-hidden bg-cream">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={c.img}
+                    alt={c.label}
+                    className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+                  />
+                </div>
+                <div className="p-4">
+                  <h3 className="font-semibold transition-colors group-hover:text-brand">{c.label}</h3>
+                  <p className="text-xs text-muted mt-1">{c.eg}</p>
+                </div>
+              </div>
+            </Reveal>
+          ))}
+
+          {/* And everything else — spans two columns, same white card style, image on top */}
+          <Reveal delay={SELL_CATEGORIES.length * 80} className="sm:col-span-2">
+            <div className="group bg-paper border border-line rounded-card overflow-hidden shadow-[var(--shadow-soft)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[var(--shadow-lift)] cursor-pointer">
+              <div className="h-44 sm:h-52 overflow-hidden bg-cream">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={c.img}
-                  alt={c.label}
+                  src="/categories/everything.png"
+                  alt="And everything else"
                   className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
                 />
               </div>
               <div className="p-4">
-                <h3 className="font-semibold transition-colors group-hover:text-brand">{c.label}</h3>
-                <p className="text-xs text-muted mt-1">{c.eg}</p>
+                <h3 className="font-semibold transition-colors group-hover:text-brand">And everything else…</h3>
+                <p className="text-xs text-brand underline underline-offset-2 mt-1">
+                  Sell whatever you sell in drops
+                </p>
               </div>
             </div>
-          ))}
-
-          {/* And everything else — spans two columns, same white card style, image on top */}
-          <div className="group sm:col-span-2 flex flex-col bg-paper border border-line rounded-card overflow-hidden shadow-[var(--shadow-soft)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[var(--shadow-lift)] cursor-pointer">
-            <div className="flex-1 min-h-[160px] overflow-hidden bg-cream">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/categories/everything.png"
-                alt="And everything else"
-                className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-              />
-            </div>
-            <div className="p-4">
-              <h3 className="font-semibold transition-colors group-hover:text-brand">And everything else…</h3>
-              <p className="text-xs text-brand underline underline-offset-2 mt-1">
-                Sell whatever you sell in drops
-              </p>
-            </div>
-          </div>
+          </Reveal>
         </div>
       </Section>
 
       {/* PROBLEM */}
       <Section className="py-20 sm:py-28">
-        <div className="max-w-3xl">
+        <Reveal className="max-w-3xl">
           <Eyebrow>The problem</Eyebrow>
           <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-3">
             Your business runs on a dozen apps that don't talk to each other.
@@ -266,18 +268,20 @@ export default function Home() {
             notes for the rest. It works — until a drop goes viral and the whole
             thing falls apart at the worst possible moment.
           </p>
-        </div>
+        </Reveal>
         <div className="grid sm:grid-cols-3 gap-4 mt-10">
           {[
             ["😵‍💫", "Overselling & refunds", "No real inventory means promising stock you can't deliver."],
             ["💥", "Crashed links", "A story from a big account, and your ordering page buckles."],
             ["🫥", "Customers you lose", "No list, no way to bring last week's buyers back."],
-          ].map(([emoji, t, b]) => (
-            <Card key={t} className="p-6">
-              <div className="text-3xl">{emoji}</div>
-              <h3 className="font-semibold mt-3">{t}</h3>
-              <p className="text-sm text-muted mt-1.5">{b}</p>
-            </Card>
+          ].map(([emoji, t, b], i) => (
+            <Reveal key={t} delay={i * 80}>
+              <Card className="p-6">
+                <div className="text-3xl">{emoji}</div>
+                <h3 className="font-semibold mt-3">{t}</h3>
+                <p className="text-sm text-muted mt-1.5">{b}</p>
+              </Card>
+            </Reveal>
           ))}
         </div>
       </Section>
@@ -285,35 +289,35 @@ export default function Home() {
       {/* HOW IT WORKS */}
       <div className="bg-ink text-cream">
         <Section id="how" className="py-20 sm:py-28">
-          <div className="max-w-2xl">
+          <Reveal className="max-w-2xl">
             <span className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">
               How it works
             </span>
             <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-3">
               From idea to sold-out in one afternoon.
             </h2>
-          </div>
+          </Reveal>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-12">
-            {STEPS.map((s) => (
-              <div key={s.n} className="relative">
+            {STEPS.map((s, i) => (
+              <Reveal key={s.n} delay={i * 90} className="relative">
                 <div className="text-3xl">{s.emoji}</div>
                 <div className="font-display text-sm text-grey mt-4">{s.n}</div>
                 <h3 className="font-semibold text-lg mt-1">{s.title}</h3>
                 <p className="text-sm text-cream/70 mt-2">{s.body}</p>
-              </div>
+              </Reveal>
             ))}
           </div>
-          <div className="mt-12">
+          <Reveal className="mt-12">
             <LinkButton href="/signup" variant="brand" size="lg">
               Build your first drop
             </LinkButton>
-          </div>
+          </Reveal>
         </Section>
       </div>
 
       {/* DROPS EXPLAINED */}
       <Section id="drops" className="py-20 sm:py-28 grid lg:grid-cols-2 gap-14 items-center">
-        <div>
+        <Reveal>
           <Eyebrow>What's a drop?</Eyebrow>
           <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-3">
             Scarcity that sells out — on purpose.
@@ -336,7 +340,8 @@ export default function Home() {
               </li>
             ))}
           </ul>
-        </div>
+        </Reveal>
+        <Reveal delay={120}>
         <Card className="p-7">
           <div className="flex items-center justify-between mb-5">
             <span className="font-display text-lg font-semibold">This week's drop</span>
@@ -366,27 +371,30 @@ export default function Home() {
             })}
           </div>
         </Card>
+        </Reveal>
       </Section>
 
       {/* FEATURES GRID */}
       <div className="bg-paper border-y border-line">
         <Section id="features" className="py-20 sm:py-28">
-          <div className="max-w-2xl">
+          <Reveal className="max-w-2xl">
             <Eyebrow>Everything in one place</Eyebrow>
             <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-3">
               One platform. The whole business.
             </h2>
-          </div>
+          </Reveal>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-12">
-            {FEATURES.map((f) => (
-              <div key={f.title} className="bg-cream border border-line rounded-card p-6">
-                <div className="text-3xl">{f.emoji}</div>
-                <span className="block text-xs font-semibold uppercase tracking-wider text-brand mt-4">
-                  {f.tag}
-                </span>
-                <h3 className="font-semibold text-lg mt-1">{f.title}</h3>
-                <p className="text-sm text-muted mt-2 leading-relaxed">{f.body}</p>
-              </div>
+            {FEATURES.map((f, i) => (
+              <Reveal key={f.title} delay={(i % 3) * 80}>
+                <div className="bg-cream border border-line rounded-card p-6 h-full">
+                  <div className="text-3xl">{f.emoji}</div>
+                  <span className="block text-xs font-semibold uppercase tracking-wider text-brand mt-4">
+                    {f.tag}
+                  </span>
+                  <h3 className="font-semibold text-lg mt-1">{f.title}</h3>
+                  <p className="text-sm text-muted mt-2 leading-relaxed">{f.body}</p>
+                </div>
+              </Reveal>
             ))}
           </div>
         </Section>
@@ -394,6 +402,7 @@ export default function Home() {
 
       {/* TESTIMONIAL */}
       <Section id="stories" className="py-20 sm:py-28">
+        <Reveal>
         <Card className="p-8 sm:p-14 text-center max-w-3xl mx-auto">
           <div className="text-grey text-2xl">★★★★★</div>
           <blockquote className="font-display text-2xl sm:text-3xl font-medium leading-snug mt-5">
@@ -408,12 +417,13 @@ export default function Home() {
             </div>
           </div>
         </Card>
+        </Reveal>
       </Section>
 
       {/* PRICING TEASER */}
       <div className="bg-ink text-cream">
         <Section id="pricing" className="py-20 sm:py-28">
-          <div className="max-w-2xl">
+          <Reveal className="max-w-2xl">
             <span className="text-xs font-semibold uppercase tracking-[0.18em] text-grey">
               Pricing
             </span>
@@ -424,16 +434,16 @@ export default function Home() {
               Try free on Starter, run unlimited drops on Growth, and keep a simple
               2% transaction fee at every tier. Cancel anytime.
             </p>
-          </div>
-          <div className="grid sm:grid-cols-3 gap-5 mt-12">
+          </Reveal>
+          <div className="grid sm:grid-cols-3 gap-5 mt-12 items-start">
             {[
               ["Starter", "$0", "/mo", "Try DropQ", ["3 drops to start", "Online ordering", "Pickup & delivery", "Customer list", "QR codes", "2% transaction fee"], false, false],
               ["Growth", "$20", "/mo", "Run Drops", ["Unlimited drops", "Customer signups (SMS + email)", "Sales analytics", "Repeat-customer tracking", "Shareable drop links", "2% transaction fee"], true, false],
               ["Pro", "$99", "/mo", "Grow Customers", ["Everything in Growth", "Advanced analytics", "Automated reminders", "Multiple locations & team", "Reduced 1.5% fee"], false, true],
-            ].map(([name, price, per, position, feats, featured, soon]) => (
+            ].map(([name, price, per, position, feats, featured, soon], i) => (
+              <Reveal key={String(name)} delay={i * 90}>
               <div
-                key={String(name)}
-                className={`rounded-card p-6 ${
+                className={`rounded-card p-6 h-full ${
                   featured
                     ? "bg-brand text-white ring-2 ring-grey"
                     : "bg-cream/5 border border-cream/15"
@@ -458,11 +468,12 @@ export default function Home() {
                   ))}
                 </ul>
               </div>
+              </Reveal>
             ))}
           </div>
-          <div className="mt-8">
+          <Reveal className="mt-8">
             <LinkButton href="/pricing" variant="secondary">See full pricing &amp; features →</LinkButton>
-          </div>
+          </Reveal>
         </Section>
       </div>
 
