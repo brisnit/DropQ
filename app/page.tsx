@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SiteNav } from "@/components/site-nav";
 import { SiteFooter } from "@/components/site-footer";
 import { LinkButton, Eyebrow, Card, Badge } from "@/components/ui";
@@ -98,10 +99,10 @@ function Section({
 }
 
 const SELL_CATEGORIES = [
-  { img: "/categories/food.png", label: "Food & Beverage", eg: "Bakers, cottage food, popups" },
-  { img: "/categories/collectibles.png", label: "Collectibles", eg: "Cards, toys, antiques, vintage" },
-  { img: "/categories/apparel.png", label: "Apparel & Merch", eg: "Limited runs and branded merch" },
-  { img: "/categories/art.png", label: "Art & Handmade", eg: "Prints, ceramics, makers" },
+  { slug: "food", img: "/categories/food.png", label: "Food & Beverage", eg: "Bakers, cottage food, popups" },
+  { slug: "collectibles", img: "/categories/collectibles.png", label: "Collectibles", eg: "Cards, toys, antiques, vintage" },
+  { slug: "apparel", img: "/categories/apparel.png", label: "Apparel & Merch", eg: "Limited runs and branded merch" },
+  { slug: "art", img: "/categories/art.png", label: "Art & Handmade", eg: "Prints, ceramics, makers" },
 ];
 
 const STEPS = [
@@ -224,7 +225,7 @@ export default function Home() {
       </div>
 
       {/* CATEGORIES — DropQ is for every kind of seller */}
-      <Section className="pt-16 pb-6 sm:pt-20 sm:pb-10">
+      <Section id="sell" className="pt-16 pb-6 sm:pt-20 sm:pb-10 scroll-mt-24">
         <Reveal className="max-w-2xl mx-auto text-center">
           <Eyebrow>For every kind of seller</Eyebrow>
           <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-3">
@@ -239,7 +240,10 @@ export default function Home() {
         <div className="grid sm:grid-cols-3 gap-4 sm:gap-5 mt-20">
           {SELL_CATEGORIES.map((c, i) => (
             <Reveal key={c.label} delay={i * 80}>
-              <div className="group bg-paper border border-line rounded-card overflow-hidden shadow-[var(--shadow-soft)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[var(--shadow-lift)] cursor-pointer">
+              <Link
+                href={`/sell/${c.slug}`}
+                className="group block bg-paper border border-line rounded-card overflow-hidden shadow-[var(--shadow-soft)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[var(--shadow-lift)]"
+              >
                 <div className="aspect-[5/4] overflow-hidden bg-cream">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -252,7 +256,7 @@ export default function Home() {
                   <h3 className="font-semibold transition-colors group-hover:text-brand">{c.label}</h3>
                   <p className="text-xs text-muted mt-1">{c.eg}</p>
                 </div>
-              </div>
+              </Link>
             </Reveal>
           ))}
 
@@ -262,7 +266,10 @@ export default function Home() {
               footer lines up at the same height. basis-0 stops the image's
               intrinsic size from inflating the row. */}
           <Reveal delay={SELL_CATEGORIES.length * 80} className="sm:col-span-2">
-            <div className="group h-full flex flex-col bg-paper border border-line rounded-card overflow-hidden shadow-[var(--shadow-soft)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[var(--shadow-lift)] cursor-pointer">
+            <Link
+              href="/sell/everything"
+              className="group h-full flex flex-col bg-paper border border-line rounded-card overflow-hidden shadow-[var(--shadow-soft)] transition-all duration-300 ease-out hover:-translate-y-1.5 hover:shadow-[var(--shadow-lift)]"
+            >
               <div className="flex-1 basis-0 min-h-0 overflow-hidden bg-cream">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -277,7 +284,7 @@ export default function Home() {
                   Sell whatever you sell in drops
                 </p>
               </div>
-            </div>
+            </Link>
           </Reveal>
         </div>
       </Section>
