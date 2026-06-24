@@ -1,11 +1,11 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button, Field, Input, Textarea } from "@/components/ui";
 import { updateStoreAction, type StoreSaveState } from "@/lib/actions/dashboard";
 import { SOCIALS } from "@/lib/social";
-import { compressImage, setInputFiles } from "@/lib/compress-image";
+import { uploadImage, ImageTooLargeError } from "@/lib/upload-client";
 
 const ACCENTS = ["#ff6268", "#3a8895", "#3F7D5B", "#8A2D52", "#2B6CB0", "#1C1916"];
 const isHex = (v: string) => /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(v);
@@ -57,49 +57,55 @@ export function StoreSettingsForm({
     setDirty(true);
   };
 
-  const logoRef = useRef<HTMLInputElement>(null);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  const [logoRemoved, setLogoRemoved] = useState(false);
-  const shownLogo = logoPreview || (logoRemoved ? null : seller.logoUrl);
+  // Logo / header are uploaded to the server upload route on selection (one
+  // small request each), then submitted as URLs — never as file bytes through
+  // the save action, which would 413 on large/undecodable photos.
+  const [imgError, setImgError] = useState<string | null>(null);
 
-  const onLogoFile = async (input: HTMLInputElement) => {
+  const [logoUrl, setLogoUrl] = useState<string | null>(seller.logoUrl);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const shownLogo = logoUrl;
+
+  const uploadFor = async (
+    input: HTMLInputElement,
+    setUrl: (u: string) => void,
+    setBusy: (b: boolean) => void
+  ) => {
     const file = input.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    const compressed = await compressImage(file);
-    setInputFiles(input, [compressed]);
-    if (logoPreview) URL.revokeObjectURL(logoPreview);
-    setLogoPreview(URL.createObjectURL(compressed));
-    setLogoRemoved(false);
-    setDirty(true);
+    input.value = ""; // allow re-selecting the same file later
+    if (!file) return;
+    setImgError(null);
+    setBusy(true);
+    try {
+      const url = await uploadImage(file);
+      setUrl(url);
+      setDirty(true);
+    } catch (e) {
+      setImgError(
+        e instanceof ImageTooLargeError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : "Couldn't upload that image."
+      );
+    } finally {
+      setBusy(false);
+    }
   };
+
+  const onLogoFile = (input: HTMLInputElement) => uploadFor(input, setLogoUrl, setLogoBusy);
   const removeLogo = () => {
-    if (logoRef.current) logoRef.current.value = "";
-    if (logoPreview) URL.revokeObjectURL(logoPreview);
-    setLogoPreview(null);
-    setLogoRemoved(true);
+    setLogoUrl(null);
     setDirty(true);
   };
 
-  const headerRef = useRef<HTMLInputElement>(null);
-  const [headerPreview, setHeaderPreview] = useState<string | null>(null);
-  const [headerRemoved, setHeaderRemoved] = useState(false);
-  const shownHeader = headerPreview || (headerRemoved ? null : seller.headerImageUrl);
+  const [headerUrl, setHeaderUrl] = useState<string | null>(seller.headerImageUrl);
+  const [headerBusy, setHeaderBusy] = useState(false);
+  const shownHeader = headerUrl;
 
-  const onHeaderFile = async (input: HTMLInputElement) => {
-    const file = input.files?.[0];
-    if (!file || !file.type.startsWith("image/")) return;
-    const compressed = await compressImage(file, 2000);
-    setInputFiles(input, [compressed]);
-    if (headerPreview) URL.revokeObjectURL(headerPreview);
-    setHeaderPreview(URL.createObjectURL(compressed));
-    setHeaderRemoved(false);
-    setDirty(true);
-  };
+  const onHeaderFile = (input: HTMLInputElement) => uploadFor(input, setHeaderUrl, setHeaderBusy);
   const removeHeader = () => {
-    if (headerRef.current) headerRef.current.value = "";
-    if (headerPreview) URL.revokeObjectURL(headerPreview);
-    setHeaderPreview(null);
-    setHeaderRemoved(true);
+    setHeaderUrl(null);
     setDirty(true);
   };
 
@@ -112,8 +118,11 @@ export function StoreSettingsForm({
     >
       {/* Profile */}
       <div className="bg-paper border border-line rounded-card p-6 sm:p-8 space-y-5">
-        <input type="hidden" name="removeLogo" value={logoRemoved ? "1" : "0"} />
-        <input type="hidden" name="removeHeader" value={headerRemoved ? "1" : "0"} />
+        <input type="hidden" name="logoUrl" value={logoUrl ?? ""} />
+        <input type="hidden" name="headerImageUrl" value={headerUrl ?? ""} />
+        {imgError && (
+          <p className="text-sm bg-brand-tint text-brand-dark rounded-lg px-3 py-2">{imgError}</p>
+        )}
         <Field label="Store logo" hint="Square works best. Shown on your storefront.">
           <div className="flex items-center gap-4">
             <label className="relative w-20 h-20 rounded-2xl overflow-hidden border border-line-strong bg-cream grid place-items-center cursor-pointer group shrink-0">
@@ -128,10 +137,13 @@ export function StoreSettingsForm({
               <span className="absolute inset-0 bg-ink/45 text-white text-[11px] font-medium grid place-items-center opacity-0 group-hover:opacity-100 transition">
                 {shownLogo ? "Change" : "📷 Upload"}
               </span>
+              {logoBusy && (
+                <span className="absolute inset-0 bg-paper/80 grid place-items-center text-xs text-muted animate-pulse">
+                  Uploading…
+                </span>
+              )}
               <input
-                ref={logoRef}
                 type="file"
-                name="logo"
                 accept="image/*"
                 className="sr-only"
                 onChange={(e) => onLogoFile(e.currentTarget)}
@@ -162,10 +174,13 @@ export function StoreSettingsForm({
             <span className="absolute inset-0 bg-ink/40 text-white text-sm font-medium grid place-items-center opacity-0 group-hover:opacity-100 transition">
               {shownHeader ? "Change header image" : "📷 Upload header image"}
             </span>
+            {headerBusy && (
+              <span className="absolute inset-0 bg-paper/80 grid place-items-center text-sm text-muted animate-pulse">
+                Uploading…
+              </span>
+            )}
             <input
-              ref={headerRef}
               type="file"
-              name="headerImage"
               accept="image/png,image/jpeg,image/webp,image/avif"
               className="sr-only"
               onChange={(e) => onHeaderFile(e.currentTarget)}

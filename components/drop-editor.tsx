@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button, Field, Input, Textarea, Select } from "@/components/ui";
 import { vocab, showItemMeta, isFood } from "@/lib/category";
-import { uploadProductImage, ImageTooLargeError } from "@/lib/upload-client";
+import { uploadImage, ImageTooLargeError } from "@/lib/upload-client";
 import { DateRangePicker } from "@/components/date-range-picker";
 
 const MAX_IMAGES_PER_PRODUCT = 6;
@@ -175,7 +175,7 @@ export function DropEditor({
     await Promise.all(
       toUpload.map(async (file) => {
         try {
-          const url = await uploadProductImage(file);
+          const url = await uploadImage(file);
           setRows((rs) =>
             rs.map((r) =>
               r.key === key

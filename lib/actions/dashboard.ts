@@ -44,17 +44,12 @@ export async function updateStoreAction(
   formData: FormData
 ): Promise<StoreSaveState> {
   const seller = await requireSeller();
+  try {
   const location = String(formData.get("location") ?? "").trim() || null;
 
-  // Logo: new upload wins; else honor an explicit remove; else keep existing.
-  const newLogo = await saveImage(formData.get("logo"));
-  const removeLogo = formData.get("removeLogo") === "1";
-  const logoUrl = newLogo ?? (removeLogo ? null : seller.logoUrl);
-
-  // Header/banner image: same upload-wins / remove / keep logic.
-  const newHeader = await saveImage(formData.get("headerImage"));
-  const removeHeader = formData.get("removeHeader") === "1";
-  const headerImageUrl = newHeader ?? (removeHeader ? null : seller.headerImageUrl);
+  // Logo / header arrive pre-uploaded as URLs (empty string = cleared).
+  const logoUrl = String(formData.get("logoUrl") ?? "").trim() || null;
+  const headerImageUrl = String(formData.get("headerImageUrl") ?? "").trim() || null;
 
   const accentRaw = String(formData.get("accent") ?? seller.accent).trim();
   const accent = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(accentRaw) ? accentRaw : seller.accent;
@@ -106,6 +101,11 @@ export async function updateStoreAction(
   revalidatePath("/dashboard/store");
   revalidatePath(`/s/${seller.slug}`);
   return { saved: true };
+  } catch (e) {
+    // Never crash the page on save — surface a friendly inline error instead.
+    console.error("updateStoreAction failed:", e);
+    return { error: "Something went wrong saving your profile. Please try again." };
+  }
 }
 
 /* ------------------------------ Gallery --------------------------------- */

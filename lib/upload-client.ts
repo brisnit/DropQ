@@ -13,7 +13,7 @@ export class ImageTooLargeError extends Error {}
  * Compress an image in the browser, then upload it (one small request each) via
  * the server upload route. Returns the public URL.
  */
-export async function uploadProductImage(file: File): Promise<string> {
+export async function uploadImage(file: File): Promise<string> {
   if (!file.type.startsWith("image/")) {
     throw new Error("That file isn't an image.");
   }
