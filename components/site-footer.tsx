@@ -40,7 +40,7 @@ export function SiteFooter() {
         <div>
           <Logo />
           <p className="mt-4 text-sm text-muted max-w-xs">
-            The operating system for modern food businesses. Sell, run drops,
+            The operating system for modern product drops. Sell, run drops,
             fulfill, and grow — all in one place.
           </p>
         </div>

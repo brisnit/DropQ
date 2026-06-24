@@ -17,10 +17,26 @@ const googleSans = Google_Sans_Flex({
   display: "swap",
 });
 
+const TAGLINE = "The operating system for modern product drops.";
+const SHARE_DESCRIPTION =
+  "Sell online, run timed drops, manage orders, and grow recurring revenue. One platform for food makers, collectors, designers, artists — every kind of seller.";
+
 export const metadata: Metadata = {
-  title: "DropQ — The operating system for modern food businesses",
-  description:
-    "Sell food online, run drops, manage orders, and grow recurring revenue. One platform built for bakers, cottage food makers, meal preppers, and food creators.",
+  metadataBase: new URL("https://www.drop-q.com"),
+  title: `DropQ — ${TAGLINE}`,
+  description: SHARE_DESCRIPTION,
+  openGraph: {
+    title: TAGLINE,
+    description: SHARE_DESCRIPTION,
+    url: "https://www.drop-q.com",
+    siteName: "DropQ",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: TAGLINE,
+    description: SHARE_DESCRIPTION,
+  },
 };
 
 export default function RootLayout({

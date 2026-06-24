@@ -46,7 +46,7 @@ function layout(heading: string, body: string, cta: { href: string; label: strin
         <p style="font-size:12px;color:#6b6b6b;margin:22px 0 0">If the button doesn't work, copy this link:<br><span style="color:#ff6268;word-break:break-all">${cta.href}</span></p>
       </div>
     </div>
-    <p style="text-align:center;color:#6b6b6b;font-size:12px;margin-top:16px">DropQ — the operating system for modern food businesses</p>
+    <p style="text-align:center;color:#6b6b6b;font-size:12px;margin-top:16px">DropQ — the operating system for modern product drops</p>
   </div>`;
 }
 
