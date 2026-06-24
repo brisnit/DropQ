@@ -7,6 +7,7 @@ import { ReviewForm } from "@/components/review-form";
 import { SocialLinks } from "@/components/social-links";
 import { formatMoney, formatDate } from "@/lib/format";
 import { isDemoStore } from "@/lib/demo";
+import { getCurrentSeller } from "@/lib/auth";
 
 export async function generateMetadata({
   params,
@@ -37,6 +38,11 @@ export default async function StorePage({
   });
   if (!seller || seller.disabledAt) notFound();
 
+  // Only the store's own logged-in owner sees a way back to the dashboard;
+  // customers never do.
+  const viewer = await getCurrentSeller();
+  const isOwner = viewer?.id === seller.id;
+
   const accent = seller.accent || "#ff666c";
   const liveDrops = seller.drops.filter((d) => d.status === "live");
   const pastDrops = seller.drops.filter((d) => d.status === "closed");
@@ -54,6 +60,16 @@ export default async function StorePage({
 
   return (
     <main className="min-h-screen">
+      {isOwner && (
+        <div className="bg-ink text-cream text-sm">
+          <div className="max-w-3xl mx-auto px-5 py-2.5 flex items-center justify-between gap-3">
+            <Link href="/dashboard" className="inline-flex items-center gap-1.5 font-medium hover:underline">
+              ← Back to dashboard
+            </Link>
+            <span className="text-cream/60">You&rsquo;re previewing your store</span>
+          </div>
+        </div>
+      )}
       {isDemo && (
         <div className="bg-ink text-cream text-center text-sm py-2 px-4">
           ✨ This is a demo store — a visual example of a DropQ storefront.{" "}
