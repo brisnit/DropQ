@@ -171,6 +171,15 @@ const FEATURES = [
   },
 ];
 
+// Each feature card cycles a palette accent so the grid uses coral, teal,
+// yellow and grey rather than leaning on one color.
+const FEATURE_ACCENTS = [
+  { bar: "bg-brand", tag: "text-brand-dark", num: "text-brand/15" },
+  { bar: "bg-tertiary", tag: "text-[#067b7d]", num: "text-tertiary/20" },
+  { bar: "bg-quad", tag: "text-[#9a7400]", num: "text-quad/25" },
+  { bar: "bg-secondary", tag: "text-secondary", num: "text-secondary/25" },
+];
+
 export default function Home() {
   return (
     <main className="min-h-screen flex flex-col">
@@ -419,18 +428,26 @@ export default function Home() {
             </h2>
           </Reveal>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-12">
-            {FEATURES.map((f, i) => (
-              <Reveal key={f.title} delay={(i % 3) * 80}>
-                <div className="bg-cream border border-line rounded-card p-6 h-full">
-                  <div className="text-3xl">{f.emoji}</div>
-                  <span className="block text-xs font-semibold uppercase tracking-wider text-brand mt-4">
-                    {f.tag}
-                  </span>
-                  <h3 className="font-semibold text-lg mt-1">{f.title}</h3>
-                  <p className="text-sm text-muted mt-2 leading-relaxed">{f.body}</p>
-                </div>
-              </Reveal>
-            ))}
+            {FEATURES.map((f, i) => {
+              const acc = FEATURE_ACCENTS[i % FEATURE_ACCENTS.length];
+              return (
+                <Reveal key={f.title} delay={(i % 3) * 80}>
+                  <div className="group relative h-full overflow-hidden bg-paper border border-line rounded-card p-6 shadow-[var(--shadow-soft)] transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-[var(--shadow-lift)]">
+                    <span
+                      className={`pointer-events-none select-none absolute -top-1 right-3 font-display text-6xl font-bold leading-none ${acc.num}`}
+                    >
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <div className={`w-10 h-1.5 rounded-full ${acc.bar}`} />
+                    <span className={`block text-xs font-semibold uppercase tracking-wider mt-5 ${acc.tag}`}>
+                      {f.tag}
+                    </span>
+                    <h3 className="font-semibold text-lg mt-1">{f.title}</h3>
+                    <p className="text-sm text-muted mt-2 leading-relaxed">{f.body}</p>
+                  </div>
+                </Reveal>
+              );
+            })}
           </div>
         </Section>
       </div>
