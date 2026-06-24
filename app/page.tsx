@@ -487,7 +487,7 @@ export default function Home() {
               2% transaction fee at every tier. Cancel anytime.
             </p>
           </Reveal>
-          <div className="grid sm:grid-cols-3 gap-5 mt-12 items-start">
+          <div className="grid sm:grid-cols-3 gap-5 mt-12">
             {[
               ["Starter", "$0", "/mo", "Try DropQ", ["3 drops to start", "Online ordering", "Pickup & delivery", "Customer list", "QR codes", "2% transaction fee"], false, false],
               ["Growth", "$20", "/mo", "Run Drops", ["Unlimited drops", "Customer signups (SMS + email)", "Sales analytics", "Repeat-customer tracking", "Shareable drop links", "2% transaction fee"], true, false],
