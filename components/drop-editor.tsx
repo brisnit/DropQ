@@ -184,6 +184,7 @@ export function DropEditor({
             )
           );
         } catch (err) {
+          console.error("Product image upload failed:", err);
           setRows((rs) =>
             rs.map((r) =>
               r.key === key ? { ...r, uploading: Math.max(0, r.uploading - 1) } : r
@@ -192,7 +193,9 @@ export function DropEditor({
           setError(
             err instanceof ImageTooLargeError
               ? err.message
-              : "Couldn't upload that image. Please try again."
+              : `Couldn't upload that image: ${
+                  err instanceof Error ? err.message : "unknown error"
+                }`
           );
         }
       })
