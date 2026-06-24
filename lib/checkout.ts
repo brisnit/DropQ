@@ -1,8 +1,14 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { getStripe } from "@/lib/stripe";
-import { sendEmail } from "@/lib/email";
+import { sendEmail, orderReceivedEmail } from "@/lib/email";
 import { sendSms } from "@/lib/notifications";
+
+// Header-free base URL — finalizePaidOrder runs from webhooks and cron sweeps
+// that have no request context, so we can't rely on headers().
+function orderBaseUrl(): string {
+  return process.env.APP_URL?.replace(/\/$/, "") || "https://www.drop-q.com";
+}
 
 /**
  * Mark a pending order as paid and increment inventory — exactly once.
@@ -30,7 +36,11 @@ export async function finalizePaidOrder(
 
     const order = await tx.order.findUnique({
       where: { id: orderId },
-      include: { items: true },
+      include: {
+        items: true,
+        seller: { select: { storeName: true } },
+        drop: { select: { pickupInfo: true, fulfillment: true } },
+      },
     });
     if (!order) return { state: "missing" as const, order: null };
 
@@ -73,6 +83,28 @@ export async function finalizePaidOrder(
   if (result.state === "oversold" && result.order) {
     await refundOversoldOrder(orderId);
   }
+
+  // Confirmation email — only on the call that actually flipped the order to
+  // paid (state "ok"), so the webhook/success-page race emails exactly once.
+  if (result.state === "ok" && result.order) {
+    const o = result.order;
+    const first = o.buyerName.split(" ")[0] || o.buyerName;
+    try {
+      await sendEmail(
+        orderReceivedEmail({
+          to: o.buyerEmail,
+          storeName: o.seller.storeName,
+          buyerFirst: first,
+          orderLink: `${orderBaseUrl()}/order/${o.id}`,
+          pickupInfo: o.drop.pickupInfo,
+          fulfillment: o.drop.fulfillment,
+        })
+      );
+    } catch (e) {
+      console.error("Order confirmation email failed:", e);
+    }
+  }
+
   return result.order;
 }
 

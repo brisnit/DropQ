@@ -8,7 +8,13 @@ import { prisma } from "@/lib/db";
 import { requireSeller } from "@/lib/auth";
 import { dollarsToCents } from "@/lib/format";
 import { saveImage } from "@/lib/upload";
-import { sendEmail, orderReadyEmail } from "@/lib/email";
+import {
+  sendEmail,
+  orderInProgressEmail,
+  orderReadyEmail,
+  orderCompletedEmail,
+  orderCanceledEmail,
+} from "@/lib/email";
 import { sendSms } from "@/lib/notifications";
 import { geocode } from "@/lib/geofence";
 import { canCreateDrop } from "@/lib/plans";
@@ -345,22 +351,29 @@ export async function updateOrderStatusAction(formData: FormData) {
     const isPickup = (order.drop.fulfillment ?? "pickup") === "pickup";
     let sms: string | null = null;
     let mail: Parameters<typeof sendEmail>[0] | null = null;
+    // Shared recipient/context for every status email.
+    const mailArgs = {
+      to: order.buyerEmail,
+      storeName: store,
+      buyerFirst: first,
+      orderLink: link,
+      pickupInfo: order.drop.pickupInfo,
+      fulfillment: order.drop.fulfillment,
+    };
 
-    if (status === "ready") {
+    if (status === "in_progress") {
+      sms = `${store}: We're preparing your order now, ${first}! We'll let you know the moment it's ready. ${link}`;
+      mail = orderInProgressEmail(mailArgs);
+    } else if (status === "ready") {
       const where = order.drop.pickupInfo ? ` ${order.drop.pickupInfo}` : "";
       sms = `${store}: Your order is ready${isPickup ? " for pickup" : ""}! 🎉${where} ${link}`;
-      mail = orderReadyEmail({
-        to: order.buyerEmail,
-        storeName: store,
-        buyerFirst: first,
-        orderLink: link,
-        pickupInfo: order.drop.pickupInfo,
-        fulfillment: order.drop.fulfillment,
-      });
+      mail = orderReadyEmail(mailArgs);
     } else if (status === "completed") {
       sms = `${store}: Thanks for your order, ${first}! 🙌 See you at the next drop.`;
+      mail = orderCompletedEmail(mailArgs);
     } else if (status === "canceled") {
       sms = `${store}: Your order was canceled. Reach out to the maker with any questions.`;
+      mail = orderCanceledEmail(mailArgs);
     }
 
     if (sms || mail) {
