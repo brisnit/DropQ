@@ -169,7 +169,8 @@ model Product {
   description String?
   priceCents  Int
   emoji       String  @default("🍪") // fallback visual when no photo uploaded
-  imageUrl    String? // uploaded product photo (served from /uploads)
+  imageUrl    String? // primary photo (kept in sync with images[0] for back-compat)
+  images      String[] @default([]) // all product photos (gallery); first is primary
   inventory   Int     @default(0) // total units made available
   sold        Int     @default(0)
   sortOrder   Int     @default(0)

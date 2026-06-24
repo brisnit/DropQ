@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { formatMoney } from "@/lib/format";
 import { placeOrderAction, type OrderState } from "@/lib/actions/order";
@@ -12,6 +12,7 @@ type Product = {
   priceCents: number;
   emoji: string;
   imageUrl: string | null;
+  images: string[];
   remaining: number;
   productType?: string | null;
   condition?: string | null;
@@ -84,6 +85,8 @@ export function StorefrontOrder({
 }) {
   const [qty, setQty] = useState<Record<string, number>>({});
   const [state, formAction] = useActionState<OrderState, FormData>(placeOrderAction, {});
+  // Lightbox: which product's photos are open, and the active photo index.
+  const [zoom, setZoom] = useState<{ images: string[]; name: string; index: number } | null>(null);
 
   const setItem = (id: string, n: number, max: number) =>
     setQty((q) => ({ ...q, [id]: Math.max(0, Math.min(n, max)) }));
@@ -98,6 +101,7 @@ export function StorefrontOrder({
   const count = lines.reduce((s, l) => s + l.n, 0);
 
   return (
+    <>
     <form action={formAction} className="grid lg:grid-cols-[1fr_360px] gap-8 items-start">
       <input type="hidden" name="dropId" value={dropId} />
       {products.map((p) => (
@@ -116,13 +120,24 @@ export function StorefrontOrder({
                 soldOut ? "border-line opacity-60" : "border-line"
               }`}
             >
-              {p.imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={p.imageUrl}
-                  alt={p.name}
-                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover shrink-0 border border-line"
-                />
+              {p.images.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setZoom({ images: p.images, name: p.name, index: 0 })}
+                  className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl shrink-0 overflow-hidden border border-line group/img"
+                  aria-label={`View ${p.name} photos`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.images[0]} alt={p.name} className="w-full h-full object-cover" />
+                  <span className="absolute inset-0 bg-ink/0 group-hover/img:bg-ink/25 transition grid place-items-center text-white opacity-0 group-hover/img:opacity-100">
+                    <ZoomIcon />
+                  </span>
+                  {p.images.length > 1 && (
+                    <span className="absolute bottom-1 right-1 text-[10px] font-semibold bg-ink/70 text-white rounded-full px-1.5 py-0.5 leading-none">
+                      {p.images.length}
+                    </span>
+                  )}
+                </button>
               ) : (
                 <span className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-cream grid place-items-center text-3xl shrink-0">
                   {p.emoji}
@@ -279,5 +294,128 @@ export function StorefrontOrder({
         </p>
       </div>
     </form>
+    {zoom && (
+      <Lightbox
+        images={zoom.images}
+        name={zoom.name}
+        index={zoom.index}
+        onIndex={(i) => setZoom((z) => (z ? { ...z, index: i } : z))}
+        onClose={() => setZoom(null)}
+      />
+    )}
+    </>
+  );
+}
+
+function ZoomIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+      <path d="M21 21l-4-4M11 8v6M8 11h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/* Full-screen photo viewer with prev/next, a thumbnail strip, and click-to-zoom
+   so customers can inspect product photos up close. */
+function Lightbox({
+  images,
+  name,
+  index,
+  onIndex,
+  onClose,
+}: {
+  images: string[];
+  name: string;
+  index: number;
+  onIndex: (i: number) => void;
+  onClose: () => void;
+}) {
+  const [magnified, setMagnified] = useState(false);
+  const safe = Math.max(0, Math.min(index, images.length - 1));
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight" && safe < images.length - 1) onIndex(safe + 1);
+      if (e.key === "ArrowLeft" && safe > 0) onIndex(safe - 1);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [safe, images.length, onIndex, onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/90 flex flex-col"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${name} photos`}
+    >
+      <div className="flex items-center justify-between px-4 py-3 text-white/90 shrink-0">
+        <span className="text-sm font-medium truncate">{name}</span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="w-9 h-9 grid place-items-center rounded-full hover:bg-white/15 text-2xl leading-none"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="flex-1 min-h-0 flex items-center justify-center px-4 relative">
+        {safe > 0 && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onIndex(safe - 1); }}
+            aria-label="Previous photo"
+            className="absolute left-2 sm:left-4 w-11 h-11 grid place-items-center rounded-full bg-white/10 hover:bg-white/20 text-white text-2xl"
+          >
+            ‹
+          </button>
+        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={images[safe]}
+          alt={`${name} photo ${safe + 1}`}
+          onClick={(e) => { e.stopPropagation(); setMagnified((m) => !m); }}
+          className={`max-h-full max-w-full object-contain select-none transition-transform duration-200 ${
+            magnified ? "scale-150 cursor-zoom-out" : "cursor-zoom-in"
+          }`}
+        />
+        {safe < images.length - 1 && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onIndex(safe + 1); }}
+            aria-label="Next photo"
+            className="absolute right-2 sm:right-4 w-11 h-11 grid place-items-center rounded-full bg-white/10 hover:bg-white/20 text-white text-2xl"
+          >
+            ›
+          </button>
+        )}
+      </div>
+
+      {images.length > 1 && (
+        <div
+          className="flex gap-2 justify-center px-4 py-4 overflow-x-auto shrink-0"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {images.map((url, i) => (
+            <button
+              key={url}
+              type="button"
+              onClick={() => { onIndex(i); setMagnified(false); }}
+              className={`w-14 h-14 rounded-lg overflow-hidden border-2 shrink-0 ${
+                i === safe ? "border-white" : "border-transparent opacity-60 hover:opacity-100"
+              }`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt="" className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

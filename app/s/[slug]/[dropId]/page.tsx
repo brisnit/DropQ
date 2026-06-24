@@ -123,6 +123,7 @@ export default async function DropOrderPage({
               priceCents: p.priceCents,
               emoji: p.emoji,
               imageUrl: p.imageUrl,
+              images: p.images?.length ? p.images : p.imageUrl ? [p.imageUrl] : [],
               remaining: Math.max(0, p.inventory - p.sold),
               productType: p.productType,
               condition: p.condition,

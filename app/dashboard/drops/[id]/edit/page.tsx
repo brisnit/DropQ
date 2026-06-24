@@ -53,6 +53,7 @@ export default async function EditDropPage({
             price: (p.priceCents / 100).toFixed(2),
             inventory: String(p.inventory),
             imageUrl: p.imageUrl,
+            images: p.images ?? [],
             productType: p.productType ?? "",
             condition: p.condition ?? "",
             rarity: p.rarity ?? "",

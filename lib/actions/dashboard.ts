@@ -174,24 +174,25 @@ export async function createDropAction(formData: FormData) {
   const types = formData.getAll("p_type").map(String);
   const conditions = formData.getAll("p_condition").map(String);
   const rarities = formData.getAll("p_rarity").map(String);
-  const images = formData.getAll("p_image"); // File entries, may be empty
-
-  // Save uploaded photos (in parallel), preserving row order
-  const imageUrls = await Promise.all(images.map((img) => saveImage(img)));
 
   const products = names
-    .map((name, i) => ({
-      name: name.trim(),
-      description: (descs[i] ?? "").trim() || null,
-      priceCents: dollarsToCents(prices[i] ?? "0"),
-      emoji: (emojis[i] ?? "🍪").trim() || "🍪",
-      imageUrl: imageUrls[i] ?? null,
-      inventory: Math.max(0, parseInt(invs[i] ?? "0", 10) || 0),
-      sortOrder: i,
-      productType: (types[i] ?? "").trim() || null,
-      condition: (conditions[i] ?? "").trim() || null,
-      rarity: (rarities[i] ?? "").trim() || null,
-    }))
+    .map((name, i) => {
+      // Photos for this row arrive pre-uploaded as URLs in p_img_<i>.
+      const imgs = formData.getAll(`p_img_${i}`).map(String).filter(Boolean);
+      return {
+        name: name.trim(),
+        description: (descs[i] ?? "").trim() || null,
+        priceCents: dollarsToCents(prices[i] ?? "0"),
+        emoji: (emojis[i] ?? "🍪").trim() || "🍪",
+        images: imgs,
+        imageUrl: imgs[0] ?? null,
+        inventory: Math.max(0, parseInt(invs[i] ?? "0", 10) || 0),
+        sortOrder: i,
+        productType: (types[i] ?? "").trim() || null,
+        condition: (conditions[i] ?? "").trim() || null,
+        rarity: (rarities[i] ?? "").trim() || null,
+      };
+    })
     .filter((p) => p.name.length > 0);
 
   const drop = await prisma.drop.create({
@@ -253,40 +254,37 @@ export async function updateDropFullAction(formData: FormData) {
   const prices = formData.getAll("p_price").map(String);
   const emojis = formData.getAll("p_emoji").map(String);
   const invs = formData.getAll("p_inventory").map(String);
-  const keepImages = formData.getAll("p_keep_image").map(String);
   const types = formData.getAll("p_type").map(String);
   const conditions = formData.getAll("p_condition").map(String);
   const rarities = formData.getAll("p_rarity").map(String);
-  const images = formData.getAll("p_image");
-  const imageUrls = await Promise.all(images.map((img) => saveImage(img)));
 
   const submittedIds = new Set<string>();
   for (let i = 0; i < names.length; i++) {
     const name = names[i].trim();
     if (!name) continue;
+    // The editor pre-uploads photos and submits the full URL set (kept + new)
+    // for each row as p_img_<i>, so we just persist it verbatim.
+    const imgs = formData.getAll(`p_img_${i}`).map(String).filter(Boolean);
     const base = {
       name,
       description: (descs[i] ?? "").trim() || null,
       priceCents: dollarsToCents(prices[i] ?? "0"),
       emoji: (emojis[i] ?? "🍪").trim() || "🍪",
+      images: imgs,
+      imageUrl: imgs[0] ?? null,
       inventory: Math.max(0, parseInt(invs[i] ?? "0", 10) || 0),
       sortOrder: i,
       productType: (types[i] ?? "").trim() || null,
       condition: (conditions[i] ?? "").trim() || null,
       rarity: (rarities[i] ?? "").trim() || null,
     };
-    const newImage = imageUrls[i] ?? null;
     const id = ids[i];
     if (id) {
       submittedIds.add(id);
-      const keptImage = (keepImages[i] ?? "") || null;
       // Scope to this drop so a crafted p_id can't overwrite another vendor's product.
-      await prisma.product.updateMany({
-        where: { id, dropId },
-        data: { ...base, imageUrl: newImage ?? keptImage },
-      });
+      await prisma.product.updateMany({ where: { id, dropId }, data: base });
     } else {
-      await prisma.product.create({ data: { ...base, dropId, imageUrl: newImage } });
+      await prisma.product.create({ data: { ...base, dropId } });
     }
   }
   const removed = drop.products.filter((p) => !submittedIds.has(p.id)).map((p) => p.id);
