@@ -4,11 +4,20 @@ const RESEND_URL = "https://api.resend.com/emails";
 
 type Mail = { to: string; subject: string; html: string };
 
+export type SendResult = {
+  ok: boolean;
+  skipped?: boolean; // no API key — logged to console instead of sent
+  status?: number;
+  error?: string;
+};
+
 /**
  * Send an email via Resend if RESEND_API_KEY is set; otherwise log it to the
  * server console (dev mode) so flows work with zero paid services.
+ * Returns a delivery result so callers (e.g. the admin test button) can report
+ * success/failure. Existing callers that ignore the return value still work.
  */
-export async function sendEmail({ to, subject, html }: Mail): Promise<void> {
+export async function sendEmail({ to, subject, html }: Mail): Promise<SendResult> {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM || "DropQ <onboarding@resend.dev>";
 
@@ -19,7 +28,7 @@ export async function sendEmail({ to, subject, html }: Mail): Promise<void> {
         `To:      ${to}\nSubject: ${subject}\n${text}\n` +
         `────────────────────────────────────────────────────────────────────────\n`
     );
-    return;
+    return { ok: false, skipped: true, error: "RESEND_API_KEY is not set" };
   }
 
   try {
@@ -28,9 +37,15 @@ export async function sendEmail({ to, subject, html }: Mail): Promise<void> {
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({ from, to, subject, html }),
     });
-    if (!res.ok) console.error("Resend email failed:", res.status, await res.text());
+    if (!res.ok) {
+      const body = await res.text();
+      console.error("Resend email failed:", res.status, body);
+      return { ok: false, status: res.status, error: body.slice(0, 400) };
+    }
+    return { ok: true, status: res.status };
   } catch (e) {
     console.error("Resend email error:", e);
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
 

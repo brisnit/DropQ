@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { grantAdminByEmailAction, setAdminAction } from "@/lib/actions/admin";
+import { grantAdminByEmailAction, setAdminAction, sendTestEmailAction } from "@/lib/actions/admin";
 import { formatMoney, relativeTime, formatDate } from "@/lib/format";
 import { Stat } from "@/components/dashboard-ui";
 import { Badge, Button, Input } from "@/components/ui";
@@ -28,10 +28,23 @@ const PLAN_BADGE: Record<Plan, string> = {
 export default async function AdminHome({
   searchParams,
 }: {
-  searchParams: Promise<{ admin?: string; email?: string; deleted?: string }>;
+  searchParams: Promise<{
+    admin?: string;
+    email?: string;
+    deleted?: string;
+    test?: string;
+    testmsg?: string;
+  }>;
 }) {
   const sp = await searchParams;
   const me = await requireAdmin();
+
+  // Non-secret email config status (never expose the API key value itself).
+  const emailConfig = {
+    resendKeySet: !!process.env.RESEND_API_KEY,
+    from: process.env.EMAIL_FROM || null,
+    appUrl: process.env.APP_URL || null,
+  };
   const [sellers, sales, customerGroups, liveDrops, subs, proWaitlist, referrals] = await Promise.all([
     prisma.seller.findMany({
       // The marketing demo store is a visual showcase only — keep it out of Vendors.
@@ -124,6 +137,63 @@ export default async function AdminHome({
           ✓ Vendor deleted.
         </p>
       )}
+
+      {/* Email delivery status + test button */}
+      <div className="mb-8 rounded-card border border-line bg-paper p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="font-semibold text-lg">Email delivery</h2>
+            <p className="text-sm text-muted mt-0.5">
+              Order confirmations and status updates send through Resend.
+            </p>
+            <dl className="mt-3 space-y-1.5 text-sm">
+              <div className="flex items-center gap-2">
+                <dt className="text-muted w-32">RESEND_API_KEY</dt>
+                <dd>
+                  {emailConfig.resendKeySet ? (
+                    <Badge className="bg-sage-tint text-sage">Set</Badge>
+                  ) : (
+                    <Badge className="bg-brand-tint text-brand-dark">Not set</Badge>
+                  )}
+                </dd>
+              </div>
+              <div className="flex items-center gap-2">
+                <dt className="text-muted w-32">EMAIL_FROM</dt>
+                <dd className="font-mono text-xs">
+                  {emailConfig.from ?? (
+                    <span className="text-brand-dark">
+                      default onboarding@resend.dev — only reaches your Resend account email
+                    </span>
+                  )}
+                </dd>
+              </div>
+              <div className="flex items-center gap-2">
+                <dt className="text-muted w-32">APP_URL</dt>
+                <dd className="font-mono text-xs">
+                  {emailConfig.appUrl ?? <span className="text-muted">fallback https://www.drop-q.com</span>}
+                </dd>
+              </div>
+            </dl>
+          </div>
+          <form action={sendTestEmailAction} className="shrink-0">
+            <Button type="submit" variant="dark">Send test email to me</Button>
+            <p className="text-xs text-muted mt-1.5 max-w-[12rem]">
+              Sends to {me.email} and reports the result.
+            </p>
+          </form>
+        </div>
+
+        {sp.test === "sent" && (
+          <p className="mt-4 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">
+            ✓ Test email accepted by Resend — check {me.email} (and spam).
+          </p>
+        )}
+        {sp.test === "fail" && (
+          <p className="mt-4 text-sm bg-brand-tint text-brand-dark rounded-lg px-3 py-2">
+            ✕ Test email failed: {sp.testmsg || "Unknown error."}
+          </p>
+        )}
+      </div>
 
       {/* Platform totals */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">

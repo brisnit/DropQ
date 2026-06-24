@@ -4,9 +4,29 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { sendEmail } from "@/lib/email";
 import { partnerExpiryFrom, type Plan } from "@/lib/plans";
 
 const PLANS: Plan[] = ["starter", "growth", "partner", "pro"];
+
+/** Admin: send a one-off test email to your own address to confirm delivery. */
+export async function sendTestEmailAction() {
+  const me = await requireAdmin();
+  const res = await sendEmail({
+    to: me.email,
+    subject: "DropQ test email ✅",
+    html:
+      `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;padding:24px">` +
+      `<h1 style="font-size:20px;margin:0 0 10px">It works! 🎉</h1>` +
+      `<p style="font-size:15px;line-height:1.55">This is a test email from DropQ. If you're reading it in your inbox, ` +
+      `transactional email delivery (order confirmations and status updates) is configured correctly.</p>` +
+      `<p style="font-size:12px;color:#6b6b6b;margin-top:18px">Sent to ${me.email}.</p></div>`,
+  });
+  const params = res.ok
+    ? "test=sent"
+    : `test=fail&testmsg=${encodeURIComponent(res.skipped ? "RESEND_API_KEY is not set — email was logged to the server console, not sent." : res.error || "Unknown error")}`;
+  redirect(`/admin?${params}`);
+}
 
 /** Admin: change a vendor's plan. Assigning Partner (re)starts the 12-month clock. */
 export async function setPlanAction(formData: FormData) {
