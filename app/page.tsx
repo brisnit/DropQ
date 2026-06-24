@@ -364,7 +364,7 @@ export default function Home() {
         <Reveal>
           <Eyebrow>What's a drop?</Eyebrow>
           <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-3">
-            Scarcity that sells out — on purpose.
+            Scarcity that sells out on purpose.
           </h2>
           <p className="text-lg text-ink-soft mt-5">
             A drop is a limited release, available for a set window. You decide what
@@ -379,7 +379,7 @@ export default function Home() {
               "Handles big traffic spikes without breaking a sweat",
             ].map((t) => (
               <li key={t} className="flex gap-3 text-ink-soft">
-                <span className="mt-0.5 w-5 h-5 rounded-full bg-sage-tint text-sage grid place-items-center text-xs shrink-0">✓</span>
+                <span className="mt-0.5 w-5 h-5 rounded-full bg-brand-tint text-brand-dark grid place-items-center text-xs shrink-0">✓</span>
                 {t}
               </li>
             ))}
@@ -389,7 +389,7 @@ export default function Home() {
         <Card className="p-7">
           <div className="flex items-center justify-between mb-5">
             <span className="font-display text-lg font-semibold">This week's drop</span>
-            <Badge className="bg-sage-tint text-sage">Open now</Badge>
+            <Badge className="bg-brand-tint text-brand-dark">Open now</Badge>
           </div>
           <div className="space-y-3">
             {[
@@ -455,7 +455,10 @@ export default function Home() {
       {/* TESTIMONIAL */}
       <Section id="stories" className="py-20 sm:py-28">
         <Reveal>
-        <Card className="p-8 sm:p-14 text-center max-w-3xl mx-auto">
+        <div
+          className="p-8 sm:p-14 text-center max-w-3xl mx-auto border border-line rounded-card shadow-[var(--shadow-soft)]"
+          style={{ backgroundColor: "#ececed" }}
+        >
           <div className="text-grey text-2xl">★★★★★</div>
           <blockquote className="font-display text-2xl sm:text-3xl font-medium leading-snug mt-5">
             “DropQ turned my weekend hobby into a real business. I sold out my
@@ -465,7 +468,7 @@ export default function Home() {
             <p className="font-semibold">Matt Jennings</p>
             <p className="text-sm text-muted">Dope Collectables · La Mesa, CA</p>
           </div>
-        </Card>
+        </div>
         </Reveal>
       </Section>
 
