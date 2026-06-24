@@ -34,12 +34,15 @@ export default async function DashboardLayout({
         <div className="p-4 flex-1">
           <DashboardNav />
           {admin && (
-            <Link
-              href="/admin"
-              className="flex items-center gap-3 px-3 py-2.5 mt-1 rounded-xl text-sm font-medium text-brand hover:bg-brand-tint/60 transition"
-            >
-              <span className="text-base leading-none">🛡️</span> DropQ Admin
-            </Link>
+            <>
+              <div className="my-1 border-t border-line/70" aria-hidden />
+              <Link
+                href="/admin"
+                className="block px-3 py-2.5 rounded-xl text-sm font-medium text-brand hover:bg-brand-tint/60 transition"
+              >
+                DropQ Admin
+              </Link>
+            </>
           )}
         </div>
         <div className="p-4 border-t border-line/70 space-y-3">
@@ -57,16 +60,12 @@ export default async function DashboardLayout({
             </span>
           </Link>
 
-          {/* Account + logout (always the last item) */}
-          <div className="pt-1">
-            <p className="text-sm font-medium truncate">{seller.storeName}</p>
-            <p className="text-xs text-muted truncate mb-2">{seller.email}</p>
-            <form action={logoutAction}>
-              <button className="w-full inline-flex items-center gap-2 text-sm font-medium text-ink-soft hover:text-brand hover:bg-line/60 rounded-lg px-3 py-2.5 transition">
-                <span aria-hidden className="text-base leading-none">↩</span> Log out
-              </button>
-            </form>
-          </div>
+          {/* Log out CTA */}
+          <form action={logoutAction}>
+            <button className="w-full text-center border border-line-strong rounded-xl px-3 py-2.5 text-sm font-medium text-ink hover:bg-line/50 transition">
+              Log out
+            </button>
+          </form>
         </div>
       </aside>
 
