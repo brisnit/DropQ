@@ -110,25 +110,25 @@ const STEPS = [
     n: "01",
     title: "Set up your store",
     body: "Add your name, your story, and how customers pick up or get delivery. Two minutes, no code.",
-    emoji: "🏪",
+    icon: "/categories/landing/icons/set-up-store.png",
   },
   {
     n: "02",
     title: "Build a drop",
     body: "List your products, set quantities, and pick when ordering opens and closes. Sell-outs handled automatically.",
-    emoji: "🗓️",
+    icon: "/categories/landing/icons/build-a-drop.png",
   },
   {
     n: "03",
     title: "Share one link",
     body: "Drop it in your bio, stories, or a text blast. Your waitlist gets notified the moment you go live.",
-    emoji: "🔗",
+    icon: "/categories/landing/icons/share-one-link.png",
   },
   {
     n: "04",
     title: "Fulfill & get paid",
     body: "Orders land in one organized list. Mark them ready, hand them off, and watch revenue add up.",
-    emoji: "💸",
+    icon: "/categories/landing/icons/fulfill-get-paid.png",
   },
 ];
 
@@ -334,7 +334,8 @@ export default function Home() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-12">
             {STEPS.map((s, i) => (
               <Reveal key={s.n} delay={i * 90} className="relative">
-                <div className="text-3xl">{s.emoji}</div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={s.icon} alt="" className="w-9 h-9 object-contain" />
                 <div className="font-display text-sm text-grey mt-4">{s.n}</div>
                 <h3 className="font-semibold text-lg mt-1">{s.title}</h3>
                 <p className="text-sm text-cream/70 mt-2">{s.body}</p>
