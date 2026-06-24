@@ -146,6 +146,15 @@ export function DropEditor({
   const [error, setError] = useState<string | null>(null);
   const fileRefs = useRef<Record<number, HTMLInputElement | null>>({});
 
+  // Separate date + time inputs, combined into the "YYYY-MM-DDTHH:mm" the
+  // server action expects via the hidden opensAt/closesAt fields.
+  const [opensDate, setOpensDate] = useState(defaults.opensAt?.slice(0, 10) ?? "");
+  const [opensTime, setOpensTime] = useState(defaults.opensAt?.slice(11, 16) ?? "");
+  const [closesDate, setClosesDate] = useState(defaults.closesAt?.slice(0, 10) ?? "");
+  const [closesTime, setClosesTime] = useState(defaults.closesAt?.slice(11, 16) ?? "");
+  const opensAt = opensDate && opensTime ? `${opensDate}T${opensTime}` : "";
+  const closesAt = closesDate && closesTime ? `${closesDate}T${closesTime}` : "";
+
   const update = (key: number, patch: Partial<Row>) =>
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
 
@@ -262,10 +271,42 @@ export function DropEditor({
         {!live && (
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Opens" hint="When ordering starts.">
-              <Input name="opensAt" type="datetime-local" defaultValue={defaults.opensAt ?? ""} required />
+              <div className="flex gap-2">
+                <Input
+                  type="date"
+                  aria-label="Opens date"
+                  value={opensDate}
+                  onChange={(e) => setOpensDate(e.target.value)}
+                  className="flex-1 min-w-0"
+                />
+                <Input
+                  type="time"
+                  aria-label="Opens time"
+                  value={opensTime}
+                  onChange={(e) => setOpensTime(e.target.value)}
+                  className="w-32 shrink-0"
+                />
+              </div>
+              <input type="hidden" name="opensAt" value={opensAt} />
             </Field>
             <Field label="Closes" hint="Last call for orders.">
-              <Input name="closesAt" type="datetime-local" defaultValue={defaults.closesAt ?? ""} required />
+              <div className="flex gap-2">
+                <Input
+                  type="date"
+                  aria-label="Closes date"
+                  value={closesDate}
+                  onChange={(e) => setClosesDate(e.target.value)}
+                  className="flex-1 min-w-0"
+                />
+                <Input
+                  type="time"
+                  aria-label="Closes time"
+                  value={closesTime}
+                  onChange={(e) => setClosesTime(e.target.value)}
+                  className="w-32 shrink-0"
+                />
+              </div>
+              <input type="hidden" name="closesAt" value={closesAt} />
             </Field>
           </div>
         )}

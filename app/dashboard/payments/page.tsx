@@ -191,11 +191,6 @@ export default async function PaymentsPage({
           </p>
         </div>
       )}
-
-      <p className="text-xs text-muted mt-4">
-        Platform fee is configurable via{" "}
-        <code className="bg-paper border border-line px-1.5 py-0.5 rounded">DROPQ_FEE_PERCENT</code>.
-      </p>
     </Section>
   );
 }
