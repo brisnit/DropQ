@@ -25,17 +25,37 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
-function ymd(d: Date) {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-/** Parse "YYYY-MM-DDTHH:mm" into a local Date (date only) + "HH:mm" time. */
+/**
+ * Parse a stored value into a local Date (date only) + "HH:mm" time.
+ * Accepts an ISO instant (with Z / offset) — converted to the viewer's local
+ * wall-clock — or a legacy local "YYYY-MM-DDTHH:mm" string.
+ */
 function parseDefault(s?: string): { date: Date | null; time: string } {
   if (!s) return { date: null, time: "" };
-  const [datePart, timePart] = s.split("T");
+  if (/Z$|[+-]\d\d:?\d\d$/.test(s)) {
+    const dt = new Date(s);
+    if (isNaN(dt.getTime())) return { date: null, time: "" };
+    return {
+      date: new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()),
+      time: `${pad(dt.getHours())}:${pad(dt.getMinutes())}`,
+    };
+  }
+  const [datePart, timePart = ""] = s.split("T");
   const [y, m, d] = datePart.split("-").map(Number);
-  if (!y || !m || !d) return { date: null, time: timePart ?? "" };
-  return { date: new Date(y, m - 1, d), time: (timePart ?? "").slice(0, 5) };
+  if (!y || !m || !d) return { date: null, time: timePart };
+  return { date: new Date(y, m - 1, d), time: timePart.slice(0, 5) };
+}
+
+/** Combine a local date + "HH:mm" into a UTC ISO instant (in the viewer's TZ). */
+function toIsoInstant(date: Date, time: string): string {
+  const [hh = 0, mm = 0] = time.split(":").map(Number);
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    hh,
+    mm
+  ).toISOString();
 }
 
 /** Strip time so day comparisons are stable. */
@@ -79,8 +99,10 @@ export function DateRangePicker({
     (initStart.date ?? today).getMonth()
   );
 
-  const opensAt = startDate && startTime ? `${ymd(startDate)}T${startTime}` : "";
-  const closesAt = endDate && endTime ? `${ymd(endDate)}T${endTime}` : "";
+  // Emit proper UTC instants (computed in the vendor's timezone) so the server
+  // stores the exact moment ordering opens/closes — not a UTC-misread wall clock.
+  const opensAt = startDate && startTime ? toIsoInstant(startDate, startTime) : "";
+  const closesAt = endDate && endTime ? toIsoInstant(endDate, endTime) : "";
 
   const years = useMemo(() => {
     const base = today.getFullYear();

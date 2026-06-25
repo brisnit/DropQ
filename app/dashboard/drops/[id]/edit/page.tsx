@@ -8,8 +8,10 @@ import { BackLink } from "@/components/back-link";
 
 export const metadata = { title: "Edit drop — DropQ" };
 
-function toLocalInput(d: Date | null): string {
-  return d ? new Date(d).toISOString().slice(0, 16) : "";
+// Pass the full ISO instant; the (client) date picker converts it to the
+// vendor's local time for display, then re-emits a correct UTC instant on save.
+function toIso(d: Date | null): string {
+  return d ? new Date(d).toISOString() : "";
 }
 
 export default async function EditDropPage({
@@ -42,8 +44,8 @@ export default async function EditDropPage({
           description: drop.description ?? "",
           fulfillment: drop.fulfillment,
           location: drop.pickupInfo ?? "",
-          opensAt: toLocalInput(drop.opensAt),
-          closesAt: toLocalInput(drop.closesAt),
+          opensAt: toIso(drop.opensAt),
+          closesAt: toIso(drop.closesAt),
           status: drop.status,
           products: drop.products.map((p) => ({
             id: p.id,
