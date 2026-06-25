@@ -220,6 +220,8 @@ export async function placeOrderAction(
     orderLink,
     pickupInfo: drop.pickupInfo,
     fulfillment: drop.fulfillment,
+    logoUrl: drop.seller.logoUrl,
+    accent: drop.seller.accent,
   });
   const smsText = `${drop.seller.storeName}: Got your order! 🎉 We'll text you when it's ready. ${orderLink}`;
   after(async () => {

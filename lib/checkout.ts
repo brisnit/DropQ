@@ -38,7 +38,7 @@ export async function finalizePaidOrder(
       where: { id: orderId },
       include: {
         items: true,
-        seller: { select: { storeName: true } },
+        seller: { select: { storeName: true, logoUrl: true, accent: true } },
         drop: { select: { pickupInfo: true, fulfillment: true } },
       },
     });
@@ -98,6 +98,8 @@ export async function finalizePaidOrder(
           orderLink: `${orderBaseUrl()}/order/${o.id}`,
           pickupInfo: o.drop.pickupInfo,
           fulfillment: o.drop.fulfillment,
+          logoUrl: o.seller.logoUrl,
+          accent: o.seller.accent,
         })
       );
     } catch (e) {

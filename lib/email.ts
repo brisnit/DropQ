@@ -65,6 +65,75 @@ function layout(heading: string, body: string, cta: { href: string; label: strin
   </div>`;
 }
 
+function esc(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/** Pick black/white text for legibility on top of an arbitrary brand color. */
+function readableOn(hex: string): string {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
+  if (!m) return "#ffffff";
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.62 ? "#1a1a1a" : "#ffffff";
+}
+
+type Brand = { storeName: string; logoUrl?: string | null; accent?: string | null };
+
+/**
+ * Vendor-branded email shell for customer messages: the vendor's logo + name in
+ * their store's accent color, a matching CTA, and a small DropQ credit in the
+ * footer. The email reads as if it's from the vendor, not from DropQ.
+ */
+function vendorLayout(
+  brand: Brand,
+  heading: string,
+  body: string,
+  cta: { href: string; label: string }
+) {
+  const accent =
+    brand.accent && /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(brand.accent)
+      ? brand.accent
+      : "#1a1a1a";
+  const onAccent = readableOn(accent);
+  const name = esc(brand.storeName);
+  const logoCell = brand.logoUrl
+    ? `<td style="padding-right:12px;vertical-align:middle" width="48">
+         <img src="${brand.logoUrl}" alt="${name}" width="44" height="44" style="display:block;width:44px;height:44px;border-radius:10px;object-fit:cover;background:#fff;border:1px solid rgba(255,255,255,0.35)" />
+       </td>`
+    : "";
+  return `
+  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafafa;padding:32px">
+    <div style="max-width:480px;margin:0 auto;background:#fff;border:1px solid #e8e8e8;border-radius:18px;overflow:hidden">
+      <div style="background:${accent};padding:18px 24px">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+          ${logoCell}
+          <td style="vertical-align:middle">
+            <span style="font-size:20px;font-weight:700;letter-spacing:-0.01em;color:${onAccent}">${name}</span>
+          </td>
+        </tr></table>
+      </div>
+      <div style="padding:28px 24px;color:#1a1a1a">
+        <h1 style="font-size:20px;margin:0 0 12px">${heading}</h1>
+        <p style="font-size:15px;line-height:1.55;color:#3d3d3d;margin:0 0 22px">${body}</p>
+        <a href="${cta.href}" style="display:inline-block;background:${accent};color:${onAccent};text-decoration:none;font-weight:600;padding:12px 22px;border-radius:12px">${cta.label}</a>
+        <p style="font-size:12px;color:#6b6b6b;margin:22px 0 0">If the button doesn't work, copy this link:<br><span style="color:#6b6b6b;word-break:break-all">${cta.href}</span></p>
+      </div>
+    </div>
+    <p style="text-align:center;color:#9aa0a6;font-size:12px;margin-top:16px">
+      Powered by <a href="https://www.drop-q.com" style="color:#9aa0a6;text-decoration:underline">DropQ</a>
+      &nbsp;·&nbsp; Want a store like this? <a href="https://www.drop-q.com" style="color:#9aa0a6;text-decoration:underline">Start free →</a>
+    </p>
+  </div>`;
+}
+
 export function verificationEmail(to: string, link: string): Mail {
   return {
     to,
@@ -96,13 +165,21 @@ type OrderMail = {
   orderLink: string;
   pickupInfo?: string | null;
   fulfillment?: string;
+  logoUrl?: string | null;
+  accent?: string | null;
 };
+
+/** Branding block pulled from the OrderMail for the vendor-branded shell. */
+function brandOf(o: OrderMail): Brand {
+  return { storeName: o.storeName, logoUrl: o.logoUrl, accent: o.accent };
+}
 
 export function orderReceivedEmail(o: OrderMail): Mail {
   return {
     to: o.to,
     subject: `${o.storeName} got your order ✅`,
-    html: layout(
+    html: vendorLayout(
+      brandOf(o),
       "Order received!",
       `Hi ${o.buyerFirst}, thanks for ordering from <b>${o.storeName}</b>. We'll let you know the moment it's ready.` +
         (o.pickupInfo ? `<br><br><b>${o.fulfillment || "Pickup"}:</b> ${o.pickupInfo}` : ""),
@@ -115,7 +192,8 @@ export function orderInProgressEmail(o: OrderMail): Mail {
   return {
     to: o.to,
     subject: `${o.storeName} is preparing your order 👩‍🍳`,
-    html: layout(
+    html: vendorLayout(
+      brandOf(o),
       "Your order is being prepared",
       `Hi ${o.buyerFirst}, <b>${o.storeName}</b> just started preparing your order. We'll email you the moment it's ready.` +
         (o.pickupInfo ? `<br><br><b>${o.fulfillment || "Pickup"}:</b> ${o.pickupInfo}` : ""),
@@ -129,7 +207,8 @@ export function orderReadyEmail(o: OrderMail): Mail {
   return {
     to: o.to,
     subject: `Your ${o.storeName} order is ready${isPickup ? " for pickup" : ""} 🎉`,
-    html: layout(
+    html: vendorLayout(
+      brandOf(o),
       `Your order is ready${isPickup ? " for pickup" : ""}! 🎉`,
       `Hi ${o.buyerFirst}, your order from <b>${o.storeName}</b> is ready.` +
         (o.pickupInfo
@@ -144,7 +223,8 @@ export function orderCompletedEmail(o: OrderMail): Mail {
   return {
     to: o.to,
     subject: `Thanks for your order from ${o.storeName}! 🙌`,
-    html: layout(
+    html: vendorLayout(
+      brandOf(o),
       "Order complete",
       `Hi ${o.buyerFirst}, thanks for ordering from <b>${o.storeName}</b>. We hope you loved it — see you at the next drop!`,
       { href: o.orderLink, label: "View your order" }
@@ -156,7 +236,8 @@ export function orderCanceledEmail(o: OrderMail): Mail {
   return {
     to: o.to,
     subject: `Your ${o.storeName} order was canceled`,
-    html: layout(
+    html: vendorLayout(
+      brandOf(o),
       "Order canceled",
       `Hi ${o.buyerFirst}, your order from <b>${o.storeName}</b> has been canceled. If you have any questions, just reply to reach the maker.`,
       { href: o.orderLink, label: "View your order" }

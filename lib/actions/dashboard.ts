@@ -349,7 +349,7 @@ export async function updateOrderStatusAction(formData: FormData) {
     const isPickup = (order.drop.fulfillment ?? "pickup") === "pickup";
     let sms: string | null = null;
     let mail: Parameters<typeof sendEmail>[0] | null = null;
-    // Shared recipient/context for every status email.
+    // Shared recipient/context for every status email — branded as the vendor.
     const mailArgs = {
       to: order.buyerEmail,
       storeName: store,
@@ -357,6 +357,8 @@ export async function updateOrderStatusAction(formData: FormData) {
       orderLink: link,
       pickupInfo: order.drop.pickupInfo,
       fulfillment: order.drop.fulfillment,
+      logoUrl: seller.logoUrl,
+      accent: seller.accent,
     };
 
     if (status === "in_progress") {
