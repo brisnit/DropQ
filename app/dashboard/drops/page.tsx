@@ -25,6 +25,22 @@ export default async function DropsPage() {
   const remaining = dropsRemaining(seller);
   const atLimit = !canCreateDrop(seller);
 
+  // Flag published preorder drops whose close time has already passed, and show
+  // schedule times in the store's timezone (not the server's UTC).
+  const now = new Date();
+  const tz = seller.timezone || undefined;
+  const fmtWhen = (d: Date | null) =>
+    d
+      ? new Intl.DateTimeFormat("en-US", {
+          timeZone: tz,
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          timeZoneName: "short",
+        }).format(d)
+      : null;
+
   return (
     <Section>
       <PageHeader
@@ -74,6 +90,10 @@ export default async function DropsPage() {
             const sold = d.products.reduce((s, p) => s + p.sold, 0);
             const stock = d.products.reduce((s, p) => s + p.inventory, 0);
             const orderCount = d.orders.length;
+            // Live (published) preorder drop whose close time is already past →
+            // customers can't order even though it shows "live".
+            const closePassed =
+              d.status === "live" && d.mode !== "live" && !!d.closesAt && d.closesAt < now;
             const confirmMsg =
               `Delete “${d.title}”` +
               (orderCount ? ` and its ${orderCount} order${orderCount !== 1 ? "s" : ""}` : "") +
@@ -90,11 +110,20 @@ export default async function DropsPage() {
                         <h3 className="font-display text-lg font-semibold truncate">{d.title}</h3>
                         <Badge className={statusStyle(d.status)}>{d.status}</Badge>
                         {d.mode === "live" && <Badge className="bg-quad/15 text-tertiary">🟢 live</Badge>}
+                        {closePassed && (
+                          <Badge className="bg-brand-tint text-brand-dark">⚠ Closing time passed</Badge>
+                        )}
                       </div>
                       <p className="text-sm text-muted mt-1">
                         {d.products.length} item{d.products.length !== 1 ? "s" : ""} ·{" "}
                         {d.fulfillment} · created {formatDate(d.createdAt)}
                       </p>
+                      {d.mode !== "live" && d.closesAt && (
+                        <p className={`text-xs mt-0.5 ${closePassed ? "text-brand-dark font-medium" : "text-muted"}`}>
+                          {closePassed ? "Closed" : "Closes"} {fmtWhen(d.closesAt)}
+                          {closePassed && " — edit the drop to reopen or re-schedule."}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-6 text-right">
                       <div>
