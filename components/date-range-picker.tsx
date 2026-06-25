@@ -269,25 +269,29 @@ function SummaryRow({
   return (
     <div>
       <p className="text-xs font-semibold tracking-wide text-muted mb-1">{label}</p>
-      <div className="flex items-center gap-4">
-        <span className="font-display text-4xl sm:text-5xl font-light text-brand w-14 tabular-nums">
-          {date ? date.getDate() : "—"}
-        </span>
-        <div className="min-w-0 flex-1">
-          {date ? (
-            <>
-              <p className="font-medium text-ink leading-tight">
-                {MONTHS[date.getMonth()]} {date.getFullYear()}
+      {/* Date group + time group wrap onto separate lines when the row is too
+          narrow, so the date copy never gets squeezed into the time picker. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="flex items-center gap-4">
+          <span className="font-display text-4xl sm:text-5xl font-light text-brand w-14 tabular-nums shrink-0">
+            {date ? date.getDate() : "—"}
+          </span>
+          <div>
+            {date ? (
+              <>
+                <p className="font-medium text-ink leading-tight whitespace-nowrap">
+                  {MONTHS[date.getMonth()]} {date.getFullYear()}
+                </p>
+                <p className="text-sm text-muted">{WEEKDAYS_LONG[date.getDay()]}</p>
+              </>
+            ) : (
+              <p className="text-muted">
+                {label === "FROM" ? "Pick a start date above" : "Pick an end date above"}
               </p>
-              <p className="text-sm text-muted">{WEEKDAYS_LONG[date.getDay()]}</p>
-            </>
-          ) : (
-            <p className="text-muted">
-              {label === "FROM" ? "Pick a start date above" : "Pick an end date above"}
-            </p>
-          )}
+            )}
+          </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 sm:ml-auto">
           <ClockIcon />
           <TimeSelect value={time} onChange={onTime} label={timeLabel} />
         </div>
