@@ -104,9 +104,15 @@ function vendorLayout(
       : "#1a1a1a";
   const onAccent = readableOn(accent);
   const name = esc(brand.storeName);
-  const logoCell = brand.logoUrl
+  // Email images need absolute URLs; resolve any relative storefront logo.
+  const logoSrc = brand.logoUrl
+    ? brand.logoUrl.startsWith("/")
+      ? `https://www.drop-q.com${brand.logoUrl}`
+      : brand.logoUrl
+    : null;
+  const logoCell = logoSrc
     ? `<td style="padding-right:12px;vertical-align:middle" width="48">
-         <img src="${brand.logoUrl}" alt="${name}" width="44" height="44" style="display:block;width:44px;height:44px;border-radius:10px;object-fit:cover;background:#fff;border:1px solid rgba(255,255,255,0.35)" />
+         <img src="${logoSrc}" alt="${name}" width="44" height="44" style="display:block;width:44px;height:44px;border-radius:10px;object-fit:cover;background:#fff;border:1px solid rgba(255,255,255,0.35)" />
        </td>`
     : "";
   return `
