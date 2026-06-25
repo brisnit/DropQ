@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getStripe } from "@/lib/stripe";
 import { finalizePaidOrder } from "@/lib/checkout";
-import { Mark } from "@/components/logo";
 import { formatMoney } from "@/lib/format";
 
 export const metadata = { title: "Order confirmed — DropQ" };
@@ -143,7 +142,8 @@ export default async function OrderConfirmationPage({
 
         {/* Subtle post-order upsell — the only place we mention DropQ to a buyer */}
         <p className="text-center text-sm text-muted mt-6 flex items-center justify-center gap-1.5">
-          <Mark size={15} /> Want a store like this?{" "}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/dropq-mark.png" alt="DropQ" className="h-4 w-auto" /> Want a store like this?{" "}
           <Link href="/" className="text-ink font-medium hover:underline">
             Start your own free →
           </Link>
