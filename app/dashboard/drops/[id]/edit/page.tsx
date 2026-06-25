@@ -39,6 +39,7 @@ export default async function EditDropPage({
         action={updateDropFullAction}
         category={seller.category}
         dropMode={drop.mode === "live" ? "live" : "preorder"}
+        timeZone={seller.timezone ?? undefined}
         defaults={{
           title: drop.title,
           description: drop.description ?? "",

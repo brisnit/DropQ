@@ -117,6 +117,7 @@ export function DropEditor({
   dropId,
   category = "food",
   dropMode = "preorder",
+  timeZone,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   mode?: "create" | "edit";
@@ -124,6 +125,7 @@ export function DropEditor({
   dropId?: string;
   category?: string;
   dropMode?: "preorder" | "live";
+  timeZone?: string;
 }) {
   const v = vocab(category);
   const meta = showItemMeta(category);
@@ -294,6 +296,7 @@ export function DropEditor({
             <DateRangePicker
               defaultStart={defaults.opensAt}
               defaultEnd={defaults.closesAt}
+              timeZone={timeZone}
             />
           </div>
         )}

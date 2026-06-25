@@ -19,6 +19,7 @@ export type StoreFormData = {
   logoUrl: string | null;
   headerImageUrl: string | null;
   accent: string;
+  timezone: string | null;
   instagram: string | null;
   tiktok: string | null;
   twitter: string | null;
@@ -52,6 +53,35 @@ export function StoreSettingsForm({
   const [dirty, setDirty] = useState(false);
   const [geo, setGeo] = useState(seller.geofenceEnabled);
   const [accent, setAccent] = useState(seller.accent);
+
+  // Timezone used to schedule drops. Default to the vendor's browser zone so
+  // saving captures something sensible even if they never touch the field.
+  const browserTz = (() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    } catch {
+      return "UTC";
+    }
+  })();
+  const [timezone, setTimezone] = useState(seller.timezone || browserTz);
+  const zones = (() => {
+    let list: string[] = [];
+    try {
+      const sv = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf;
+      if (sv) list = sv("timeZone");
+    } catch {
+      /* ignore */
+    }
+    if (!list.length) {
+      list = [
+        "America/New_York", "America/Chicago", "America/Denver", "America/Phoenix",
+        "America/Los_Angeles", "America/Anchorage", "Pacific/Honolulu", "UTC",
+        "Europe/London", "Europe/Paris", "Europe/Berlin", "Australia/Sydney",
+      ];
+    }
+    if (timezone && !list.includes(timezone)) list = [timezone, ...list];
+    return list;
+  })();
   const pickAccent = (v: string) => {
     setAccent(v);
     setDirty(true);
@@ -217,6 +247,24 @@ export function StoreSettingsForm({
           hint="Your city/area — shown on your storefront with a 📍. Set the exact pickup or delivery address on each drop."
         >
           <Input name="location" defaultValue={seller.location ?? ""} placeholder="Austin, TX" />
+        </Field>
+        <Field
+          label="Timezone"
+          hint="Drop open/close times are scheduled in this timezone."
+        >
+          <input type="hidden" name="timezone" value={timezone} />
+          <select
+            value={timezone}
+            onChange={(e) => {
+              setTimezone(e.target.value);
+              setDirty(true);
+            }}
+            className="w-full bg-paper border border-line-strong rounded-xl px-3.5 py-2.5 text-ink focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+          >
+            {zones.map((z) => (
+              <option key={z} value={z}>{z.replace(/_/g, " ")}</option>
+            ))}
+          </select>
         </Field>
         <Field label="Brand accent" hint="Pick a preset or set any custom color.">
           <input type="hidden" name="accent" value={accent} />

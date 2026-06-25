@@ -54,6 +54,10 @@ export async function updateStoreAction(
   const accentRaw = String(formData.get("accent") ?? seller.accent).trim();
   const accent = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(accentRaw) ? accentRaw : seller.accent;
 
+  // Timezone — accept a plausible IANA value (e.g. "America/New_York" or "UTC").
+  const tzRaw = String(formData.get("timezone") ?? "").trim();
+  const timezone = /^[A-Za-z]+(?:\/[A-Za-z0-9_+-]+)+$|^UTC$/.test(tzRaw) ? tzRaw : seller.timezone;
+
   // Social links — normalize handles/partial URLs to full https URLs.
   const socials = Object.fromEntries(
     SOCIALS.map((s) => [s.key, normalizeSocialUrl(s.key, String(formData.get(`social_${s.key}`) ?? ""))])
@@ -82,6 +86,7 @@ export async function updateStoreAction(
       logoUrl,
       headerImageUrl,
       accent,
+      timezone,
       instagram: socials.instagram,
       tiktok: socials.tiktok,
       twitter: socials.twitter,

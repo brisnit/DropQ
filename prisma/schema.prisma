@@ -64,6 +64,10 @@ model Seller {
   // DropQ fee: "absorb" (store eats the fee) | "pass" (customer pays the fee)
   feeMode String @default("absorb")
 
+  // IANA timezone for scheduling drops (e.g. "America/New_York"). Null = use the
+  // vendor's browser timezone when scheduling.
+  timezone        String?
+
   // Geofencing notifications (location + opt-in radius)
   geofenceEnabled Boolean @default(false)
   latitude        Float?

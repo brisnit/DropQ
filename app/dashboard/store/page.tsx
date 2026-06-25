@@ -94,6 +94,7 @@ export default async function StorePage() {
           logoUrl: seller.logoUrl,
           headerImageUrl: seller.headerImageUrl,
           accent: seller.accent,
+          timezone: seller.timezone,
           instagram: seller.instagram,
           tiktok: seller.tiktok,
           twitter: seller.twitter,

@@ -25,16 +25,76 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
+/** Offset (ms) of an IANA timezone at a given instant. */
+function tzOffsetMs(timeZone: string, at: Date): number {
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  const map: Record<string, number> = {};
+  for (const p of dtf.formatToParts(at)) {
+    if (p.type !== "literal") map[p.type] = Number(p.value);
+  }
+  const asUTC = Date.UTC(map.year, map.month - 1, map.day, map.hour, map.minute, map.second);
+  return asUTC - at.getTime();
+}
+
+/** Wall-clock (y, m0, d, hh, mm) in `timeZone` → UTC ISO instant. */
+function zonedToUtcIso(
+  y: number,
+  m0: number,
+  d: number,
+  hh: number,
+  mm: number,
+  timeZone?: string
+): string {
+  if (!timeZone) return new Date(y, m0, d, hh, mm).toISOString();
+  const guess = Date.UTC(y, m0, d, hh, mm);
+  const off1 = tzOffsetMs(timeZone, new Date(guess));
+  let utc = guess - off1;
+  const off2 = tzOffsetMs(timeZone, new Date(utc)); // refine across DST edges
+  if (off2 !== off1) utc = guess - off2;
+  return new Date(utc).toISOString();
+}
+
 /**
- * Parse a stored value into a local Date (date only) + "HH:mm" time.
- * Accepts an ISO instant (with Z / offset) — converted to the viewer's local
- * wall-clock — or a legacy local "YYYY-MM-DDTHH:mm" string.
+ * Parse a stored value into a Date (date only) + "HH:mm" time, expressed in
+ * `timeZone` (or the viewer's local zone if none). Accepts an ISO instant or a
+ * legacy local "YYYY-MM-DDTHH:mm" string.
  */
-function parseDefault(s?: string): { date: Date | null; time: string } {
+function parseDefault(
+  s: string | undefined,
+  timeZone?: string
+): { date: Date | null; time: string } {
   if (!s) return { date: null, time: "" };
   if (/Z$|[+-]\d\d:?\d\d$/.test(s)) {
     const dt = new Date(s);
     if (isNaN(dt.getTime())) return { date: null, time: "" };
+    if (timeZone) {
+      const map: Record<string, number> = {};
+      const dtf = new Intl.DateTimeFormat("en-US", {
+        timeZone,
+        hourCycle: "h23",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      for (const p of dtf.formatToParts(dt)) {
+        if (p.type !== "literal") map[p.type] = Number(p.value);
+      }
+      return {
+        date: new Date(map.year, map.month - 1, map.day),
+        time: `${pad(map.hour)}:${pad(map.minute)}`,
+      };
+    }
     return {
       date: new Date(dt.getFullYear(), dt.getMonth(), dt.getDate()),
       time: `${pad(dt.getHours())}:${pad(dt.getMinutes())}`,
@@ -46,16 +106,10 @@ function parseDefault(s?: string): { date: Date | null; time: string } {
   return { date: new Date(y, m - 1, d), time: timePart.slice(0, 5) };
 }
 
-/** Combine a local date + "HH:mm" into a UTC ISO instant (in the viewer's TZ). */
-function toIsoInstant(date: Date, time: string): string {
+/** Combine a picked Date + "HH:mm" into a UTC ISO instant in `timeZone`. */
+function toIsoInstant(date: Date, time: string, timeZone?: string): string {
   const [hh = 0, mm = 0] = time.split(":").map(Number);
-  return new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    hh,
-    mm
-  ).toISOString();
+  return zonedToUtcIso(date.getFullYear(), date.getMonth(), date.getDate(), hh, mm, timeZone);
 }
 
 /** Strip time so day comparisons are stable. */
@@ -75,12 +129,14 @@ function ClockIcon() {
 export function DateRangePicker({
   defaultStart,
   defaultEnd,
+  timeZone,
 }: {
   defaultStart?: string;
   defaultEnd?: string;
+  timeZone?: string;
 }) {
-  const initStart = useMemo(() => parseDefault(defaultStart), [defaultStart]);
-  const initEnd = useMemo(() => parseDefault(defaultEnd), [defaultEnd]);
+  const initStart = useMemo(() => parseDefault(defaultStart, timeZone), [defaultStart, timeZone]);
+  const initEnd = useMemo(() => parseDefault(defaultEnd, timeZone), [defaultEnd, timeZone]);
 
   const today = useMemo(() => new Date(), []);
   const [startDate, setStartDate] = useState<Date | null>(initStart.date);
@@ -101,8 +157,8 @@ export function DateRangePicker({
 
   // Emit proper UTC instants (computed in the vendor's timezone) so the server
   // stores the exact moment ordering opens/closes — not a UTC-misread wall clock.
-  const opensAt = startDate && startTime ? toIsoInstant(startDate, startTime) : "";
-  const closesAt = endDate && endTime ? toIsoInstant(endDate, endTime) : "";
+  const opensAt = startDate && startTime ? toIsoInstant(startDate, startTime, timeZone) : "";
+  const closesAt = endDate && endTime ? toIsoInstant(endDate, endTime, timeZone) : "";
 
   const years = useMemo(() => {
     const base = today.getFullYear();
@@ -268,6 +324,12 @@ export function DateRangePicker({
           timeLabel="Closes time"
         />
       </div>
+
+      {timeZone && (
+        <p className="mt-4 text-xs text-muted text-center">
+          Times are in <span className="font-medium text-ink-soft">{timeZone.replace(/_/g, " ")}</span> (your store timezone).
+        </p>
+      )}
 
       <input type="hidden" name="opensAt" value={opensAt} />
       <input type="hidden" name="closesAt" value={closesAt} />

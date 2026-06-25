@@ -44,6 +44,7 @@ export default async function NewDropPage({
         action={createDropAction}
         category={seller.category}
         dropMode={dropMode}
+        timeZone={seller.timezone ?? undefined}
       />
     </Section>
   );
