@@ -242,8 +242,7 @@ export default function PrivacyPage() {
         <Section n="13" title="Contact Us">
           <p>
             Questions or requests regarding this Privacy Policy or your information:{" "}
-            <a href="mailto:support@dropq.app" className="text-brand hover:underline">support@dropq.app</a>{" "}
-            (update with your real contact).
+            <a href="mailto:dropqteam@gmail.com" className="text-brand hover:underline">dropqteam@gmail.com</a>.
           </p>
         </Section>
 

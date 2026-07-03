@@ -220,7 +220,10 @@ export default function TermsPage() {
         </Section>
 
         <Section n="16" title="Contact">
-          <p>Questions about this Agreement: support@dropq.app (update with your real contact).</p>
+          <p>
+            Questions about this Agreement:{" "}
+            <a href="mailto:dropqteam@gmail.com" className="text-brand hover:underline">dropqteam@gmail.com</a>.
+          </p>
         </Section>
 
         <div className="mt-10 rounded-card border border-line bg-paper p-5 text-sm text-muted">

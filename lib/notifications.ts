@@ -32,11 +32,21 @@ export function normalizePhone(raw: string): string {
   return d ? `+${d}` : "";
 }
 
+export type SmsResult = {
+  ok: boolean;
+  skipped?: boolean; // Twilio not configured — logged instead of sent
+  status?: number;
+  error?: string;
+};
+
 /** Send a single SMS. No-op (logs) when Twilio isn't configured. */
-export async function sendSms(to: string | null | undefined, body: string): Promise<void> {
-  if (!to) return;
+export async function sendSms(
+  to: string | null | undefined,
+  body: string
+): Promise<SmsResult> {
+  if (!to) return { ok: false, error: "No phone number." };
   const phone = normalizePhone(to);
-  if (!phone) return;
+  if (!phone) return { ok: false, error: "Invalid phone number." };
 
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
@@ -46,7 +56,7 @@ export async function sendSms(to: string | null | undefined, body: string): Prom
   // Need auth + a sender: a Messaging Service (preferred for A2P 10DLC) or a number.
   if (!sid || !token || (!messagingServiceSid && !from)) {
     console.log(`\n──── 📱 SMS (dev — set TWILIO_* to send) ────\nTo: ${phone}\n${body}\n────────────────────────────────────────────\n`);
-    return;
+    return { ok: false, skipped: true, error: "Twilio is not configured." };
   }
 
   // MessagingServiceSid routes through your registered A2P campaign + number
@@ -67,9 +77,23 @@ export async function sendSms(to: string | null | undefined, body: string): Prom
         body: new URLSearchParams(params).toString(),
       }
     );
-    if (!res.ok) console.error("Twilio SMS failed:", res.status, await res.text());
+    if (!res.ok) {
+      const text = await res.text();
+      console.error("Twilio SMS failed:", res.status, text);
+      // Surface Twilio's human-readable message when present.
+      let msg = text.slice(0, 300);
+      try {
+        const j = JSON.parse(text);
+        if (j?.message) msg = `${j.message}${j.code ? ` (code ${j.code})` : ""}`;
+      } catch {
+        /* keep raw */
+      }
+      return { ok: false, status: res.status, error: msg };
+    }
+    return { ok: true, status: res.status };
   } catch (e) {
     console.error("Twilio SMS error:", e);
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
 

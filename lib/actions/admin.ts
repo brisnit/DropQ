@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { sendEmail, dropqTestEmail } from "@/lib/email";
+import { sendSms } from "@/lib/notifications";
 import { partnerExpiryFrom, type Plan } from "@/lib/plans";
 
 const PLANS: Plan[] = ["starter", "growth", "partner", "pro"];
@@ -16,6 +17,18 @@ export async function sendTestEmailAction() {
   const params = res.ok
     ? "test=sent"
     : `test=fail&testmsg=${encodeURIComponent(res.skipped ? "RESEND_API_KEY is not set — email was logged to the server console, not sent." : res.error || "Unknown error")}`;
+  redirect(`/admin?${params}`);
+}
+
+/** Admin: send a one-off test SMS to a number to confirm Twilio delivery. */
+export async function sendTestSmsAction(formData: FormData) {
+  await requireAdmin();
+  const phone = String(formData.get("phone") ?? "").trim();
+  if (!phone) redirect("/admin?sms=fail&smsmsg=" + encodeURIComponent("Enter a phone number."));
+  const res = await sendSms(phone, "DropQ test message ✅ — if you got this, SMS is working.");
+  const params = res.ok
+    ? "sms=sent"
+    : `sms=fail&smsmsg=${encodeURIComponent(res.skipped ? "Twilio is not configured (set TWILIO_* env vars)." : res.error || "Unknown error")}`;
   redirect(`/admin?${params}`);
 }
 

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
-import { grantAdminByEmailAction, setAdminAction, sendTestEmailAction } from "@/lib/actions/admin";
+import { grantAdminByEmailAction, setAdminAction, sendTestEmailAction, sendTestSmsAction } from "@/lib/actions/admin";
 import { formatMoney, relativeTime, formatDate } from "@/lib/format";
 import { Stat } from "@/components/dashboard-ui";
 import { Badge, Button, Input } from "@/components/ui";
@@ -34,6 +34,8 @@ export default async function AdminHome({
     deleted?: string;
     test?: string;
     testmsg?: string;
+    sms?: string;
+    smsmsg?: string;
   }>;
 }) {
   const sp = await searchParams;
@@ -203,12 +205,25 @@ export default async function AdminHome({
               </div>
             </dl>
           </div>
-          <form action={sendTestEmailAction} className="shrink-0">
-            <Button type="submit" variant="dark">Send test email to me</Button>
-            <p className="text-xs text-muted mt-1.5 max-w-[12rem]">
-              Sends to {me.email} and reports the result.
-            </p>
-          </form>
+          <div className="shrink-0 space-y-3">
+            <form action={sendTestEmailAction}>
+              <Button type="submit" variant="dark">Send test email to me</Button>
+              <p className="text-xs text-muted mt-1.5 max-w-[13rem]">Sends to {me.email}.</p>
+            </form>
+            <form action={sendTestSmsAction} className="flex flex-col gap-1.5">
+              <div className="flex gap-2">
+                <input
+                  name="phone"
+                  type="tel"
+                  required
+                  placeholder="+1 555 000 1234"
+                  className="w-40 bg-paper border border-line-strong rounded-lg px-3 py-2 text-sm"
+                />
+                <Button type="submit" variant="secondary">Send test SMS</Button>
+              </div>
+              <p className="text-xs text-muted max-w-[13rem]">Texts that number via Twilio.</p>
+            </form>
+          </div>
         </div>
 
         {sp.test === "sent" && (
@@ -219,6 +234,16 @@ export default async function AdminHome({
         {sp.test === "fail" && (
           <p className="mt-4 text-sm bg-brand-tint text-brand-dark rounded-lg px-3 py-2">
             ✕ Test email failed: {sp.testmsg || "Unknown error."}
+          </p>
+        )}
+        {sp.sms === "sent" && (
+          <p className="mt-4 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">
+            ✓ Test SMS accepted by Twilio — it should arrive shortly.
+          </p>
+        )}
+        {sp.sms === "fail" && (
+          <p className="mt-4 text-sm bg-brand-tint text-brand-dark rounded-lg px-3 py-2">
+            ✕ Test SMS failed: {sp.smsmsg || "Unknown error."}
           </p>
         )}
       </div>
