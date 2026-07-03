@@ -20,6 +20,7 @@ import { PARTNER_INVITE_CODE, partnerExpiryFrom } from "@/lib/plans";
 import { CATEGORY_VALUES } from "@/lib/category";
 import { recordReferral } from "@/lib/referral";
 import { normalizeCode } from "@/lib/commission";
+import { linkSellerAsRep } from "@/lib/sales-rep";
 import { createGrowthCheckoutUrl } from "@/lib/billing";
 
 export type AuthState = { error?: string };
@@ -132,6 +133,9 @@ export async function signupAction(
     }
   }
 
+  // If this email matches a sales rep, activate their Referral Dashboard.
+  await linkSellerAsRep({ id: seller.id, email: seller.email });
+
   // Send the verification email in the background so signup feels instant.
   after(() => sendVerification(seller.id, seller.email));
   await createSession(seller.id);
@@ -171,6 +175,9 @@ export async function loginAction(
   if (seller.disabledAt) {
     return { error: "This account has been suspended. Contact support if you think this is a mistake." };
   }
+
+  // Activate the Referral Dashboard if this email is a sales rep.
+  await linkSellerAsRep({ id: seller.id, email: seller.email });
 
   await createSession(seller.id);
   redirect("/dashboard");

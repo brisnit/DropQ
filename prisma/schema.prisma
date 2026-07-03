@@ -99,12 +99,20 @@ model Seller {
 // code are permanently attributed to them and earn the rep commission.
 model SalesRep {
   id             String   @id @default(cuid())
+  // The rep activates their dashboard by signing up/logging in as a normal
+  // DropQ user with this same email; userId links to that Seller account.
+  userId         String?  @unique
   name           String
   email          String   @unique
-  passwordHash   String?  // set to enable the read-only sales-rep portal login
+  phone          String?
+  passwordHash   String?  // legacy (standalone portal) — activation is now email-match
   referralCode   String   @unique // stored UPPERCASE; matched case-insensitively
   commissionRate Float    @default(0.01) // 1% — change here or per-rep to adjust
   status         String   @default("active") // active | inactive
+
+  inviteSentAt     DateTime? // last time the invite email/SMS was sent
+  inviteAcceptedAt DateTime? // when the rep first activated their dashboard
+
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

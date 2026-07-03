@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { requireSeller, isAdminEmail } from "@/lib/auth";
+import { salesRepForSeller } from "@/lib/sales-rep";
 import { logoutAction, acceptTermsAction } from "@/lib/actions/auth";
 import { Logo } from "@/components/logo";
 import { DashboardNav } from "@/components/dashboard-nav";
@@ -23,6 +24,8 @@ export default async function DashboardLayout({
   }
 
   const admin = seller.isAdmin || isAdminEmail(seller.email);
+  // Show the Referral Dashboard link only to an active linked sales rep.
+  const isRep = !!(await salesRepForSeller(seller));
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[260px_1fr]">
@@ -33,6 +36,17 @@ export default async function DashboardLayout({
         </div>
         <div className="p-4 flex-1">
           <DashboardNav />
+          {isRep && (
+            <>
+              <div className="my-1 border-t border-line/70" aria-hidden />
+              <Link
+                href="/dashboard/referrals"
+                className="block px-3 py-2.5 rounded-xl text-sm font-medium text-ink hover:bg-line/60 transition"
+              >
+                Referral Dashboard
+              </Link>
+            </>
+          )}
           {admin && (
             <>
               <div className="my-1 border-t border-line/70" aria-hidden />
@@ -75,7 +89,7 @@ export default async function DashboardLayout({
         <div className="md:hidden sticky top-0 z-30 bg-cream/95 backdrop-blur border-b border-line">
           <div className="flex items-center justify-between px-5 h-14">
             <Logo href="/dashboard" />
-            <MobileNav admin={admin} slug={seller.slug} />
+            <MobileNav admin={admin} isRep={isRep} slug={seller.slug} />
           </div>
         </div>
         <Suspense fallback={null}>

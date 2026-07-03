@@ -14,6 +14,12 @@ function baseUrl() {
   return process.env.APP_URL?.replace(/\/$/, "") || "https://www.drop-q.com";
 }
 
+function inviteBadge(rep: { userId: string | null; inviteAcceptedAt: Date | null; inviteSentAt: Date | null }) {
+  if (rep.userId || rep.inviteAcceptedAt) return { label: "accepted", cls: "bg-sage-tint text-sage" };
+  if (rep.inviteSentAt) return { label: "sent", cls: "bg-brand-tint text-brand-dark" };
+  return { label: "not sent", cls: "bg-line text-ink-soft" };
+}
+
 export default async function SalesRepsPage({
   searchParams,
 }: {
@@ -57,25 +63,32 @@ export default async function SalesRepsPage({
       {/* Create */}
       <form
         action={createSalesRepAction}
-        className="bg-paper border border-line rounded-card p-5 mb-8 grid sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end"
+        className="bg-paper border border-line rounded-card p-5 mb-8 grid sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end"
       >
-        <div className="lg:col-span-1">
+        <div>
           <label className="block text-xs font-medium text-muted mb-1">Name</label>
           <Input name="name" placeholder="James Rivera" required />
         </div>
-        <div className="lg:col-span-1">
+        <div>
           <label className="block text-xs font-medium text-muted mb-1">Email</label>
           <Input name="email" type="email" placeholder="james@example.com" required />
         </div>
         <div>
-          <label className="block text-xs font-medium text-muted mb-1">Referral code (optional)</label>
-          <Input name="referralCode" placeholder="Auto-generated" />
+          <label className="block text-xs font-medium text-muted mb-1">Phone (SMS)</label>
+          <Input name="phone" type="tel" placeholder="+1 555 000 1234" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-muted mb-1">Referral code</label>
+          <Input name="referralCode" placeholder="Auto" />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Commission %</label>
           <Input name="commissionPercent" type="number" step="0.1" min="0" defaultValue="1" />
         </div>
-        <Button type="submit" variant="dark">Add sales rep</Button>
+        <Button type="submit" variant="dark">Add &amp; invite</Button>
+        <p className="text-xs text-muted lg:col-span-6 -mt-1">
+          Creating a rep automatically emails/texts them their code, signup link, and how to activate their dashboard.
+        </p>
       </form>
 
       {/* Table */}
@@ -96,6 +109,7 @@ export default async function SalesRepsPage({
                 <th className="px-4 py-3 text-right">Accrued</th>
                 <th className="px-4 py-3 text-right">Paid</th>
                 <th className="px-4 py-3 text-right">Unpaid</th>
+                <th className="px-4 py-3">Invite</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3"></th>
               </tr>
@@ -124,6 +138,12 @@ export default async function SalesRepsPage({
                     <td className="px-4 py-3 text-right">{formatMoney(s?.accruedCents ?? 0)}</td>
                     <td className="px-4 py-3 text-right text-muted">{formatMoney(s?.paidCents ?? 0)}</td>
                     <td className="px-4 py-3 text-right font-semibold">{formatMoney(s?.unpaidCents ?? 0)}</td>
+                    <td className="px-4 py-3">
+                      {(() => { const b = inviteBadge(r); return <Badge className={b.cls}>{b.label}</Badge>; })()}
+                      {r.inviteSentAt && !r.userId && !r.inviteAcceptedAt && (
+                        <div className="text-[11px] text-muted mt-0.5">{formatDate(r.inviteSentAt)}</div>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <Badge className={r.status === "active" ? "bg-sage-tint text-sage" : "bg-line text-ink-soft"}>
                         {r.status}

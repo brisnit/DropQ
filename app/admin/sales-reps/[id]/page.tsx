@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import {
   updateSalesRepAction,
-  setRepPasswordAction,
+  sendInviteAction,
   deleteSalesRepAction,
   markCommissionPaidAction,
   voidCommissionAction,
@@ -31,7 +31,7 @@ export default async function SalesRepDetail({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; saved?: string; created?: string; pwset?: string; bulkpaid?: string }>;
+  searchParams: Promise<{ error?: string; saved?: string; created?: string; bulkpaid?: string; invite?: string }>;
 }) {
   await requireAdmin();
   const { id } = await params;
@@ -73,9 +73,15 @@ export default async function SalesRepDetail({
         </div>
       </div>
 
+      {sp.created && sp.invite === "sent" && (
+        <p className="mb-4 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">✓ Sales rep created. Invite sent with referral code and signup link.</p>
+      )}
+      {sp.created && sp.invite === "failed" && (
+        <p className="mb-4 text-sm bg-quad/20 text-ink rounded-lg px-3 py-2">⚠ Sales rep created, but invite delivery failed. Use “Resend invite” below.</p>
+      )}
+      {!sp.created && sp.invite === "sent" && <p className="mb-4 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">✓ Invite sent.</p>}
+      {!sp.created && sp.invite === "failed" && <p className="mb-4 text-sm bg-quad/20 text-ink rounded-lg px-3 py-2">⚠ Invite delivery failed. Check the rep’s email/phone and try again.</p>}
       {sp.saved && <p className="mb-4 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">✓ Saved.</p>}
-      {sp.created && <p className="mb-4 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">✓ Sales rep created. Share their signup link below.</p>}
-      {sp.pwset && <p className="mb-4 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">✓ Portal password set — the rep can now log in at /rep/login.</p>}
       {sp.bulkpaid && <p className="mb-4 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">✓ Marked all unpaid commission as paid.</p>}
       {sp.error && <p className="mb-4 text-sm bg-brand-tint text-brand-dark rounded-lg px-3 py-2">{sp.error.replace(/\+/g, " ")}</p>}
 
@@ -102,7 +108,7 @@ export default async function SalesRepDetail({
         <Stat label="Unpaid" value={formatMoney(stats.unpaidCents)} />
       </div>
 
-      {/* Edit + password */}
+      {/* Edit + invite */}
       <div className="grid lg:grid-cols-2 gap-4 mb-8">
         <form action={updateSalesRepAction} className="bg-paper border border-line rounded-card p-5 space-y-3">
           <input type="hidden" name="id" value={rep.id} />
@@ -115,6 +121,10 @@ export default async function SalesRepDetail({
             <div>
               <label className="block text-xs font-medium text-muted mb-1">Email</label>
               <Input name="email" type="email" defaultValue={rep.email} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-muted mb-1">Phone (SMS)</label>
+              <Input name="phone" type="tel" defaultValue={rep.phone ?? ""} placeholder="+1 555 000 1234" />
             </div>
             <div>
               <label className="block text-xs font-medium text-muted mb-1">Referral code</label>
@@ -135,18 +145,30 @@ export default async function SalesRepDetail({
           <Button type="submit" variant="dark">Save changes</Button>
         </form>
 
-        <form action={setRepPasswordAction} className="bg-paper border border-line rounded-card p-5 space-y-3">
-          <input type="hidden" name="id" value={rep.id} />
-          <h2 className="font-semibold">Portal access</h2>
-          <p className="text-sm text-muted">
-            {rep.passwordHash ? "Password set — the rep can log in at /rep/login." : "Set a password to give this rep a read-only login."}
-          </p>
-          <div>
-            <label className="block text-xs font-medium text-muted mb-1">{rep.passwordHash ? "Reset password" : "Set password"}</label>
-            <Input name="password" type="password" placeholder="At least 8 characters" minLength={8} />
+        <div className="bg-paper border border-line rounded-card p-5 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-semibold">Invite &amp; activation</h2>
+            <Badge className={
+              rep.userId || rep.inviteAcceptedAt ? "bg-sage-tint text-sage"
+                : rep.inviteSentAt ? "bg-brand-tint text-brand-dark" : "bg-line text-ink-soft"
+            }>
+              {rep.userId || rep.inviteAcceptedAt ? "account created" : rep.inviteSentAt ? "invite sent" : "not sent"}
+            </Badge>
           </div>
-          <Button type="submit" variant="secondary">{rep.passwordHash ? "Reset password" : "Set password"}</Button>
-        </form>
+          <p className="text-sm text-muted">
+            The rep activates their dashboard by signing up / logging in at DropQ with
+            <b> {rep.email}</b> — no separate account needed. The invite emails/texts them the code, signup link, and steps.
+          </p>
+          <dl className="text-sm space-y-1">
+            <div className="flex justify-between"><dt className="text-muted">Last invite sent</dt><dd>{rep.inviteSentAt ? formatDate(rep.inviteSentAt) : "Never"}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">Dashboard activated</dt><dd>{rep.inviteAcceptedAt ? formatDate(rep.inviteAcceptedAt) : "Not yet"}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted">SMS</dt><dd>{rep.phone ? rep.phone : "No phone on file"}</dd></div>
+          </dl>
+          <form action={sendInviteAction}>
+            <input type="hidden" name="id" value={rep.id} />
+            <Button type="submit" variant="secondary">{rep.inviteSentAt ? "Resend invite" : "Send invite"}</Button>
+          </form>
+        </div>
       </div>
 
       {/* Referred vendors */}

@@ -23,7 +23,7 @@ function isActive(pathname: string, href: string, exact?: boolean) {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-export function MobileNav({ admin, slug }: { admin: boolean; slug: string }) {
+export function MobileNav({ admin, isRep, slug }: { admin: boolean; isRep?: boolean; slug: string }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const close = () => setOpen(false);
@@ -72,6 +72,14 @@ export function MobileNav({ admin, slug }: { admin: boolean; slug: string }) {
                 {i < NAV.length - 1 && <div className={DIVIDER} aria-hidden />}
               </Fragment>
             ))}
+            {isRep && (
+              <>
+                <div className={DIVIDER} aria-hidden />
+                <Link href="/dashboard/referrals" onClick={close} className="block px-3 py-2.5 rounded-xl text-sm font-medium text-ink hover:bg-line/60 transition">
+                  Referral Dashboard
+                </Link>
+              </>
+            )}
             {admin && (
               <>
                 <div className={DIVIDER} aria-hidden />
