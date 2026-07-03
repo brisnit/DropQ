@@ -39,11 +39,23 @@ export default async function AdminHome({
   const sp = await searchParams;
   const me = await requireAdmin();
 
-  // Non-secret email config status (never expose the API key value itself).
+  // Non-secret delivery config status (never expose the API key/token values).
   const emailConfig = {
     resendKeySet: !!process.env.RESEND_API_KEY,
     from: process.env.EMAIL_FROM || null,
     appUrl: process.env.APP_URL || null,
+  };
+  const smsConfig = {
+    accountSet: !!process.env.TWILIO_ACCOUNT_SID,
+    tokenSet: !!process.env.TWILIO_AUTH_TOKEN,
+    sender:
+      process.env.TWILIO_MESSAGING_SERVICE_SID
+        ? "Messaging Service"
+        : process.env.TWILIO_FROM_NUMBER || null,
+    enabled:
+      !!process.env.TWILIO_ACCOUNT_SID &&
+      !!process.env.TWILIO_AUTH_TOKEN &&
+      (!!process.env.TWILIO_MESSAGING_SERVICE_SID || !!process.env.TWILIO_FROM_NUMBER),
   };
   const [sellers, sales, customerGroups, liveDrops, subs, proWaitlist, referrals] = await Promise.all([
     prisma.seller.findMany({
@@ -171,6 +183,22 @@ export default async function AdminHome({
                 <dt className="text-muted w-32">APP_URL</dt>
                 <dd className="font-mono text-xs">
                   {emailConfig.appUrl ?? <span className="text-muted">fallback https://www.drop-q.com</span>}
+                </dd>
+              </div>
+              <div className="flex items-center gap-2 pt-2 mt-1 border-t border-line">
+                <dt className="text-muted w-32">SMS (Twilio)</dt>
+                <dd>
+                  {smsConfig.enabled ? (
+                    <Badge className="bg-sage-tint text-sage">Live</Badge>
+                  ) : (
+                    <Badge className="bg-brand-tint text-brand-dark">Not configured</Badge>
+                  )}
+                </dd>
+              </div>
+              <div className="flex items-center gap-2">
+                <dt className="text-muted w-32">SMS sender</dt>
+                <dd className="font-mono text-xs">
+                  {smsConfig.sender ?? <span className="text-brand-dark">set TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_NUMBER</span>}
                 </dd>
               </div>
             </dl>
