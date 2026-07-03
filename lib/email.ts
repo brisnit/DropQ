@@ -11,6 +11,26 @@ export type SendResult = {
   error?: string;
 };
 
+const LOGO_CID = "dropqlogo";
+const LOGO_URL = "https://www.drop-q.com/brand/dropq-logo.png";
+
+// Cache the logo bytes per lambda so we fetch it at most once. Embedding it as
+// an inline (CID) attachment means the logo renders even when a mail client
+// blocks remote images — which is why the hosted <img> showed a broken link.
+let logoB64: string | null = null;
+let logoFetched = false;
+async function dropqLogoBase64(): Promise<string | null> {
+  if (logoFetched) return logoB64;
+  logoFetched = true;
+  try {
+    const res = await fetch(LOGO_URL);
+    if (res.ok) logoB64 = Buffer.from(await res.arrayBuffer()).toString("base64");
+  } catch (e) {
+    console.error("Logo fetch for email failed:", e);
+  }
+  return logoB64;
+}
+
 /**
  * Send an email via Resend if RESEND_API_KEY is set; otherwise log it to the
  * server console (dev mode) so flows work with zero paid services.
@@ -31,11 +51,23 @@ export async function sendEmail({ to, subject, html }: Mail): Promise<SendResult
     return { ok: false, skipped: true, error: "RESEND_API_KEY is not set" };
   }
 
+  // Inline the DropQ logo as a CID attachment when the template references it,
+  // so it renders regardless of the client's remote-image settings.
+  const payload: Record<string, unknown> = { from, to, subject, html };
+  if (html.includes(`cid:${LOGO_CID}`)) {
+    const b64 = await dropqLogoBase64();
+    if (b64) {
+      payload.attachments = [
+        { filename: "dropq-logo.png", content: b64, content_id: LOGO_CID, content_type: "image/png" },
+      ];
+    }
+  }
+
   try {
     const res = await fetch(RESEND_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to, subject, html }),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const body = await res.text();
@@ -54,7 +86,7 @@ function layout(heading: string, body: string, cta: { href: string; label: strin
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafafa;padding:32px">
     <div style="max-width:480px;margin:0 auto;background:#fff;border:1px solid #e8e8e8;border-radius:18px;overflow:hidden">
       <div style="background:#1a1a1a;padding:18px 24px">
-        <img src="https://www.drop-q.com/brand/dropq-logo.png" alt="DropQ" height="30" width="146" style="display:block;height:30px;width:auto;border:0" />
+        <img src="cid:dropqlogo" alt="DropQ" height="30" style="display:block;height:30px;width:auto;border:0" />
       </div>
       <div style="padding:28px 24px;color:#1a1a1a">
         <h1 style="font-size:20px;margin:0 0 12px">${heading}</h1>
@@ -140,6 +172,19 @@ function vendorLayout(
       &nbsp;·&nbsp; Want a store like this? <a href="https://www.drop-q.com" style="color:#9aa0a6;text-decoration:underline">Start free →</a>
     </p>
   </div>`;
+}
+
+export function dropqTestEmail(to: string): Mail {
+  return {
+    to,
+    subject: "DropQ test email ✅",
+    html: layout(
+      "It works! 🎉",
+      "This is a test email from DropQ. If you can see the DropQ logo in the header above " +
+        "(even with remote images turned off), inline branding is rendering correctly.",
+      { href: "https://www.drop-q.com", label: "Go to DropQ" }
+    ),
+  };
 }
 
 export function salesRepInviteEmail(o: {
