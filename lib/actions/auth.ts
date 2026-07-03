@@ -113,23 +113,20 @@ export async function signupAction(
   const ref = String(formData.get("ref") ?? "").trim();
   if (ref) after(() => recordReferral(ref, seller.id));
 
-  // Sales-rep attribution: if ?ref matches an active sales rep's code, attribute
-  // this vendor to them permanently. Invalid codes are ignored so signup always
-  // continues. (Sales-rep codes and vendor-referral codes live in separate
-  // tables, so a code matches at most one system.)
+  // Sales-rep attribution: the rep's signup link carries their account id in
+  // ?ref. If it matches an active sales rep, attribute this vendor to them
+  // permanently. (A legacy referral code is still accepted for older links.)
+  // Invalid values are ignored so signup always continues.
   if (ref) {
-    const code = normalizeCode(ref);
-    if (code) {
-      const rep = await prisma.salesRep.findUnique({
-        where: { referralCode: code },
-        select: { id: true, status: true },
+    const rep = await prisma.salesRep.findFirst({
+      where: { status: "active", OR: [{ id: ref }, { referralCode: normalizeCode(ref) }] },
+      select: { id: true },
+    });
+    if (rep) {
+      await prisma.seller.update({
+        where: { id: seller.id },
+        data: { salesRepId: rep.id, referralCodeUsed: ref, referredAt: new Date() },
       });
-      if (rep && rep.status === "active") {
-        await prisma.seller.update({
-          where: { id: seller.id },
-          data: { salesRepId: rep.id, referralCodeUsed: code, referredAt: new Date() },
-        });
-      }
     }
   }
 

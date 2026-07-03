@@ -63,7 +63,7 @@ export default async function SalesRepsPage({
       {/* Create */}
       <form
         action={createSalesRepAction}
-        className="bg-paper border border-line rounded-card p-5 mb-8 grid sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end"
+        className="bg-paper border border-line rounded-card p-5 mb-8 grid sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end"
       >
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Name</label>
@@ -76,10 +76,6 @@ export default async function SalesRepsPage({
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Phone (SMS)</label>
           <Input name="phone" type="tel" placeholder="+1 555 000 1234" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-muted mb-1">Referral code</label>
-          <Input name="referralCode" placeholder="Auto" />
         </div>
         <div>
           <label className="block text-xs font-medium text-muted mb-1">Commission %</label>
@@ -102,7 +98,7 @@ export default async function SalesRepsPage({
             <thead className="text-left text-xs uppercase tracking-wide text-muted border-b border-line">
               <tr>
                 <th className="px-4 py-3">Rep</th>
-                <th className="px-4 py-3">Code</th>
+                <th className="px-4 py-3">Signup link</th>
                 <th className="px-4 py-3 text-right">Vendors</th>
                 <th className="px-4 py-3 text-right">Vendor sales</th>
                 <th className="px-4 py-3 text-right">DropQ rev</th>
@@ -117,7 +113,7 @@ export default async function SalesRepsPage({
             <tbody>
               {reps.map((r) => {
                 const s = stats.get(r.id);
-                const link = `${base}/vendor/signup?ref=${r.referralCode}`;
+                const link = `${base}/vendor/signup?ref=${r.id}`;
                 return (
                   <tr key={r.id} className="border-b border-line/60 hover:bg-cream/50">
                     <td className="px-4 py-3">
@@ -127,10 +123,7 @@ export default async function SalesRepsPage({
                       <div className="text-xs text-muted">{r.email}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <code className="font-mono font-semibold bg-cream border border-line rounded px-1.5 py-0.5">{r.referralCode}</code>
-                        <CopyButton text={link} label="Link" />
-                      </div>
+                      <CopyButton text={link} label="Copy signup link" />
                     </td>
                     <td className="px-4 py-3 text-right">{s?.vendorCount ?? 0}</td>
                     <td className="px-4 py-3 text-right">{formatMoney(s?.vendorSalesCents ?? 0)}</td>

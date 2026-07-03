@@ -54,7 +54,7 @@ export default async function ReferralDashboard() {
   const activeSubscribed = vendors.filter((v) => v.subscriptionStatus === "active").length;
 
   const base = process.env.APP_URL?.replace(/\/$/, "") || "https://www.drop-q.com";
-  const link = `${base}/vendor/signup?ref=${rep.referralCode}`;
+  const link = `${base}/vendor/signup?ref=${rep.id}`;
   const pct = (rep.commissionRate * 100).toFixed((rep.commissionRate * 100) % 1 ? 2 : 0);
 
   return (
@@ -63,21 +63,17 @@ export default async function ReferralDashboard() {
         <span className="text-xs font-semibold uppercase tracking-wider bg-ink text-white px-2 py-0.5 rounded-pill">Sales Rep</span>
         <h1 className="font-display text-3xl font-semibold tracking-tight mt-2">Referral Dashboard</h1>
         <p className="text-muted mt-1 max-w-2xl">
-          You earn {pct}% commission on eligible vendor sales from vendors who signed up using your referral code.
+          You earn {pct}% commission on eligible vendor sales from vendors who sign up using your link below.
         </p>
       </div>
 
-      {/* Code + link */}
+      {/* Signup link */}
       <div className="bg-paper border border-line rounded-card p-5 mb-6 flex flex-wrap items-center gap-4">
-        <div>
-          <p className="text-xs text-muted mb-1">Your referral code</p>
-          <code className="font-mono text-lg font-semibold bg-cream border border-line rounded px-2 py-1">{rep.referralCode}</code>
+        <div className="min-w-0">
+          <p className="text-xs text-muted mb-1">Your vendor signup link</p>
+          <p className="text-sm break-all">{link}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <CopyButton text={rep.referralCode} label="Copy code" />
-          <CopyButton text={link} label="Copy signup link" />
-        </div>
-        <p className="text-xs text-muted w-full break-all">{link}</p>
+        <CopyButton text={link} label="Copy signup link" />
       </div>
 
       {/* Stats */}

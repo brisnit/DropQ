@@ -45,7 +45,7 @@ export default async function AdminClientPage({
         include: { _count: { select: { orders: true, products: true } } },
       },
       _count: { select: { subscribers: true } },
-      salesRep: { select: { id: true, name: true, referralCode: true } },
+      salesRep: { select: { id: true, name: true } },
     },
   });
   if (!seller) notFound();
@@ -135,8 +135,7 @@ export default async function AdminClientPage({
                 Referred by{" "}
                 <Link href={`/admin/sales-reps/${seller.salesRep.id}`} className="text-brand font-medium hover:underline">
                   {seller.salesRep.name}
-                </Link>{" "}
-                (code <code className="font-mono">{seller.salesRep.referralCode}</code>)
+                </Link>
                 {seller.referredAt ? ` · since ${formatDate(seller.referredAt)}` : ""}
               </p>
             ) : (

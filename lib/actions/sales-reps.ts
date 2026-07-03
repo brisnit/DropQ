@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireAdmin, hashPassword } from "@/lib/auth";
-import { generateReferralCode, normalizeCode } from "@/lib/commission";
 import { sendSalesRepInvite } from "@/lib/sales-rep-invite";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -22,7 +21,6 @@ export async function createSalesRepAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const phone = String(formData.get("phone") ?? "").trim() || null;
   const rate = parseRate(String(formData.get("commissionPercent") ?? "1"));
-  let code = normalizeCode(String(formData.get("referralCode") ?? ""));
 
   if (!name) redirect("/admin/sales-reps?error=Enter+a+name");
   if (!EMAIL_RE.test(email)) redirect("/admin/sales-reps?error=Enter+a+valid+email");
@@ -30,18 +28,11 @@ export async function createSalesRepAction(formData: FormData) {
   if (await prisma.salesRep.findUnique({ where: { email } })) {
     redirect("/admin/sales-reps?error=A+rep+with+that+email+already+exists");
   }
-  if (code) {
-    if (await prisma.salesRep.findUnique({ where: { referralCode: code } })) {
-      redirect("/admin/sales-reps?error=That+referral+code+is+taken");
-    }
-  } else {
-    code = await generateReferralCode(name);
-  }
 
   const rep = await prisma.salesRep.create({
-    data: { name, email, phone, referralCode: code, commissionRate: rate, status: "active" },
+    data: { name, email, phone, commissionRate: rate, status: "active" },
   });
-  // Auto-send the invite (email + SMS) so the rep gets their code/link + how to
+  // Auto-send the invite (email + SMS) with the rep's signup link + how to
   // activate their dashboard. Redirect reflects whether email delivery worked.
   const invite = await sendSalesRepInvite(rep.id);
   revalidatePath("/admin/sales-reps");
@@ -69,19 +60,15 @@ export async function updateSalesRepAction(formData: FormData) {
   const phone = String(formData.get("phone") ?? "").trim() || null;
   const rate = parseRate(String(formData.get("commissionPercent") ?? String(rep.commissionRate * 100)));
   const status = String(formData.get("status") ?? rep.status) === "inactive" ? "inactive" : "active";
-  const codeInput = normalizeCode(String(formData.get("referralCode") ?? ""));
-  const code = codeInput || rep.referralCode;
 
   if (!EMAIL_RE.test(email)) redirect(`/admin/sales-reps/${id}?error=Enter+a+valid+email`);
-  // Uniqueness checks (exclude self).
+  // Email uniqueness (exclude self).
   const emailOwner = await prisma.salesRep.findUnique({ where: { email } });
   if (emailOwner && emailOwner.id !== id) redirect(`/admin/sales-reps/${id}?error=Email+in+use`);
-  const codeOwner = await prisma.salesRep.findUnique({ where: { referralCode: code } });
-  if (codeOwner && codeOwner.id !== id) redirect(`/admin/sales-reps/${id}?error=Referral+code+taken`);
 
   await prisma.salesRep.update({
     where: { id },
-    data: { name, email, phone, referralCode: code, commissionRate: rate, status },
+    data: { name, email, phone, commissionRate: rate, status },
   });
   revalidatePath("/admin/sales-reps");
   revalidatePath(`/admin/sales-reps/${id}`);
@@ -116,11 +103,11 @@ export async function setVendorSalesRepAction(formData: FormData) {
   const salesRepId = String(formData.get("salesRepId") ?? "").trim() || null;
   if (!vendorId) redirect("/admin");
   if (salesRepId) {
-    const rep = await prisma.salesRep.findUnique({ where: { id: salesRepId }, select: { referralCode: true } });
+    const rep = await prisma.salesRep.findUnique({ where: { id: salesRepId }, select: { id: true } });
     if (!rep) redirect(`/admin/${vendorId}?error=Unknown+rep`);
     await prisma.seller.update({
       where: { id: vendorId },
-      data: { salesRepId, referralCodeUsed: rep.referralCode, referredAt: new Date() },
+      data: { salesRepId, referredAt: new Date() },
     });
   } else {
     await prisma.seller.update({

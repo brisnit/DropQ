@@ -56,7 +56,7 @@ export default async function SalesRepDetail({
   ]);
 
   const base = process.env.APP_URL?.replace(/\/$/, "") || "https://www.drop-q.com";
-  const link = `${base}/vendor/signup?ref=${rep.referralCode}`;
+  const link = `${base}/vendor/signup?ref=${rep.id}`;
   const back = `/admin/sales-reps/${id}`;
 
   return (
@@ -74,7 +74,7 @@ export default async function SalesRepDetail({
       </div>
 
       {sp.created && sp.invite === "sent" && (
-        <p className="mb-4 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">✓ Sales rep created. Invite sent with referral code and signup link.</p>
+        <p className="mb-4 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">✓ Sales rep created. Invite sent with their signup link.</p>
       )}
       {sp.created && sp.invite === "failed" && (
         <p className="mb-4 text-sm bg-quad/20 text-ink rounded-lg px-3 py-2">⚠ Sales rep created, but invite delivery failed. Use “Resend invite” below.</p>
@@ -85,17 +85,13 @@ export default async function SalesRepDetail({
       {sp.bulkpaid && <p className="mb-4 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">✓ Marked all unpaid commission as paid.</p>}
       {sp.error && <p className="mb-4 text-sm bg-brand-tint text-brand-dark rounded-lg px-3 py-2">{sp.error.replace(/\+/g, " ")}</p>}
 
-      {/* Referral code + link */}
+      {/* Signup link */}
       <div className="bg-paper border border-line rounded-card p-5 mb-6 flex flex-wrap items-center gap-4">
-        <div>
-          <p className="text-xs text-muted mb-1">Referral code</p>
-          <code className="font-mono text-lg font-semibold bg-cream border border-line rounded px-2 py-1">{rep.referralCode}</code>
+        <div className="min-w-0">
+          <p className="text-xs text-muted mb-1">Vendor signup link</p>
+          <p className="text-sm break-all">{link}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <CopyButton text={rep.referralCode} label="Copy code" />
-          <CopyButton text={link} label="Copy signup link" />
-        </div>
-        <p className="text-xs text-muted w-full break-all">{link}</p>
+        <CopyButton text={link} label="Copy signup link" />
       </div>
 
       {/* Stats */}
@@ -125,10 +121,6 @@ export default async function SalesRepDetail({
             <div>
               <label className="block text-xs font-medium text-muted mb-1">Phone (SMS)</label>
               <Input name="phone" type="tel" defaultValue={rep.phone ?? ""} placeholder="+1 555 000 1234" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-muted mb-1">Referral code</label>
-              <Input name="referralCode" defaultValue={rep.referralCode} />
             </div>
             <div>
               <label className="block text-xs font-medium text-muted mb-1">Commission %</label>

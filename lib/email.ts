@@ -143,7 +143,6 @@ function vendorLayout(
 export function salesRepInviteEmail(o: {
   name: string;
   email: string;
-  referralCode: string;
   signupUrl: string;
   accountUrl: string;
 }): Mail {
@@ -153,7 +152,6 @@ export function salesRepInviteEmail(o: {
     html: layout(
       `Hi ${o.name},`,
       `You've been invited to earn commission with DropQ.<br><br>` +
-        `Your DropQ referral code is: <b>${o.referralCode}</b><br>` +
         `Your vendor signup link is:<br><a href="${o.signupUrl}" style="color:#ff6268;word-break:break-all">${o.signupUrl}</a><br><br>` +
         `Vendors who subscribe through your link will be credited to your account. ` +
         `You earn <b>1% commission</b> on eligible vendor sales from referred vendors.<br><br>` +

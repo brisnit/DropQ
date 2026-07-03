@@ -106,7 +106,7 @@ model SalesRep {
   email          String   @unique
   phone          String?
   passwordHash   String?  // legacy (standalone portal) — activation is now email-match
-  referralCode   String   @unique // stored UPPERCASE; matched case-insensitively
+  referralCode   String?  @unique // legacy — obsolete; signup links now use the rep id
   commissionRate Float    @default(0.01) // 1% — change here or per-rep to adjust
   status         String   @default("active") // active | inactive
 
