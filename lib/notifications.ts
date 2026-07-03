@@ -92,16 +92,16 @@ export async function sendSms(
       }
       return { ok: false, status: res.status, error: msg };
     }
-    let sid: string | undefined;
+    let messageSid: string | undefined;
     let providerStatus: string | undefined;
     try {
       const j = await res.json();
-      sid = j?.sid;
+      messageSid = j?.sid;
       providerStatus = j?.status;
     } catch {
       /* ignore */
     }
-    return { ok: true, status: res.status, sid, providerStatus };
+    return { ok: true, status: res.status, sid: messageSid, providerStatus };
   } catch (e) {
     console.error("Twilio SMS error:", e);
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
