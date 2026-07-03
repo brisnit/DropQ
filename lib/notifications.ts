@@ -17,7 +17,8 @@ export function smsEnabled(): boolean {
   return (
     !!process.env.TWILIO_ACCOUNT_SID &&
     !!process.env.TWILIO_AUTH_TOKEN &&
-    !!process.env.TWILIO_FROM_NUMBER
+    // Either a Messaging Service (recommended for A2P 10DLC) or a plain number.
+    (!!process.env.TWILIO_MESSAGING_SERVICE_SID || !!process.env.TWILIO_FROM_NUMBER)
   );
 }
 
@@ -39,12 +40,20 @@ export async function sendSms(to: string | null | undefined, body: string): Prom
 
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
+  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
   const from = process.env.TWILIO_FROM_NUMBER;
 
-  if (!sid || !token || !from) {
+  // Need auth + a sender: a Messaging Service (preferred for A2P 10DLC) or a number.
+  if (!sid || !token || (!messagingServiceSid && !from)) {
     console.log(`\n──── 📱 SMS (dev — set TWILIO_* to send) ────\nTo: ${phone}\n${body}\n────────────────────────────────────────────\n`);
     return;
   }
+
+  // MessagingServiceSid routes through your registered A2P campaign + number
+  // pool; fall back to a single From number if no service is configured.
+  const params: Record<string, string> = { To: phone, Body: body };
+  if (messagingServiceSid) params.MessagingServiceSid = messagingServiceSid;
+  else params.From = from as string;
 
   try {
     const res = await fetch(
@@ -55,7 +64,7 @@ export async function sendSms(to: string | null | undefined, body: string): Prom
           Authorization: "Basic " + Buffer.from(`${sid}:${token}`).toString("base64"),
           "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: new URLSearchParams({ To: phone, From: from, Body: body }).toString(),
+        body: new URLSearchParams(params).toString(),
       }
     );
     if (!res.ok) console.error("Twilio SMS failed:", res.status, await res.text());
