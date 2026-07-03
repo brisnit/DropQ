@@ -53,7 +53,9 @@ function layout(heading: string, body: string, cta: { href: string; label: strin
   return `
   <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#fafafa;padding:32px">
     <div style="max-width:480px;margin:0 auto;background:#fff;border:1px solid #e8e8e8;border-radius:18px;overflow:hidden">
-      <div style="background:#1a1a1a;padding:20px 24px;color:#fff;font-size:20px;font-weight:700;letter-spacing:-0.01em">Drop<span style="color:#ffc500">Q</span></div>
+      <div style="background:#1a1a1a;padding:18px 24px">
+        <img src="https://www.drop-q.com/brand/dropq-logo.png" alt="DropQ" height="30" width="146" style="display:block;height:30px;width:auto;border:0" />
+      </div>
       <div style="padding:28px 24px;color:#1a1a1a">
         <h1 style="font-size:20px;margin:0 0 12px">${heading}</h1>
         <p style="font-size:15px;line-height:1.55;color:#3d3d3d;margin:0 0 22px">${body}</p>
