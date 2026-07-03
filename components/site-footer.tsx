@@ -68,7 +68,7 @@ export function SiteFooter() {
         <div className="max-w-6xl mx-auto px-5 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted">
           <span>© {new Date().getFullYear()} DropQ. Made for food people.</span>
           <div className="flex gap-5">
-            <Link href="/#" className="hover:text-ink">Privacy</Link>
+            <Link href="/privacy" className="hover:text-ink">Privacy</Link>
             <Link href="/terms" className="hover:text-ink">Vendor Terms</Link>
             <Link href="/login" className="hover:text-ink">Log in</Link>
           </div>
