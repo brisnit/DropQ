@@ -37,6 +37,8 @@ export type SmsResult = {
   skipped?: boolean; // Twilio not configured — logged instead of sent
   status?: number;
   error?: string;
+  sid?: string; // Twilio message SID (for looking up delivery in Twilio logs)
+  providerStatus?: string; // Twilio message status at creation (queued/accepted)
 };
 
 /** Send a single SMS. No-op (logs) when Twilio isn't configured. */
@@ -90,7 +92,16 @@ export async function sendSms(
       }
       return { ok: false, status: res.status, error: msg };
     }
-    return { ok: true, status: res.status };
+    let sid: string | undefined;
+    let providerStatus: string | undefined;
+    try {
+      const j = await res.json();
+      sid = j?.sid;
+      providerStatus = j?.status;
+    } catch {
+      /* ignore */
+    }
+    return { ok: true, status: res.status, sid, providerStatus };
   } catch (e) {
     console.error("Twilio SMS error:", e);
     return { ok: false, error: e instanceof Error ? e.message : String(e) };

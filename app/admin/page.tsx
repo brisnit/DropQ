@@ -156,52 +156,44 @@ export default async function AdminHome({
       <div className="mb-8 rounded-card border border-line bg-paper p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="font-semibold text-lg">Email delivery</h2>
+            <h2 className="font-semibold text-lg">Email &amp; SMS delivery</h2>
             <p className="text-sm text-muted mt-0.5">
-              Order confirmations and status updates send through Resend.
+              How DropQ sends order confirmations, status updates, and alerts.
             </p>
-            <dl className="mt-3 space-y-1.5 text-sm">
-              <div className="flex items-center gap-2">
-                <dt className="text-muted w-32">RESEND_API_KEY</dt>
-                <dd>
+            <dl className="mt-3 space-y-2 text-sm">
+              <div className="flex items-center gap-3">
+                <dt className="text-muted w-28">Email</dt>
+                <dd className="flex items-center gap-2">
                   {emailConfig.resendKeySet ? (
-                    <Badge className="bg-sage-tint text-sage">Set</Badge>
+                    <Badge className="bg-sage-tint text-sage">Live</Badge>
                   ) : (
                     <Badge className="bg-brand-tint text-brand-dark">Not set</Badge>
                   )}
+                  <span className="text-muted">via Resend</span>
                 </dd>
               </div>
-              <div className="flex items-center gap-2">
-                <dt className="text-muted w-32">EMAIL_FROM</dt>
-                <dd className="font-mono text-xs">
+              <div className="flex items-center gap-3">
+                <dt className="text-muted w-28">Email sender</dt>
+                <dd>
                   {emailConfig.from ?? (
-                    <span className="text-brand-dark">
-                      default onboarding@resend.dev — only reaches your Resend account email
-                    </span>
+                    <span className="text-brand-dark">Not set — emails may not reach customers</span>
                   )}
                 </dd>
               </div>
-              <div className="flex items-center gap-2">
-                <dt className="text-muted w-32">APP_URL</dt>
-                <dd className="font-mono text-xs">
-                  {emailConfig.appUrl ?? <span className="text-muted">fallback https://www.drop-q.com</span>}
-                </dd>
-              </div>
-              <div className="flex items-center gap-2 pt-2 mt-1 border-t border-line">
-                <dt className="text-muted w-32">SMS (Twilio)</dt>
-                <dd>
+              <div className="flex items-center gap-3 pt-2 mt-1 border-t border-line">
+                <dt className="text-muted w-28">Text messages</dt>
+                <dd className="flex items-center gap-2">
                   {smsConfig.enabled ? (
                     <Badge className="bg-sage-tint text-sage">Live</Badge>
                   ) : (
                     <Badge className="bg-brand-tint text-brand-dark">Not configured</Badge>
                   )}
+                  <span className="text-muted">via Twilio</span>
                 </dd>
               </div>
-              <div className="flex items-center gap-2">
-                <dt className="text-muted w-32">SMS sender</dt>
-                <dd className="font-mono text-xs">
-                  {smsConfig.sender ?? <span className="text-brand-dark">set TWILIO_MESSAGING_SERVICE_SID or TWILIO_FROM_NUMBER</span>}
-                </dd>
+              <div className="flex items-center gap-3">
+                <dt className="text-muted w-28">Text sender</dt>
+                <dd>{smsConfig.sender ?? <span className="text-brand-dark">Not set</span>}</dd>
               </div>
             </dl>
           </div>
@@ -237,13 +229,18 @@ export default async function AdminHome({
           </p>
         )}
         {sp.sms === "sent" && (
-          <p className="mt-4 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">
-            ✓ Test SMS accepted by Twilio — it should arrive shortly.
-          </p>
+          <div className="mt-4 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">
+            ✓ Twilio accepted the message{sp.smsmsg ? ` (${sp.smsmsg})` : ""}.
+            <div className="text-ink-soft mt-1">
+              If it doesn&rsquo;t arrive, the failure is at the carrier — open{" "}
+              <b>Twilio Console → Monitor → Logs → Messaging</b> and find that SID to see the exact
+              delivery status and error code.
+            </div>
+          </div>
         )}
         {sp.sms === "fail" && (
           <p className="mt-4 text-sm bg-brand-tint text-brand-dark rounded-lg px-3 py-2">
-            ✕ Test SMS failed: {sp.smsmsg || "Unknown error."}
+            ✕ Test SMS rejected by Twilio: {sp.smsmsg || "Unknown error."}
           </p>
         )}
       </div>

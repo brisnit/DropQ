@@ -27,7 +27,7 @@ export async function sendTestSmsAction(formData: FormData) {
   if (!phone) redirect("/admin?sms=fail&smsmsg=" + encodeURIComponent("Enter a phone number."));
   const res = await sendSms(phone, "DropQ test message ✅ — if you got this, SMS is working.");
   const params = res.ok
-    ? "sms=sent"
+    ? `sms=sent&smsmsg=${encodeURIComponent(`SID ${res.sid ?? "?"} · status ${res.providerStatus ?? "queued"}`)}`
     : `sms=fail&smsmsg=${encodeURIComponent(res.skipped ? "Twilio is not configured (set TWILIO_* env vars)." : res.error || "Unknown error")}`;
   redirect(`/admin?${params}`);
 }
