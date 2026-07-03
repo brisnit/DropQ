@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import { setAdminAction, setPlanAction, deleteVendorAction, setSellerDisabledAction } from "@/lib/actions/admin";
+import { setVendorSalesRepAction } from "@/lib/actions/sales-reps";
 import { formatMoney, formatDate, relativeTime, statusStyle } from "@/lib/format";
 import { Stat } from "@/components/dashboard-ui";
 import { Badge, Button, Select } from "@/components/ui";
@@ -44,9 +45,12 @@ export default async function AdminClientPage({
         include: { _count: { select: { orders: true, products: true } } },
       },
       _count: { select: { subscribers: true } },
+      salesRep: { select: { id: true, name: true, referralCode: true } },
     },
   });
   if (!seller) notFound();
+
+  const allReps = await prisma.salesRep.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
 
   const [agg, customerGroups, recent] = await Promise.all([
     prisma.order.aggregate({
@@ -119,6 +123,39 @@ export default async function AdminClientPage({
         <Stat label="Orders" value={String(agg._count)} />
         <Stat label="Customers" value={String(customerGroups.length)} />
         <Stat label="Sign-ups" value={String(seller._count.subscribers)} />
+      </div>
+
+      {/* Sales-rep attribution */}
+      <div className="bg-paper border border-line rounded-card p-5 mb-8">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">Sales rep attribution</h2>
+            {seller.salesRep ? (
+              <p className="text-sm text-muted mt-0.5">
+                Referred by{" "}
+                <Link href={`/admin/sales-reps/${seller.salesRep.id}`} className="text-brand font-medium hover:underline">
+                  {seller.salesRep.name}
+                </Link>{" "}
+                (code <code className="font-mono">{seller.salesRep.referralCode}</code>)
+                {seller.referredAt ? ` · since ${formatDate(seller.referredAt)}` : ""}
+              </p>
+            ) : (
+              <p className="text-sm text-muted mt-0.5">Not attributed to any sales rep.</p>
+            )}
+          </div>
+          <form action={setVendorSalesRepAction} className="flex items-end gap-2">
+            <input type="hidden" name="vendorId" value={seller.id} />
+            <select
+              name="salesRepId"
+              defaultValue={seller.salesRep?.id ?? ""}
+              className="bg-paper border border-line-strong rounded-xl px-3 py-2 text-sm"
+            >
+              <option value="">— No rep —</option>
+              {allReps.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+            <Button type="submit" variant="secondary">Save</Button>
+          </form>
+        </div>
       </div>
 
       {/* Plan management */}

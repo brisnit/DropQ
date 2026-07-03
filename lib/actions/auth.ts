@@ -19,6 +19,7 @@ import { TERMS_VERSION } from "@/lib/terms";
 import { PARTNER_INVITE_CODE, partnerExpiryFrom } from "@/lib/plans";
 import { CATEGORY_VALUES } from "@/lib/category";
 import { recordReferral } from "@/lib/referral";
+import { normalizeCode } from "@/lib/commission";
 import { createGrowthCheckoutUrl } from "@/lib/billing";
 
 export type AuthState = { error?: string };
@@ -110,6 +111,26 @@ export async function signupAction(
   // If they came through a referral link, credit the referrer (background).
   const ref = String(formData.get("ref") ?? "").trim();
   if (ref) after(() => recordReferral(ref, seller.id));
+
+  // Sales-rep attribution: if ?ref matches an active sales rep's code, attribute
+  // this vendor to them permanently. Invalid codes are ignored so signup always
+  // continues. (Sales-rep codes and vendor-referral codes live in separate
+  // tables, so a code matches at most one system.)
+  if (ref) {
+    const code = normalizeCode(ref);
+    if (code) {
+      const rep = await prisma.salesRep.findUnique({
+        where: { referralCode: code },
+        select: { id: true, status: true },
+      });
+      if (rep && rep.status === "active") {
+        await prisma.seller.update({
+          where: { id: seller.id },
+          data: { salesRepId: rep.id, referralCodeUsed: code, referredAt: new Date() },
+        });
+      }
+    }
+  }
 
   // Send the verification email in the background so signup feels instant.
   after(() => sendVerification(seller.id, seller.email));

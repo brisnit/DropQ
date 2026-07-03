@@ -9,14 +9,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="min-h-screen">
       <header className="border-b border-line bg-ink text-cream">
-        <div className="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-6xl mx-auto px-5 h-14 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 shrink-0">
             <Logo href="/admin" light />
             <span className="text-xs font-semibold uppercase tracking-wider bg-brand text-white px-2 py-0.5 rounded-pill">
               Admin
             </span>
           </div>
-          <Link href="/dashboard" className="text-sm text-cream/70 hover:text-cream">
+          <nav className="flex items-center gap-1 text-sm overflow-x-auto">
+            <Link href="/admin" className="px-3 py-1.5 rounded-lg text-cream/80 hover:text-cream hover:bg-white/10 whitespace-nowrap">Vendors</Link>
+            <Link href="/admin/sales-reps" className="px-3 py-1.5 rounded-lg text-cream/80 hover:text-cream hover:bg-white/10 whitespace-nowrap">Sales Reps</Link>
+            <Link href="/admin/commissions" className="px-3 py-1.5 rounded-lg text-cream/80 hover:text-cream hover:bg-white/10 whitespace-nowrap">Commissions</Link>
+          </nav>
+          <Link href="/dashboard" className="text-sm text-cream/70 hover:text-cream shrink-0 whitespace-nowrap">
             My dashboard →
           </Link>
         </div>

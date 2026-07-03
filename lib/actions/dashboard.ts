@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
+import { voidCommissionForOrder } from "@/lib/commission";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireSeller } from "@/lib/auth";
@@ -345,6 +346,12 @@ export async function updateOrderStatusAction(formData: FormData) {
     where: { id: orderId },
     data: { status, events: { create: { type: "status", detail: status } } },
   });
+
+  // Canceling a paid order implies a refund → void any un-paid sales-rep
+  // commission for it (paid commissions are left for a manual adjustment).
+  if (status === "canceled") {
+    await voidCommissionForOrder(orderId, "Order canceled by vendor");
+  }
 
   // Text (+ email) the customer when their order status changes.
   {

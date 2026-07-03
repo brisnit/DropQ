@@ -52,6 +52,12 @@ model Seller {
   referralCode     String?   @unique // this vendor's invite code
   growthBonusUntil DateTime? // free Growth-level access earned via referrals
 
+  // Sales rep attribution — set once at signup from ?ref=CODE; permanent unless
+  // an admin changes it. See SalesRep / CommissionLedger.
+  salesRepId       String?
+  referralCodeUsed String?   // the raw code entered at signup
+  referredAt       DateTime? // when attribution was set
+
   // Stripe Connect (payouts)
   stripeAccountId      String? @unique
   stripeChargesEnabled Boolean @default(false)
@@ -82,6 +88,62 @@ model Seller {
   gallery       GalleryImage[]
   referralsMade Referral[]     @relation("Referrer")
   referredBy    Referral?      @relation("Referred")
+
+  salesRep    SalesRep?          @relation("SalesRepVendors", fields: [salesRepId], references: [id], onDelete: SetNull)
+  commissions CommissionLedger[] @relation("VendorCommissions")
+
+  @@index([salesRepId])
+}
+
+// A DropQ sales rep / affiliate. Vendors who sign up with the rep's referral
+// code are permanently attributed to them and earn the rep commission.
+model SalesRep {
+  id             String   @id @default(cuid())
+  name           String
+  email          String   @unique
+  passwordHash   String?  // set to enable the read-only sales-rep portal login
+  referralCode   String   @unique // stored UPPERCASE; matched case-insensitively
+  commissionRate Float    @default(0.01) // 1% — change here or per-rep to adjust
+  status         String   @default("active") // active | inactive
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  vendors     Seller[]           @relation("SalesRepVendors")
+  commissions CommissionLedger[]
+}
+
+// One ledger row per vendor order attributed to a sales rep. Idempotent via the
+// unique (orderId, salesRepId). Refunds add a voided/negative adjustment.
+model CommissionLedger {
+  id         String @id @default(cuid())
+  salesRepId String
+  salesRep   SalesRep @relation(fields: [salesRepId], references: [id], onDelete: Cascade)
+  vendorId   String
+  vendor     Seller   @relation("VendorCommissions", fields: [vendorId], references: [id], onDelete: Cascade)
+
+  orderId   String  // the order this commission is for
+  paymentId String? // Stripe payment intent id, if available
+
+  // All amounts in cents so reporting can recompute against any base.
+  grossOrderAmount     Int  // order total
+  vendorTakeAmount     Int  // gross - DropQ fee (what the vendor nets)
+  dropqFeeAmount       Int? // DropQ platform fee, if known
+  commissionBaseAmount Int  // the base the rate is applied to (see lib/commission.ts)
+  commissionRate       Float
+  commissionAmount     Int  // base * rate, rounded (can be negative for adjustments)
+
+  status String @default("pending") // pending | approved | paid | voided
+  notes  String?
+
+  createdAt  DateTime  @default(now())
+  approvedAt DateTime?
+  paidAt     DateTime?
+  voidedAt   DateTime?
+
+  @@unique([orderId, salesRepId]) // idempotency: no duplicate commission per order
+  @@index([salesRepId])
+  @@index([vendorId])
+  @@index([status])
 }
 
 // Vendor-to-vendor referrals. One reward per referred account (referredId unique).

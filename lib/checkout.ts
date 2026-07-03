@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getStripe } from "@/lib/stripe";
 import { sendEmail, orderReceivedEmail } from "@/lib/email";
 import { sendSms } from "@/lib/notifications";
+import { createCommissionForOrder } from "@/lib/commission";
 
 // Header-free base URL — finalizePaidOrder runs from webhooks and cron sweeps
 // that have no request context, so we can't rely on headers().
@@ -82,6 +83,13 @@ export async function finalizePaidOrder(
   // connected account). Idempotent via the refund_pending guard.
   if (result.state === "oversold" && result.order) {
     await refundOversoldOrder(orderId);
+  }
+
+  // Sales-rep commission — created exactly once (the atomic paid-claim above
+  // guarantees this block runs once per order; the unique (orderId, salesRepId)
+  // is a second guard). Only for orders whose vendor is tied to a sales rep.
+  if (result.state === "ok" && result.order) {
+    await createCommissionForOrder(result.order);
   }
 
   // Confirmation email — only on the call that actually flipped the order to
