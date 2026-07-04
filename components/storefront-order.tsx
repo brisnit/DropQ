@@ -101,6 +101,52 @@ export function StorefrontOrder({
   // Lightbox: which product's photos are open, and the active photo index.
   const [zoom, setZoom] = useState<{ images: string[]; name: string; index: number } | null>(null);
 
+  // Live inventory. Seeded from the server render, then kept fresh by polling so
+  // an open tab flips items to "Sold out" without a manual refresh.
+  const [remainingById, setRemainingById] = useState<Record<string, number>>(() =>
+    Object.fromEntries(products.map((p) => [p.id, p.remaining])),
+  );
+  const [serverClosed, setServerClosed] = useState(false);
+  const remainingOf = (id: string) => remainingById[id] ?? 0;
+
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const r = await fetch(`/api/drops/${dropId}/inventory`, { cache: "no-store" });
+        if (!r.ok) return;
+        const data: { open: boolean; products: { id: string; remaining: number }[] } =
+          await r.json();
+        if (cancelled) return;
+        const next = Object.fromEntries(data.products.map((p) => [p.id, p.remaining]));
+        setRemainingById(next);
+        setServerClosed(!data.open);
+        // Clamp any cart quantities that now exceed what's left.
+        setQty((q) => {
+          let changed = false;
+          const clamped: Record<string, number> = {};
+          for (const [id, n] of Object.entries(q)) {
+            const max = next[id] ?? 0;
+            const v = Math.min(n, max);
+            clamped[id] = v;
+            if (v !== n) changed = true;
+          }
+          return changed ? clamped : q;
+        });
+      } catch {
+        // Network blip — keep the last known counts.
+      }
+    };
+    const id = setInterval(refresh, 20000);
+    const onVis = () => { if (document.visibilityState === "visible") refresh(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [dropId]);
+
   const setItem = (id: string, n: number, max: number) =>
     setQty((q) => ({ ...q, [id]: Math.max(0, Math.min(n, max)) }));
 
@@ -122,7 +168,7 @@ export function StorefrontOrder({
     return () => clearInterval(id);
   }, [live, closesAt]);
   const closeMs = !live && closesAt ? new Date(closesAt).getTime() : null;
-  const closed = closeMs != null && nowMs >= closeMs;
+  const closed = serverClosed || (closeMs != null && nowMs >= closeMs);
   const countdown = closeMs != null && !closed ? formatRemaining(closeMs - nowMs) : null;
 
   if (closed) {
@@ -157,7 +203,8 @@ export function StorefrontOrder({
       <div className="space-y-3">
         {products.map((p) => {
           const n = qty[p.id] ?? 0;
-          const soldOut = p.remaining <= 0;
+          const remaining = remainingOf(p.id);
+          const soldOut = remaining <= 0;
           return (
             <div
               key={p.id}
@@ -198,8 +245,8 @@ export function StorefrontOrder({
                 )}
                 <p className="text-sm mt-0.5">
                   <span className="font-semibold">{formatMoney(p.priceCents)}</span>
-                  {!soldOut && p.remaining <= 8 && (
-                    <span className="text-brand ml-2">{p.remaining} left</span>
+                  {!soldOut && remaining <= 8 && (
+                    <span className="text-brand ml-2">{remaining} left</span>
                   )}
                 </p>
               </div>
@@ -210,7 +257,7 @@ export function StorefrontOrder({
               ) : n === 0 ? (
                 <button
                   type="button"
-                  onClick={() => setItem(p.id, 1, p.remaining)}
+                  onClick={() => setItem(p.id, 1, remaining)}
                   style={{ color: accent, borderColor: accent }}
                   className="shrink-0 text-sm font-semibold border rounded-pill px-4 py-1.5 hover:bg-cream transition"
                 >
@@ -220,7 +267,7 @@ export function StorefrontOrder({
                 <div className="shrink-0 flex items-center gap-3 border border-line-strong rounded-pill px-1.5 py-1">
                   <button
                     type="button"
-                    onClick={() => setItem(p.id, n - 1, p.remaining)}
+                    onClick={() => setItem(p.id, n - 1, remaining)}
                     className="w-7 h-7 rounded-full hover:bg-line grid place-items-center text-lg"
                     aria-label="Decrease"
                   >
@@ -229,8 +276,8 @@ export function StorefrontOrder({
                   <span className="w-5 text-center font-semibold text-sm">{n}</span>
                   <button
                     type="button"
-                    onClick={() => setItem(p.id, n + 1, p.remaining)}
-                    disabled={n >= p.remaining}
+                    onClick={() => setItem(p.id, n + 1, remaining)}
+                    disabled={n >= remaining}
                     className="w-7 h-7 rounded-full hover:bg-line grid place-items-center text-lg disabled:opacity-30"
                     aria-label="Increase"
                   >
