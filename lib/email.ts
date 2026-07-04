@@ -239,9 +239,22 @@ type OrderMail = {
   orderLink: string;
   pickupInfo?: string | null;
   fulfillment?: string;
+  pickupWindow?: string | null; // formatted pickup date/time range
+  pickupWhere?: string | null; // pickup location line
   logoUrl?: string | null;
   accent?: string | null;
 };
+
+/** Pickup details HTML block for order emails (window + location). */
+function pickupHtml(o: OrderMail): string {
+  const label = o.fulfillment === "delivery" ? "Delivery" : "Pickup";
+  const lines = [
+    o.pickupWindow ? `<b>When:</b> ${o.pickupWindow}` : "",
+    (o.pickupWhere || o.pickupInfo) ? `<b>Where:</b> ${o.pickupWhere || o.pickupInfo}` : "",
+  ].filter(Boolean);
+  if (!lines.length) return "";
+  return `<br><br><b>${label} details</b><br>${lines.join("<br>")}`;
+}
 
 /** Branding block pulled from the OrderMail for the vendor-branded shell. */
 function brandOf(o: OrderMail): Brand {
@@ -256,7 +269,7 @@ export function orderReceivedEmail(o: OrderMail): Mail {
       brandOf(o),
       "Order received!",
       `Hi ${o.buyerFirst}, thanks for ordering from <b>${o.storeName}</b>. We'll let you know the moment it's ready.` +
-        (o.pickupInfo ? `<br><br><b>${o.fulfillment || "Pickup"}:</b> ${o.pickupInfo}` : ""),
+        pickupHtml(o),
       { href: o.orderLink, label: "View your order" }
     ),
   };

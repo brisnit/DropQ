@@ -130,10 +130,18 @@ export function DateRangePicker({
   defaultStart,
   defaultEnd,
   timeZone,
+  startName = "opensAt",
+  endName = "closesAt",
+  fromLabel = "FROM",
+  toLabel = "TO",
 }: {
   defaultStart?: string;
   defaultEnd?: string;
   timeZone?: string;
+  startName?: string;
+  endName?: string;
+  fromLabel?: string;
+  toLabel?: string;
 }) {
   const initStart = useMemo(() => parseDefault(defaultStart, timeZone), [defaultStart, timeZone]);
   const initEnd = useMemo(() => parseDefault(defaultEnd, timeZone), [defaultEnd, timeZone]);
@@ -310,18 +318,18 @@ export function DateRangePicker({
       {/* FROM / TO summary */}
       <div className="mt-6 pt-5 border-t border-line space-y-5">
         <SummaryRow
-          label="FROM"
+          label={fromLabel}
           date={startDate}
           time={startTime}
           onTime={setStartTime}
-          timeLabel="Opens time"
+          timeLabel={`${fromLabel} time`}
         />
         <SummaryRow
-          label="TO"
+          label={toLabel}
           date={endDate}
           time={endTime}
           onTime={setEndTime}
-          timeLabel="Closes time"
+          timeLabel={`${toLabel} time`}
         />
       </div>
 
@@ -331,8 +339,8 @@ export function DateRangePicker({
         </p>
       )}
 
-      <input type="hidden" name="opensAt" value={opensAt} />
-      <input type="hidden" name="closesAt" value={closesAt} />
+      <input type="hidden" name={startName} value={opensAt} />
+      <input type="hidden" name={endName} value={closesAt} />
     </div>
   );
 }

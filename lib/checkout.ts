@@ -4,6 +4,7 @@ import { getStripe } from "@/lib/stripe";
 import { sendEmail, orderReceivedEmail } from "@/lib/email";
 import { sendSms } from "@/lib/notifications";
 import { createCommissionForOrder } from "@/lib/commission";
+import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 
 // Header-free base URL — finalizePaidOrder runs from webhooks and cron sweeps
 // that have no request context, so we can't rely on headers().
@@ -39,8 +40,14 @@ export async function finalizePaidOrder(
       where: { id: orderId },
       include: {
         items: true,
-        seller: { select: { storeName: true, logoUrl: true, accent: true } },
-        drop: { select: { pickupInfo: true, fulfillment: true } },
+        seller: { select: { storeName: true, logoUrl: true, accent: true, timezone: true } },
+        drop: {
+          select: {
+            pickupInfo: true, fulfillment: true,
+            pickupStartAt: true, pickupEndAt: true,
+            pickupLocationName: true, pickupAddress: true, pickupNotes: true,
+          },
+        },
       },
     });
     if (!order) return { state: "missing" as const, order: null };
@@ -106,6 +113,8 @@ export async function finalizePaidOrder(
           orderLink: `${orderBaseUrl()}/order/${o.id}`,
           pickupInfo: o.drop.pickupInfo,
           fulfillment: o.drop.fulfillment,
+          pickupWindow: formatPickupWindow(o.drop, o.seller.timezone),
+          pickupWhere: pickupLocation(o.drop),
           logoUrl: o.seller.logoUrl,
           accent: o.seller.accent,
         })

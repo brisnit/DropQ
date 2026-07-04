@@ -66,6 +66,17 @@ function SubmitBtn({
   );
 }
 
+function formatRemaining(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m ${sec}s`;
+  return `${m}m ${sec}s`;
+}
+
 export function StorefrontOrder({
   dropId,
   products,
@@ -74,6 +85,7 @@ export function StorefrontOrder({
   feeMode = "absorb",
   feePercent = 0,
   live = false,
+  closesAt = null,
 }: {
   dropId: string;
   products: Product[];
@@ -82,6 +94,7 @@ export function StorefrontOrder({
   feeMode?: string;
   feePercent?: number;
   live?: boolean;
+  closesAt?: string | null;
 }) {
   const [qty, setQty] = useState<Record<string, number>>({});
   const [state, formAction] = useActionState<OrderState, FormData>(placeOrderAction, {});
@@ -100,8 +113,40 @@ export function StorefrontOrder({
   const total = subtotal + feeCents;
   const count = lines.reduce((s, l) => s + l.n, 0);
 
+  // Live countdown to the order close (preorder drops only). When it hits zero,
+  // ordering locks in the UI; the server also rejects late orders.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (live || !closesAt) return;
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [live, closesAt]);
+  const closeMs = !live && closesAt ? new Date(closesAt).getTime() : null;
+  const closed = closeMs != null && nowMs >= closeMs;
+  const countdown = closeMs != null && !closed ? formatRemaining(closeMs - nowMs) : null;
+
+  if (closed) {
+    return (
+      <div className="bg-paper border border-line rounded-card p-10 text-center">
+        <div className="text-4xl">🔒</div>
+        <h2 className="font-display text-xl font-semibold mt-3">
+          This drop is closed. Orders are now locked in.
+        </h2>
+        <p className="text-muted mt-2">
+          Ordering just ended for this drop. Refresh the page to see pickup details.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <>
+    {countdown && (
+      <div className="mb-5 rounded-card bg-ink text-cream px-4 py-3 flex items-center justify-between gap-3">
+        <span className="text-sm font-medium">This drop is open for orders — ordering closes in</span>
+        <span className="font-display text-lg font-semibold tabular-nums">{countdown}</span>
+      </div>
+    )}
     <form action={formAction} className="grid lg:grid-cols-[1fr_360px] gap-8 items-start">
       <input type="hidden" name="dropId" value={dropId} />
       {products.map((p) => (

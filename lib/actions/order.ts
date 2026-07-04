@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getStripe, calcFeeCents } from "@/lib/stripe";
 import { sendEmail, orderReceivedEmail } from "@/lib/email";
+import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 import { sendSms } from "@/lib/notifications";
 import { isDemoStore } from "@/lib/demo";
 
@@ -220,6 +221,8 @@ export async function placeOrderAction(
     orderLink,
     pickupInfo: drop.pickupInfo,
     fulfillment: drop.fulfillment,
+    pickupWindow: formatPickupWindow(drop, drop.seller.timezone),
+    pickupWhere: pickupLocation(drop),
     logoUrl: drop.seller.logoUrl,
     accent: drop.seller.accent,
   });

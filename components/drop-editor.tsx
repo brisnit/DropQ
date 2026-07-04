@@ -6,6 +6,7 @@ import { Button, Field, Input, Textarea, Select } from "@/components/ui";
 import { vocab, showItemMeta, isFood } from "@/lib/category";
 import { uploadImage, ImageTooLargeError } from "@/lib/upload-client";
 import { DateRangePicker } from "@/components/date-range-picker";
+import { AddressAutocomplete } from "@/components/address-autocomplete";
 
 const MAX_IMAGES_PER_PRODUCT = 6;
 
@@ -14,8 +15,15 @@ export type DropDefaults = {
   description?: string;
   fulfillment?: string;
   location?: string;
-  opensAt?: string; // "YYYY-MM-DDTHH:mm"
+  opensAt?: string; // ISO instant
   closesAt?: string;
+  pickupStartAt?: string;
+  pickupEndAt?: string;
+  pickupLocationName?: string;
+  pickupAddress?: string;
+  pickupLat?: number | null;
+  pickupLng?: number | null;
+  pickupNotes?: string;
   status?: string;
   products?: Array<{
     id?: string;
@@ -227,6 +235,27 @@ export function DropEditor({
         setError("Close date/time must be after the open date/time.");
         return;
       }
+      // Pickup window is optional, but if set it must be consistent (ISO
+      // instants compare chronologically as strings).
+      const pStart = String(fd.get("pickupStartAt") ?? "");
+      const pEnd = String(fd.get("pickupEndAt") ?? "");
+      if ((pStart && !pEnd) || (!pStart && pEnd)) {
+        e.preventDefault();
+        setError("Set both a pickup start and end time, or leave both blank.");
+        return;
+      }
+      if (pStart && pEnd) {
+        if (pEnd <= pStart) {
+          e.preventDefault();
+          setError("Pickup end must be after pickup start.");
+          return;
+        }
+        if (pStart < closes) {
+          e.preventDefault();
+          setError("Pickup can't start before ordering closes.");
+          return;
+        }
+      }
     }
     const hasItem = rows.some((r) => r.name.trim().length > 0);
     if (!hasItem) {
@@ -289,18 +318,72 @@ export function DropEditor({
         </div>
         {!live && (
           <div>
-            <p className="text-sm font-medium text-ink mb-1">Schedule</p>
+            <p className="text-sm font-medium text-ink mb-1">Order window</p>
             <p className="text-sm text-muted mb-3">
-              Pick when ordering opens and when it closes.
+              When ordering opens and closes. Ordering locks automatically at the close time.
             </p>
             <DateRangePicker
               defaultStart={defaults.opensAt}
               defaultEnd={defaults.closesAt}
               timeZone={timeZone}
+              startName="opensAt"
+              endName="closesAt"
+              fromLabel="Opens"
+              toLabel="Closes"
             />
           </div>
         )}
       </div>
+
+      {/* Pickup window + location (preorder drops) */}
+      {!live && (
+        <div className="bg-paper border border-line rounded-card p-6 space-y-5">
+          <div>
+            <h2 className="font-semibold text-lg">Pickup</h2>
+            <p className="text-sm text-muted mt-0.5">
+              When and where customers pick up (or receive) their orders after ordering closes.
+            </p>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium text-ink mb-1">Pickup window</p>
+            <p className="text-sm text-muted mb-3">Must start on or after your order close time.</p>
+            <DateRangePicker
+              defaultStart={defaults.pickupStartAt}
+              defaultEnd={defaults.pickupEndAt}
+              timeZone={timeZone}
+              startName="pickupStartAt"
+              endName="pickupEndAt"
+              fromLabel="Pickup opens"
+              toLabel="Pickup ends"
+            />
+          </div>
+
+          <Field label="Pickup location name" hint="Optional label shown to customers (e.g. “The shop”, “Front porch”).">
+            <Input
+              name="pickupLocationName"
+              defaultValue={defaults.pickupLocationName ?? ""}
+              placeholder="The shop"
+            />
+          </Field>
+
+          <Field label="Pickup address">
+            <AddressAutocomplete
+              defaultAddress={defaults.pickupAddress ?? ""}
+              defaultLat={defaults.pickupLat ?? null}
+              defaultLng={defaults.pickupLng ?? null}
+            />
+          </Field>
+
+          <Field label="Pickup / delivery notes" hint="Instructions like parking, entrance, or what to bring.">
+            <Textarea
+              name="pickupNotes"
+              defaultValue={defaults.pickupNotes ?? ""}
+              placeholder="Park in the driveway and text when you arrive."
+            />
+          </Field>
+        </div>
+      )}
 
       {/* Items */}
       <div className="bg-paper border border-line rounded-card p-6">

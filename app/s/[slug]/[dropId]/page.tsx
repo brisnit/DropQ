@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import { isStripeEnabled, feePercent } from "@/lib/stripe";
 import { StorefrontOrder } from "@/components/storefront-order";
 import { WaitlistForm } from "@/components/waitlist-form";
+import { computeDropPhase, isOrderingOpen } from "@/lib/drop-status";
+import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 
 export async function generateMetadata({
   params,
@@ -37,8 +39,10 @@ export default async function DropOrderPage({
   if (!drop || drop.seller.slug !== slug || drop.seller.disabledAt) notFound();
 
   const accent = drop.seller.accent || "#ff6268";
-  const isLive = drop.status === "live";
+  const tz = drop.seller.timezone;
   const isLiveDrop = drop.mode === "live";
+  const phase = computeDropPhase(drop);
+  const orderingOpen = isOrderingOpen(drop); // server-time gate for the order form
   const paymentsEnabled =
     isStripeEnabled() && drop.seller.stripeChargesEnabled && !!drop.seller.stripeAccountId;
   const fulfillmentLabel =
@@ -49,6 +53,35 @@ export default async function DropOrderPage({
         : drop.fulfillment === "handoff"
           ? "On-site / local handoff"
           : "Pickup";
+
+  const pickupWindow = formatPickupWindow(drop, tz);
+  const pickupWhere = pickupLocation(drop);
+  const opensAtLabel =
+    drop.opensAt &&
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: tz || undefined,
+      weekday: "short", month: "short", day: "numeric",
+      hour: "numeric", minute: "2-digit", timeZoneName: "short",
+    }).format(drop.opensAt);
+
+  // Pickup details block, reused in the open + closed states.
+  const pickupBlock =
+    pickupWindow || pickupWhere || drop.pickupNotes ? (
+      <div className="bg-paper border border-line rounded-card p-5 mt-5">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+          {drop.fulfillment === "delivery" ? "Delivery" : "Pickup"} details
+        </p>
+        {pickupWindow && (
+          <p className="mt-1.5 text-sm"><span className="font-medium">When:</span> {pickupWindow}</p>
+        )}
+        {pickupWhere && (
+          <p className="mt-1 text-sm"><span className="font-medium">Where:</span> {pickupWhere}</p>
+        )}
+        {drop.pickupNotes && (
+          <p className="mt-1 text-sm text-ink-soft"><span className="font-medium">Notes:</span> {drop.pickupNotes}</p>
+        )}
+      </div>
+    ) : null;
 
   return (
     <main className="min-h-screen">
@@ -85,16 +118,20 @@ export default async function DropOrderPage({
         )}
         {/* Drop header */}
         <div className="mb-7">
-          {isLive ? (
+          {orderingOpen ? (
             <span
               style={{ backgroundColor: accent }}
               className="inline-flex items-center gap-1.5 text-white text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-pill"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-white live-dot" /> {isLiveDrop ? "Live now — order here" : "Ordering open"}
             </span>
+          ) : phase === "scheduled" ? (
+            <span className="inline-flex items-center gap-1.5 bg-quad/20 text-ink-soft text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-pill">
+              Opens {opensAtLabel}
+            </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 bg-line text-ink-soft text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-pill">
-              Ordering closed
+              {phase === "pickup" ? "Pickup available" : "Ordering closed"}
             </span>
           )}
           <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-3">
@@ -108,42 +145,66 @@ export default async function DropOrderPage({
           )}
         </div>
 
-        {isLive ? (
-          <StorefrontOrder
-            dropId={drop.id}
-            accent={accent}
-            paymentsEnabled={paymentsEnabled}
-            live={isLiveDrop}
-            feeMode={drop.seller.feeMode}
-            feePercent={feePercent()}
-            products={drop.products.map((p) => ({
-              id: p.id,
-              name: p.name,
-              description: p.description,
-              priceCents: p.priceCents,
-              emoji: p.emoji,
-              imageUrl: p.imageUrl,
-              images: p.images?.length ? p.images : p.imageUrl ? [p.imageUrl] : [],
-              remaining: Math.max(0, p.inventory - p.sold),
-              productType: p.productType,
-              condition: p.condition,
-              rarity: p.rarity,
-            }))}
-          />
-        ) : (
+        {orderingOpen ? (
+          <>
+            <StorefrontOrder
+              dropId={drop.id}
+              accent={accent}
+              paymentsEnabled={paymentsEnabled}
+              live={isLiveDrop}
+              closesAt={drop.closesAt ? drop.closesAt.toISOString() : null}
+              feeMode={drop.seller.feeMode}
+              feePercent={feePercent()}
+              products={drop.products.map((p) => ({
+                id: p.id,
+                name: p.name,
+                description: p.description,
+                priceCents: p.priceCents,
+                emoji: p.emoji,
+                imageUrl: p.imageUrl,
+                images: p.images?.length ? p.images : p.imageUrl ? [p.imageUrl] : [],
+                remaining: Math.max(0, p.inventory - p.sold),
+                productType: p.productType,
+                condition: p.condition,
+                rarity: p.rarity,
+              }))}
+            />
+            {pickupBlock}
+          </>
+        ) : phase === "scheduled" ? (
           <div className="bg-paper border border-line rounded-card p-10 text-center">
-            <div className="text-4xl">🕓</div>
-            <h2 className="font-display text-xl font-semibold mt-3">Ordering is closed for this drop</h2>
-            <p className="text-muted mt-2">
-              You just missed it — or it hasn't opened yet. Follow {drop.seller.storeName} for the next one.
-            </p>
-            <Link
-              href={`/s/${slug}`}
-              className="inline-block mt-5 text-sm font-semibold rounded-pill px-5 py-2.5 text-white"
-              style={{ backgroundColor: accent }}
-            >
-              Back to {drop.seller.storeName}
-            </Link>
+            <div className="text-4xl">🗓️</div>
+            <h2 className="font-display text-xl font-semibold mt-3">Ordering opens {opensAtLabel}</h2>
+            <p className="text-muted mt-2">Get notified the moment it goes live.</p>
+            <div className="mt-6 max-w-md mx-auto text-left">
+              <WaitlistForm
+                sellerId={drop.sellerId}
+                dropId={drop.id}
+                storeName={drop.seller.storeName}
+                accent={accent}
+                geofence={drop.seller.geofenceEnabled}
+              />
+            </div>
+          </div>
+        ) : (
+          <div>
+            <div className="bg-paper border border-line rounded-card p-10 text-center">
+              <div className="text-4xl">🔒</div>
+              <h2 className="font-display text-xl font-semibold mt-3">
+                This drop is closed. Orders are now locked in.
+              </h2>
+              <p className="text-muted mt-2">
+                Ordering has ended for this drop. Follow {drop.seller.storeName} for the next one.
+              </p>
+              <Link
+                href={`/s/${slug}`}
+                className="inline-block mt-5 text-sm font-semibold rounded-pill px-5 py-2.5 text-white"
+                style={{ backgroundColor: accent }}
+              >
+                Back to {drop.seller.storeName}
+              </Link>
+            </div>
+            {pickupBlock}
             <div className="mt-6 max-w-md mx-auto text-left">
               <WaitlistForm
                 sellerId={drop.sellerId}

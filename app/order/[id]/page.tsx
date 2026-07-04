@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getStripe } from "@/lib/stripe";
 import { finalizePaidOrder } from "@/lib/checkout";
 import { formatMoney } from "@/lib/format";
+import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 
 export const metadata = { title: "Order confirmed — DropQ" };
 
@@ -22,6 +23,7 @@ export default async function OrderConfirmationPage({
     slug: true,
     accent: true,
     stripeAccountId: true,
+    timezone: true,
   } as const;
 
   let order = await prisma.order.findUnique({
@@ -109,14 +111,23 @@ export default async function OrderConfirmationPage({
               </div>
             </div>
 
-            {order.drop.pickupInfo && (
-              <div className="mt-4 bg-cream border border-line rounded-xl p-4">
-                <p className="text-xs uppercase tracking-wider text-muted">
-                  {order.drop.fulfillment}
-                </p>
-                <p className="text-sm font-medium mt-0.5">{order.drop.pickupInfo}</p>
-              </div>
-            )}
+            {(() => {
+              const win = formatPickupWindow(order.drop, order.seller.timezone);
+              const where = pickupLocation(order.drop);
+              if (!win && !where && !order.drop.pickupNotes) return null;
+              return (
+                <div className="mt-4 bg-cream border border-line rounded-xl p-4">
+                  <p className="text-xs uppercase tracking-wider text-muted">
+                    {order.drop.fulfillment === "delivery" ? "Delivery" : "Pickup"} details
+                  </p>
+                  {win && <p className="text-sm mt-1"><span className="font-medium">When:</span> {win}</p>}
+                  {where && <p className="text-sm mt-0.5"><span className="font-medium">Where:</span> {where}</p>}
+                  {order.drop.pickupNotes && (
+                    <p className="text-sm mt-0.5 text-ink-soft"><span className="font-medium">Notes:</span> {order.drop.pickupNotes}</p>
+                  )}
+                </div>
+              );
+            })()}
 
             <p className="text-sm text-muted mt-4">
               A receipt is on its way to <span className="text-ink">{order.buyerEmail}</span>.

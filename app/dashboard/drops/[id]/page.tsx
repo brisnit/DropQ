@@ -17,6 +17,9 @@ import { ShareButton } from "@/components/share-button";
 import { StatusSelect } from "@/components/status-select";
 import { LiveOrders } from "@/components/live-orders";
 import { ConfirmSubmit } from "@/components/confirm-submit";
+import { Countdown } from "@/components/countdown";
+import { computeDropPhase } from "@/lib/drop-status";
+import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 import { BackLink } from "@/components/back-link";
 
 export default async function DropDetailPage({
@@ -127,6 +130,54 @@ export default async function DropDetailPage({
           </Link>
         </div>
       </div>
+
+      {/* Order window + pickup (preorder drops) */}
+      {!isLiveDrop && (() => {
+        const tz = seller.timezone || undefined;
+        const fmt = (d: Date | null) =>
+          d ? new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(d) : null;
+        const phase = computeDropPhase(drop);
+        const pickupWin = formatPickupWindow(drop, tz);
+        const pickupWhere = pickupLocation(drop);
+        return (
+          <div className="grid sm:grid-cols-2 gap-4 mb-8">
+            <div className="bg-paper border border-line rounded-card p-5">
+              <p className="text-xs uppercase tracking-wide text-muted">Order window</p>
+              {drop.opensAt && drop.closesAt ? (
+                <>
+                  <p className="text-sm mt-1">{fmt(drop.opensAt)} <span className="text-muted">→</span> {fmt(drop.closesAt)}</p>
+                  <p className="mt-2 text-sm">
+                    {phase === "open" ? (
+                      <>Ordering closes in <Countdown to={drop.closesAt.toISOString()} /></>
+                    ) : phase === "scheduled" ? (
+                      <span className="text-muted">Scheduled — hasn&rsquo;t opened yet</span>
+                    ) : (
+                      <span className="text-muted">Ordering closed</span>
+                    )}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted mt-1">No order window set.</p>
+              )}
+              <p className="text-sm mt-3">
+                <span className="font-semibold">{drop.orders.length}</span> order{drop.orders.length !== 1 ? "s" : ""} locked in
+              </p>
+            </div>
+            <div className="bg-paper border border-line rounded-card p-5">
+              <p className="text-xs uppercase tracking-wide text-muted">Pickup</p>
+              {pickupWin && <p className="text-sm mt-1"><span className="font-medium">When:</span> {pickupWin}</p>}
+              {pickupWhere && <p className="text-sm mt-0.5"><span className="font-medium">Where:</span> {pickupWhere}</p>}
+              {drop.pickupNotes && <p className="text-sm mt-0.5 text-ink-soft"><span className="font-medium">Notes:</span> {drop.pickupNotes}</p>}
+              {!pickupWin && !pickupWhere && !drop.pickupNotes && (
+                <p className="text-sm text-muted mt-1">
+                  No pickup details yet.{" "}
+                  <Link href={`/dashboard/drops/${drop.id}/edit`} className="text-brand hover:underline">Add them</Link>.
+                </p>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Share + QR (always visible) */}
       <div className="grid md:grid-cols-[1fr_auto] gap-4 mb-8 items-stretch">

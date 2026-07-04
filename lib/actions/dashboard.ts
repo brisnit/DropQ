@@ -17,6 +17,7 @@ import {
   orderCanceledEmail,
 } from "@/lib/email";
 import { sendSms } from "@/lib/notifications";
+import { formatPickupWindow, pickupLocation, pickupSummary } from "@/lib/pickup";
 import { geocode } from "@/lib/geofence";
 import { canCreateDrop } from "@/lib/plans";
 import { ORDER_STATUSES } from "@/lib/orders";
@@ -38,6 +39,60 @@ function numOrNull(v: FormDataEntryValue | null): number | null {
   if (!s) return null;
   const n = parseFloat(s);
   return isFinite(n) ? n : null;
+}
+
+/** Email + text customers who already ordered when pickup details change. */
+async function notifyPickupChanged(dropId: string) {
+  const drop = await prisma.drop.findUnique({
+    where: { id: dropId },
+    include: { seller: { select: { storeName: true, timezone: true } } },
+  });
+  if (!drop) return;
+  const orders = await prisma.order.findMany({
+    where: { dropId, status: { in: ["new", "in_progress", "ready"] } },
+    select: { buyerEmail: true, buyerPhone: true, buyerName: true },
+  });
+  if (!orders.length) return;
+
+  const store = drop.seller.storeName;
+  const summary = pickupSummary(drop, drop.seller.timezone);
+  const win = formatPickupWindow(drop, drop.seller.timezone);
+  const loc = pickupLocation(drop);
+  const notes = drop.pickupNotes;
+
+  for (const o of orders) {
+    const first = o.buyerName.split(" ")[0] || o.buyerName;
+    try {
+      await sendEmail({
+        to: o.buyerEmail,
+        subject: `Pickup details updated for your ${store} order`,
+        html:
+          `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a">` +
+          `<p>Hi ${first}, the pickup details for your <b>${store}</b> order have been updated:</p>` +
+          (win ? `<p><b>Pickup:</b> ${win}</p>` : "") +
+          (loc ? `<p><b>Where:</b> ${loc}</p>` : "") +
+          (notes ? `<p><b>Notes:</b> ${notes}</p>` : "") +
+          `</div>`,
+      });
+      await sendSms(o.buyerPhone, `${store}: your pickup details were updated. ${summary}`);
+    } catch (e) {
+      console.error("notifyPickupChanged send failed:", e);
+    }
+  }
+}
+
+/** Parse the drop pickup-window + location fields from a drop form submission. */
+function parsePickup(formData: FormData) {
+  const dt = (k: string) => (formData.get(k) ? new Date(String(formData.get(k))) : null);
+  return {
+    pickupStartAt: dt("pickupStartAt"),
+    pickupEndAt: dt("pickupEndAt"),
+    pickupLocationName: String(formData.get("pickupLocationName") ?? "").trim() || null,
+    pickupAddress: String(formData.get("pickupAddress") ?? "").trim() || null,
+    pickupLat: numOrNull(formData.get("pickupLat")),
+    pickupLng: numOrNull(formData.get("pickupLng")),
+    pickupNotes: String(formData.get("pickupNotes") ?? "").trim() || null,
+  };
 }
 
 export async function updateStoreAction(
@@ -212,6 +267,7 @@ export async function createDropAction(formData: FormData) {
       pickupInfo: String(formData.get("pickupInfo") ?? "").trim() || null,
       opensAt,
       closesAt,
+      ...parsePickup(formData),
       products: { create: products },
     },
   });
@@ -239,6 +295,15 @@ export async function updateDropFullAction(formData: FormData) {
   const status = ["draft", "live", "closed"].includes(statusRaw) ? statusRaw : drop.status;
   const opensAt = formData.get("opensAt") ? new Date(String(formData.get("opensAt"))) : drop.opensAt;
   const closesAt = formData.get("closesAt") ? new Date(String(formData.get("closesAt"))) : drop.closesAt;
+  const pickup = parsePickup(formData);
+
+  // Detect a pickup-detail change so we can notify customers who already ordered.
+  const pickupChanged =
+    drop.pickupStartAt?.getTime() !== pickup.pickupStartAt?.getTime() ||
+    drop.pickupEndAt?.getTime() !== pickup.pickupEndAt?.getTime() ||
+    (drop.pickupAddress ?? null) !== pickup.pickupAddress ||
+    (drop.pickupLocationName ?? null) !== pickup.pickupLocationName ||
+    (drop.pickupNotes ?? null) !== pickup.pickupNotes;
 
   await prisma.drop.update({
     where: { id: dropId },
@@ -250,8 +315,15 @@ export async function updateDropFullAction(formData: FormData) {
       status,
       opensAt,
       closesAt,
+      ...pickup,
     },
   });
+
+  // If pickup details changed and this drop already has orders, let those
+  // customers know (email + SMS, best effort in the background).
+  if (pickupChanged && (pickup.pickupStartAt || pickup.pickupAddress)) {
+    after(() => notifyPickupChanged(dropId));
+  }
 
   // Sync products (update existing, create new, delete removed)
   const ids = formData.getAll("p_id").map(String);

@@ -47,6 +47,13 @@ export default async function EditDropPage({
           location: drop.pickupInfo ?? "",
           opensAt: toIso(drop.opensAt),
           closesAt: toIso(drop.closesAt),
+          pickupStartAt: toIso(drop.pickupStartAt),
+          pickupEndAt: toIso(drop.pickupEndAt),
+          pickupLocationName: drop.pickupLocationName ?? "",
+          pickupAddress: drop.pickupAddress ?? "",
+          pickupLat: drop.pickupLat,
+          pickupLng: drop.pickupLng,
+          pickupNotes: drop.pickupNotes ?? "",
           status: drop.status,
           products: drop.products.map((p) => ({
             id: p.id,

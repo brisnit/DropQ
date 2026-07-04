@@ -225,9 +225,20 @@ model Drop {
   status      String    @default("draft") // draft | live | closed
   mode        String    @default("preorder") // preorder (regular drop) | live (live selling / on-site QR)
   fulfillment String    @default("pickup") // pickup | delivery | handoff
-  pickupInfo  String?
-  opensAt     DateTime?
-  closesAt    DateTime?
+  pickupInfo  String?   // legacy free-text location line (kept for back-compat)
+  opensAt     DateTime? // order window start (UTC)
+  closesAt    DateTime? // order window end (UTC) — ordering locks after this
+
+  // Pickup window (after ordering closes) + structured-ish location.
+  pickupStartAt      DateTime?
+  pickupEndAt        DateTime?
+  pickupLocationName String? // e.g. "Front porch", "The shop"
+  pickupAddress      String? // formatted address (from autocomplete)
+  pickupLat          Float?
+  pickupLng          Float?
+  pickupNotes        String? // pickup / delivery instructions
+  // TODO: structured address_line_1/2, city, state, postal_code, country if needed.
+
   createdAt   DateTime  @default(now())
 
   products    Product[]
