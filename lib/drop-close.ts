@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { sendEmail, dropClosedEmail } from "@/lib/email";
 import { sendSms } from "@/lib/notifications";
 import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
+import { dropMapsUrl } from "@/lib/maps";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -27,7 +28,14 @@ export async function closeExpiredDrops(now: Date = new Date()): Promise<{ close
   // 2) Recently-expired live drops → close + broadcast.
   const recent = await prisma.drop.findMany({
     where: { status: "live", mode: "preorder", closesAt: { lt: now, gte: new Date(now.getTime() - DAY) } },
-    include: { seller: { select: { storeName: true, timezone: true, logoUrl: true, accent: true } } },
+    include: {
+      seller: {
+        select: {
+          storeName: true, timezone: true, logoUrl: true, accent: true,
+          pickupContactPhone: true, pickupContactPref: true,
+        },
+      },
+    },
   });
 
   let closed = stale.count;
@@ -48,6 +56,7 @@ export async function closeExpiredDrops(now: Date = new Date()): Promise<{ close
     });
     const win = formatPickupWindow(d, d.seller.timezone);
     const where = pickupLocation(d);
+    const mapsUrl = dropMapsUrl(d);
     const store = d.seller.storeName;
 
     for (const o of orders) {
@@ -63,13 +72,18 @@ export async function closeExpiredDrops(now: Date = new Date()): Promise<{ close
             pickupWindow: win,
             pickupWhere: where,
             pickupNotes: d.pickupNotes,
+            pickupFindMe: d.pickupFindMe,
+            mapsUrl,
+            contactPhone: d.seller.pickupContactPhone,
+            contactPref: d.seller.pickupContactPref,
             logoUrl: d.seller.logoUrl,
             accent: d.seller.accent,
           })
         );
         const sms =
           `${store}: the "${d.title}" drop is over and your order is locked in.` +
-          (win ? ` Pickup ${win}${where ? ` at ${where}` : ""}.` : "");
+          (win ? ` Pickup ${win}${where ? ` at ${where}` : ""}.` : "") +
+          (mapsUrl ? ` Directions: ${mapsUrl}` : "");
         await sendSms(o.buyerPhone, sms);
         notified++;
       } catch (e) {

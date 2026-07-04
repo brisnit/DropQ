@@ -80,14 +80,21 @@ model Seller {
   longitude       Float?
   geofenceRadiusM Int     @default(1500) // meters
 
-  drops         Drop[]
-  orders        Order[]
-  tokens        Token[]
-  subscribers   Subscriber[]
-  reviews       Review[]
-  gallery       GalleryImage[]
-  referralsMade Referral[]     @relation("Referrer")
-  referredBy    Referral?      @relation("Referred")
+  // Public pickup contact — opt-in. When a number is present, customers of a
+  // valid order can call/text the vendor at pickup. The private account phone is
+  // never exposed; only this explicitly-entered number is public.
+  pickupContactPhone String? // public pickup contact number (opt-in)
+  pickupContactPref  String  @default("text") // text | call | both — preferred CTA
+
+  drops          Drop[]
+  orders         Order[]
+  tokens         Token[]
+  subscribers    Subscriber[]
+  reviews        Review[]
+  gallery        GalleryImage[]
+  vendorProducts VendorProduct[]
+  referralsMade  Referral[]     @relation("Referrer")
+  referredBy     Referral?      @relation("Referred")
 
   salesRep    SalesRep?          @relation("SalesRepVendors", fields: [salesRepId], references: [id], onDelete: SetNull)
   commissions CommissionLedger[] @relation("VendorCommissions")
@@ -237,12 +244,15 @@ model Drop {
   pickupLat          Float?
   pickupLng          Float?
   pickupNotes        String? // pickup / delivery instructions
+  pickupFindMe       String? // "how to find the vendor" — e.g. "Blue canopy near the fountain", "White Ford Transit"
   // Structured address components (best-effort, from the autocomplete provider).
   pickupLine1        String?
   pickupCity         String?
   pickupState        String?
   pickupPostal       String?
   pickupCountry      String?
+
+  vendorArrivedAt DateTime? // vendor checked in at the pickup location
 
   createdAt   DateTime  @default(now())
 
@@ -251,10 +261,43 @@ model Drop {
   subscribers Subscriber[]
 }
 
+// A vendor's reusable product/menu-item library. Independent from any drop so
+// vendors don't recreate the same items every time. A drop's Product may be
+// spawned from one of these (Product.vendorProductId), but drop-specific fields
+// (inventory, sold, per-drop price) live on the Product, not here.
+model VendorProduct {
+  id          String   @id @default(cuid())
+  sellerId    String
+  seller      Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  priceCents  Int      @default(0) // default/master price; overridable per drop
+  emoji       String   @default("🍪")
+  imageUrl    String?  // primary photo (kept in sync with images[0])
+  images      String[] @default([])
+  category    String?  // optional grouping (e.g. "Pastries", "Drinks")
+  allergens   String?  // optional dietary/allergen notes
+  productType String?  // collectible metadata (mirrors Product)
+  condition   String?
+  rarity      String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  dropProducts Product[] // drop items created from this library item
+
+  @@index([sellerId])
+}
+
 model Product {
   id          String  @id @default(cuid())
   dropId      String
   drop        Drop    @relation(fields: [dropId], references: [id], onDelete: Cascade)
+  // Optional link back to the saved library item this was created from. Nullable
+  // so existing/ad-hoc drop products are unaffected; SetNull so deleting a
+  // library item never breaks a live drop.
+  vendorProductId String?
+  vendorProduct   VendorProduct? @relation(fields: [vendorProductId], references: [id], onDelete: SetNull)
   name        String
   description String?
   priceCents  Int
@@ -291,6 +334,7 @@ model Order {
   // Stripe
   stripeSessionId       String? @unique
   stripePaymentIntentId String?
+  customerArrivedAt DateTime? // customer tapped "I'm here" at pickup
   createdAt  DateTime @default(now())
 
   items  OrderItem[]

@@ -102,6 +102,8 @@ export default async function StorePage() {
           youtube: seller.youtube,
           website: seller.website,
           feeMode: seller.feeMode,
+          pickupContactPhone: seller.pickupContactPhone,
+          pickupContactPref: seller.pickupContactPref,
           geofenceEnabled: seller.geofenceEnabled,
           latitude: seller.latitude,
           longitude: seller.longitude,

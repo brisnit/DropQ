@@ -24,6 +24,7 @@ export type DropDefaults = {
   pickupLat?: number | null;
   pickupLng?: number | null;
   pickupNotes?: string;
+  pickupFindMe?: string;
   pickupLine1?: string | null;
   pickupCity?: string | null;
   pickupState?: string | null;
@@ -32,6 +33,7 @@ export type DropDefaults = {
   status?: string;
   products?: Array<{
     id?: string;
+    vendorProductId?: string | null;
     emoji?: string;
     name?: string;
     desc?: string;
@@ -45,9 +47,25 @@ export type DropDefaults = {
   }>;
 };
 
+// A saved library item the vendor can add to this drop.
+export type SavedProduct = {
+  id: string;
+  emoji: string;
+  name: string;
+  desc: string;
+  price: string;
+  imageUrl: string | null;
+  images: string[];
+  category: string;
+  productType: string;
+  condition: string;
+  rarity: string;
+};
+
 type Row = {
   key: number;
   id?: string;
+  vendorProductId?: string | null; // set when the row came from the saved library
   emoji: string;
   name: string;
   desc: string;
@@ -75,6 +93,21 @@ const blankRow = (emoji: string): Row => ({
   condition: "",
   rarity: "",
   images: [],
+  uploading: 0,
+});
+
+const rowFromSaved = (sp: SavedProduct, fallbackEmoji: string): Row => ({
+  key: counter++,
+  vendorProductId: sp.id,
+  emoji: sp.emoji || fallbackEmoji,
+  name: sp.name,
+  desc: sp.desc,
+  price: sp.price,
+  inventory: "", // vendor sets stock per drop
+  productType: sp.productType,
+  condition: sp.condition,
+  rarity: sp.rarity,
+  images: sp.images?.length ? sp.images : sp.imageUrl ? [sp.imageUrl] : [],
   uploading: 0,
 });
 
@@ -131,6 +164,7 @@ export function DropEditor({
   category = "food",
   dropMode = "preorder",
   timeZone,
+  savedProducts = [],
 }: {
   action: (formData: FormData) => void | Promise<void>;
   mode?: "create" | "edit";
@@ -139,6 +173,7 @@ export function DropEditor({
   category?: string;
   dropMode?: "preorder" | "live";
   timeZone?: string;
+  savedProducts?: SavedProduct[];
 }) {
   const v = vocab(category);
   const meta = showItemMeta(category);
@@ -151,6 +186,7 @@ export function DropEditor({
       ? defaults.products.map((p) => ({
           key: counter++,
           id: p.id,
+          vendorProductId: p.vendorProductId ?? null,
           emoji: p.emoji || defaultEmoji,
           name: p.name ?? "",
           desc: p.desc ?? "",
@@ -166,6 +202,29 @@ export function DropEditor({
 
   const [rows, setRows] = useState<Row[]>(initialRows);
   const [error, setError] = useState<string | null>(null);
+  const [saveToLibrary, setSaveToLibrary] = useState(true);
+  const [libOpen, setLibOpen] = useState(false);
+  const [libQuery, setLibQuery] = useState("");
+
+  // Names already on the drop — so the library picker can mark/skip duplicates.
+  const usedNames = new Set(rows.map((r) => r.name.trim().toLowerCase()).filter(Boolean));
+  const libMatches = savedProducts.filter((sp) =>
+    sp.name.toLowerCase().includes(libQuery.trim().toLowerCase())
+  );
+
+  const addFromLibrary = (sp: SavedProduct) => {
+    setRows((rs) => {
+      // Replace a leading empty row rather than stacking a blank one.
+      const firstEmpty = rs.findIndex((r) => !r.name.trim() && !r.images.length);
+      const next = rowFromSaved(sp, defaultEmoji);
+      if (firstEmpty >= 0) {
+        const copy = [...rs];
+        copy[firstEmpty] = next;
+        return copy;
+      }
+      return [...rs, next];
+    });
+  };
 
   const update = (key: number, patch: Partial<Row>) =>
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -387,11 +446,38 @@ export function DropEditor({
             />
           </Field>
 
+          <Field
+            label="How to find you"
+            hint="What customers should look for when they arrive — helps them spot you fast."
+          >
+            <Input
+              name="pickupFindMe"
+              defaultValue={defaults.pickupFindMe ?? ""}
+              placeholder="Blue canopy near the fountain · White Ford Transit with a folding table"
+            />
+          </Field>
+
           <Field label="Pickup / delivery notes" hint="Instructions like parking, entrance, or what to bring.">
             <Textarea
               name="pickupNotes"
               defaultValue={defaults.pickupNotes ?? ""}
               placeholder="Park in the driveway and text when you arrive."
+            />
+          </Field>
+        </div>
+      )}
+
+      {/* How-to-find-you for live / on-site drops (no pickup window shown) */}
+      {live && (
+        <div className="bg-paper border border-line rounded-card p-6">
+          <Field
+            label="How to find you"
+            hint="What customers should look for when they arrive at your spot."
+          >
+            <Input
+              name="pickupFindMe"
+              defaultValue={defaults.pickupFindMe ?? ""}
+              placeholder="Blue canopy near the fountain · Booth 14"
             />
           </Field>
         </div>
@@ -406,7 +492,63 @@ export function DropEditor({
             {rows.length !== 1 ? "s" : ""}
           </span>
         </div>
-        <p className="text-sm text-muted mb-5">{v.photoHint}</p>
+        <p className="text-sm text-muted mb-4">{v.photoHint}</p>
+
+        {/* Saved product library — reuse items across drops */}
+        {savedProducts.length > 0 && (
+          <div className="mb-5">
+            <button
+              type="button"
+              onClick={() => setLibOpen((o) => !o)}
+              className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-pill border border-line-strong bg-cream/60 hover:border-ink/30 transition"
+            >
+              📚 Add from saved products {libOpen ? "▲" : "▼"}
+            </button>
+            {libOpen && (
+              <div className="mt-3 rounded-xl border border-line bg-cream/40 p-3">
+                <input
+                  value={libQuery}
+                  onChange={(e) => setLibQuery(e.target.value)}
+                  placeholder="Search your saved products…"
+                  className="w-full bg-paper border border-line-strong rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                />
+                {libMatches.length === 0 ? (
+                  <p className="text-sm text-muted px-1 py-2">No matching saved products.</p>
+                ) : (
+                  <div className="max-h-64 overflow-y-auto divide-y divide-line">
+                    {libMatches.map((sp) => {
+                      const added = usedNames.has(sp.name.trim().toLowerCase());
+                      return (
+                        <div key={sp.id} className="flex items-center gap-3 py-2">
+                          {sp.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={sp.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover border border-line shrink-0" />
+                          ) : (
+                            <span className="w-10 h-10 rounded-lg bg-paper grid place-items-center text-lg shrink-0">{sp.emoji}</span>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{sp.name}</p>
+                            <p className="text-xs text-muted truncate">
+                              {[sp.category, sp.price ? `$${sp.price}` : ""].filter(Boolean).join(" · ")}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={added}
+                            onClick={() => addFromLibrary(sp)}
+                            className="text-xs font-semibold px-3 py-1.5 rounded-pill border border-line-strong bg-paper hover:border-brand hover:text-brand transition disabled:opacity-40 disabled:pointer-events-none shrink-0"
+                          >
+                            {added ? "Added" : "+ Add"}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="space-y-4">
           {rows.map((row, i) => {
@@ -492,6 +634,7 @@ export function DropEditor({
                 <div className="flex items-start gap-4">
                   <div className="flex-1 space-y-3 min-w-0">
                     <input type="hidden" name="p_id" value={row.id ?? ""} />
+                    <input type="hidden" name="p_vpid" value={row.vendorProductId ?? ""} />
                     <input type="hidden" name="p_emoji" value={row.emoji} />
                     <input
                       name="p_name"
@@ -580,6 +723,21 @@ export function DropEditor({
         >
           {v.addAnother}
         </button>
+
+        {/* Auto-save new items to the reusable library (opt-out). Always submits
+            "on"/"off" so the server can honor an explicit opt-out. */}
+        <input type="hidden" name="saveToLibrary" value={saveToLibrary ? "on" : "off"} />
+        <label className="mt-4 flex items-start gap-2.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={saveToLibrary}
+            onChange={(e) => setSaveToLibrary(e.target.checked)}
+            className="mt-0.5 w-4 h-4 accent-[#ff6268]"
+          />
+          <span className="text-sm text-ink-soft">
+            Save new {v.itemNoun}s to my product library so I can reuse them in future drops.
+          </span>
+        </label>
       </div>
 
       {error && (

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireSeller } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { deleteDropAction } from "@/lib/actions/dashboard";
+import { deleteDropAction, duplicateDropAction } from "@/lib/actions/dashboard";
 import { formatMoney, formatDate, statusStyle } from "@/lib/format";
 import { PageHeader, EmptyState, Section } from "@/components/dashboard-ui";
 import { LinkButton, Badge } from "@/components/ui";
@@ -141,6 +141,18 @@ export default async function DropsPage() {
                     </div>
                   </div>
                 </Link>
+
+                <form action={duplicateDropAction} className="flex">
+                  <input type="hidden" name="dropId" value={d.id} />
+                  <button
+                    type="submit"
+                    aria-label="Relaunch drop"
+                    title="Relaunch — copy into a new draft"
+                    className="h-full px-3 rounded-card border border-line text-muted hover:text-ink hover:border-ink/30 transition grid place-items-center"
+                  >
+                    <span aria-hidden>🔁</span>
+                  </button>
+                </form>
 
                 <form action={deleteDropAction} className="flex">
                   <input type="hidden" name="dropId" value={d.id} />

@@ -15,9 +15,11 @@ import {
   orderReadyEmail,
   orderCompletedEmail,
   orderCanceledEmail,
+  vendorArrivedEmail,
 } from "@/lib/email";
 import { sendSms } from "@/lib/notifications";
-import { formatPickupWindow, pickupLocation, pickupSummary } from "@/lib/pickup";
+import { formatPickupWindow, pickupLocation, pickupSummary, orderMailPickup } from "@/lib/pickup";
+import { dropMapsUrl } from "@/lib/maps";
 import { geocode } from "@/lib/geofence";
 import { canCreateDrop } from "@/lib/plans";
 import { ORDER_STATUSES } from "@/lib/orders";
@@ -92,6 +94,7 @@ function parsePickup(formData: FormData) {
     pickupLat: numOrNull(formData.get("pickupLat")),
     pickupLng: numOrNull(formData.get("pickupLng")),
     pickupNotes: String(formData.get("pickupNotes") ?? "").trim() || null,
+    pickupFindMe: String(formData.get("pickupFindMe") ?? "").trim() || null,
     pickupLine1: String(formData.get("pickupLine1") ?? "").trim() || null,
     pickupCity: String(formData.get("pickupCity") ?? "").trim() || null,
     pickupState: String(formData.get("pickupState") ?? "").trim() || null,
@@ -114,6 +117,11 @@ export async function updateStoreAction(
 
   const accentRaw = String(formData.get("accent") ?? seller.accent).trim();
   const accent = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(accentRaw) ? accentRaw : seller.accent;
+
+  // Public pickup contact — opt-in. Empty clears it (no public number exposed).
+  const pickupContactPhone = String(formData.get("pickupContactPhone") ?? "").trim() || null;
+  const prefRaw = String(formData.get("pickupContactPref") ?? "text").trim();
+  const pickupContactPref = ["text", "call", "both"].includes(prefRaw) ? prefRaw : "text";
 
   // Timezone — accept a plausible IANA value (e.g. "America/New_York" or "UTC").
   const tzRaw = String(formData.get("timezone") ?? "").trim();
@@ -155,6 +163,8 @@ export async function updateStoreAction(
       youtube: socials.youtube,
       website: socials.website,
       feeMode: String(formData.get("feeMode")) === "pass" ? "pass" : "absorb",
+      pickupContactPhone,
+      pickupContactPref,
       geofenceEnabled,
       latitude,
       longitude,
@@ -202,6 +212,61 @@ export async function deleteGalleryImageAction(formData: FormData) {
   redirect("/dashboard/store#gallery");
 }
 
+/* --------------------------- Product library ---------------------------- */
+type LibRow = {
+  name: string;
+  description: string | null;
+  priceCents: number;
+  emoji: string;
+  images: string[];
+  imageUrl: string | null;
+  productType: string | null;
+  condition: string | null;
+  rarity: string | null;
+  vendorProductId: string | null;
+};
+
+/**
+ * Save the new (not library-sourced) items from a drop into the vendor's
+ * reusable product library, so they don't have to recreate them next time.
+ * Matches an existing library item by name (case-insensitive) and refreshes it;
+ * otherwise creates one. Best-effort — never blocks the drop save.
+ */
+async function saveProductsToLibrary(sellerId: string, rows: LibRow[]) {
+  const existing = await prisma.vendorProduct.findMany({
+    where: { sellerId },
+    select: { id: true, name: true },
+  });
+  const byName = new Map(existing.map((e) => [e.name.trim().toLowerCase(), e.id]));
+  for (const r of rows) {
+    if (r.vendorProductId) continue; // already came from the library
+    const key = r.name.trim().toLowerCase();
+    if (!key) continue;
+    const data = {
+      name: r.name,
+      description: r.description,
+      priceCents: r.priceCents,
+      emoji: r.emoji,
+      images: r.images,
+      imageUrl: r.imageUrl,
+      productType: r.productType,
+      condition: r.condition,
+      rarity: r.rarity,
+    };
+    try {
+      const id = byName.get(key);
+      if (id) {
+        await prisma.vendorProduct.update({ where: { id }, data });
+      } else {
+        const created = await prisma.vendorProduct.create({ data: { sellerId, ...data } });
+        byName.set(key, created.id); // dedupe repeats within the same submission
+      }
+    } catch (e) {
+      console.error("saveProductsToLibrary failed for", r.name, e);
+    }
+  }
+}
+
 /* ------------------------------- Drops ---------------------------------- */
 export async function createDropAction(formData: FormData) {
   const seller = await requireSeller();
@@ -240,6 +305,7 @@ export async function createDropAction(formData: FormData) {
   const types = formData.getAll("p_type").map(String);
   const conditions = formData.getAll("p_condition").map(String);
   const rarities = formData.getAll("p_rarity").map(String);
+  const vpids = formData.getAll("p_vpid").map(String);
 
   const products = names
     .map((name, i) => {
@@ -257,6 +323,7 @@ export async function createDropAction(formData: FormData) {
         productType: (types[i] ?? "").trim() || null,
         condition: (conditions[i] ?? "").trim() || null,
         rarity: (rarities[i] ?? "").trim() || null,
+        vendorProductId: (vpids[i] ?? "").trim() || null,
       };
     })
     .filter((p) => p.name.length > 0);
@@ -276,6 +343,11 @@ export async function createDropAction(formData: FormData) {
       products: { create: products },
     },
   });
+
+  // Save new items to the vendor's library unless they opted out.
+  if (formData.get("saveToLibrary") !== "off") {
+    await saveProductsToLibrary(seller.id, products);
+  }
 
   // Count it against the lifetime allowance (never decremented, so deleting a
   // drop doesn't refund a Starter slot).
@@ -340,7 +412,9 @@ export async function updateDropFullAction(formData: FormData) {
   const types = formData.getAll("p_type").map(String);
   const conditions = formData.getAll("p_condition").map(String);
   const rarities = formData.getAll("p_rarity").map(String);
+  const vpids = formData.getAll("p_vpid").map(String);
 
+  const newLibRows: LibRow[] = [];
   const submittedIds = new Set<string>();
   for (let i = 0; i < names.length; i++) {
     const name = names[i].trim();
@@ -348,6 +422,7 @@ export async function updateDropFullAction(formData: FormData) {
     // The editor pre-uploads photos and submits the full URL set (kept + new)
     // for each row as p_img_<i>, so we just persist it verbatim.
     const imgs = formData.getAll(`p_img_${i}`).map(String).filter(Boolean);
+    const vendorProductId = (vpids[i] ?? "").trim() || null;
     const base = {
       name,
       description: (descs[i] ?? "").trim() || null,
@@ -360,6 +435,7 @@ export async function updateDropFullAction(formData: FormData) {
       productType: (types[i] ?? "").trim() || null,
       condition: (conditions[i] ?? "").trim() || null,
       rarity: (rarities[i] ?? "").trim() || null,
+      vendorProductId,
     };
     const id = ids[i];
     if (id) {
@@ -368,10 +444,16 @@ export async function updateDropFullAction(formData: FormData) {
       await prisma.product.updateMany({ where: { id, dropId }, data: base });
     } else {
       await prisma.product.create({ data: { ...base, dropId } });
+      newLibRows.push(base);
     }
   }
   const removed = drop.products.filter((p) => !submittedIds.has(p.id)).map((p) => p.id);
   if (removed.length) await prisma.product.deleteMany({ where: { id: { in: removed }, dropId } });
+
+  // Newly-added items (not from the library) get saved to it, unless opted out.
+  if (newLibRows.length && formData.get("saveToLibrary") !== "off") {
+    await saveProductsToLibrary(seller.id, newLibRows);
+  }
 
   revalidatePath(`/dashboard/drops/${dropId}`);
   revalidatePath("/dashboard/drops");
@@ -403,6 +485,135 @@ export async function deleteDropAction(formData: FormData) {
   redirect("/dashboard/drops");
 }
 
+/**
+ * Relaunch / duplicate a past drop into a fresh draft. Copies content (title,
+ * description, items + photos, prices, pickup location/notes/find-me) but NOT
+ * the schedule, orders, sales, or sold counts — the vendor sets new dates and
+ * publishes. Opens the editor with the copy.
+ */
+export async function duplicateDropAction(formData: FormData) {
+  const seller = await requireSeller();
+  const dropId = String(formData.get("dropId"));
+
+  // A relaunch is a new drop — respect the Starter lifetime limit like create.
+  if (!canCreateDrop(seller)) redirect("/dashboard/billing?limit=1");
+
+  const drop = await prisma.drop.findUnique({
+    where: { id: dropId },
+    include: { products: { orderBy: { sortOrder: "asc" } } },
+  });
+  if (!drop || drop.sellerId !== seller.id) return;
+
+  const copy = await prisma.drop.create({
+    data: {
+      sellerId: seller.id,
+      title: drop.title,
+      description: drop.description,
+      mode: drop.mode === "live" ? "live" : "preorder",
+      status: "draft", // always a draft — vendor sets new dates before publishing
+      fulfillment: drop.fulfillment,
+      pickupInfo: drop.pickupInfo,
+      // Deliberately NOT copied: opensAt, closesAt, pickupStartAt, pickupEndAt,
+      // orders, sales, vendorArrivedAt.
+      pickupLocationName: drop.pickupLocationName,
+      pickupAddress: drop.pickupAddress,
+      pickupLat: drop.pickupLat,
+      pickupLng: drop.pickupLng,
+      pickupNotes: drop.pickupNotes,
+      pickupFindMe: drop.pickupFindMe,
+      pickupLine1: drop.pickupLine1,
+      pickupCity: drop.pickupCity,
+      pickupState: drop.pickupState,
+      pickupPostal: drop.pickupPostal,
+      pickupCountry: drop.pickupCountry,
+      products: {
+        create: drop.products.map((p) => ({
+          vendorProductId: p.vendorProductId,
+          name: p.name,
+          description: p.description,
+          priceCents: p.priceCents,
+          emoji: p.emoji,
+          imageUrl: p.imageUrl,
+          images: p.images,
+          inventory: p.inventory,
+          sold: 0, // reset — fresh drop
+          sortOrder: p.sortOrder,
+          productType: p.productType,
+          condition: p.condition,
+          rarity: p.rarity,
+        })),
+      },
+    },
+  });
+
+  await prisma.seller.update({
+    where: { id: seller.id },
+    data: { dropsCreated: { increment: 1 } },
+  });
+
+  revalidatePath("/dashboard/drops");
+  redirect(`/dashboard/drops/${copy.id}/edit?copied=1`);
+}
+
+/** Email + text customers with an active order that the vendor has arrived. */
+async function notifyVendorArrived(dropId: string) {
+  const drop = await prisma.drop.findUnique({
+    where: { id: dropId },
+    include: { seller: true },
+  });
+  if (!drop) return;
+  const orders = await prisma.order.findMany({
+    where: { dropId, status: { in: ["new", "in_progress", "ready"] } },
+    select: { id: true, buyerEmail: true, buyerPhone: true, buyerName: true },
+  });
+  if (!orders.length) return;
+
+  const store = drop.seller.storeName;
+  const mapsUrl = dropMapsUrl(drop);
+  const where = pickupLocation(drop);
+  const base = await baseUrl();
+  const mailPickup = orderMailPickup(drop, drop.seller);
+
+  for (const o of orders) {
+    const first = o.buyerName.split(" ")[0] || o.buyerName;
+    const orderLink = `${base}/order/${o.id}`;
+    try {
+      await sendEmail(
+        vendorArrivedEmail({
+          to: o.buyerEmail,
+          storeName: store,
+          buyerFirst: first,
+          orderLink,
+          dropTitle: drop.title,
+          ...mailPickup,
+        })
+      );
+      await sendSms(
+        o.buyerPhone,
+        `${store} has arrived and is ready for you! ${where ? `${where}. ` : ""}` +
+          `${mapsUrl ? `Directions: ${mapsUrl} ` : ""}Your order: ${orderLink}`
+      );
+    } catch (e) {
+      console.error("notifyVendorArrived send failed:", e);
+    }
+  }
+}
+
+/** Vendor check-in at the pickup location → broadcasts to waiting customers. */
+export async function vendorArrivedAction(formData: FormData) {
+  const seller = await requireSeller();
+  const dropId = String(formData.get("dropId"));
+  const drop = await prisma.drop.findUnique({ where: { id: dropId } });
+  if (!drop || drop.sellerId !== seller.id) return;
+
+  // Idempotent: only the first check-in broadcasts.
+  if (!drop.vendorArrivedAt) {
+    await prisma.drop.update({ where: { id: dropId }, data: { vendorArrivedAt: new Date() } });
+    after(() => notifyVendorArrived(dropId));
+  }
+  revalidatePath(`/dashboard/drops/${dropId}`);
+}
+
 /* ------------------------------- Orders --------------------------------- */
 export async function updateOrderStatusAction(formData: FormData) {
   const seller = await requireSeller();
@@ -412,7 +623,7 @@ export async function updateOrderStatusAction(formData: FormData) {
   if (!ORDER_STATUSES.includes(status as (typeof ORDER_STATUSES)[number])) return;
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    include: { drop: { select: { pickupInfo: true, fulfillment: true } } },
+    include: { drop: true },
   });
   if (!order || order.sellerId !== seller.id) return;
 
@@ -438,24 +649,27 @@ export async function updateOrderStatusAction(formData: FormData) {
     const isPickup = (order.drop.fulfillment ?? "pickup") === "pickup";
     let sms: string | null = null;
     let mail: Parameters<typeof sendEmail>[0] | null = null;
-    // Shared recipient/context for every status email — branded as the vendor.
+    // Shared recipient/context for every status email — branded as the vendor,
+    // with full pickup details (window, address, maps, how-to-find, contact).
     const mailArgs = {
       to: order.buyerEmail,
       storeName: store,
       buyerFirst: first,
       orderLink: link,
-      pickupInfo: order.drop.pickupInfo,
-      fulfillment: order.drop.fulfillment,
-      logoUrl: seller.logoUrl,
-      accent: seller.accent,
+      ...orderMailPickup(order.drop, seller),
     };
 
     if (status === "in_progress") {
       sms = `${store}: We're preparing your order now, ${first}! We'll let you know the moment it's ready. ${link}`;
       mail = orderInProgressEmail(mailArgs);
     } else if (status === "ready") {
-      const where = order.drop.pickupInfo ? ` ${order.drop.pickupInfo}` : "";
-      sms = `${store}: Your order is ready${isPickup ? " for pickup" : ""}! 🎉${where} ${link}`;
+      const where = pickupLocation(order.drop);
+      const mapsUrl = dropMapsUrl(order.drop);
+      sms =
+        `${store}: Your order is ready${isPickup ? " for pickup" : ""}! 🎉` +
+        (where ? ` ${where}.` : "") +
+        (mapsUrl ? ` Directions: ${mapsUrl}` : "") +
+        ` ${link}`;
       mail = orderReadyEmail(mailArgs);
     } else if (status === "completed") {
       sms = `${store}: Thanks for your order, ${first}! 🙌 See you at the next drop.`;

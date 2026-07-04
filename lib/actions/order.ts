@@ -7,7 +7,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getStripe, calcFeeCents } from "@/lib/stripe";
 import { sendEmail, orderReceivedEmail } from "@/lib/email";
-import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
+import { orderMailPickup, pickupSummary } from "@/lib/pickup";
+import { dropMapsUrl } from "@/lib/maps";
 import { sendSms } from "@/lib/notifications";
 import { isDemoStore } from "@/lib/demo";
 
@@ -219,14 +220,16 @@ export async function placeOrderAction(
     storeName: drop.seller.storeName,
     buyerFirst: buyerName.split(" ")[0] || buyerName,
     orderLink,
-    pickupInfo: drop.pickupInfo,
-    fulfillment: drop.fulfillment,
-    pickupWindow: formatPickupWindow(drop, drop.seller.timezone),
-    pickupWhere: pickupLocation(drop),
-    logoUrl: drop.seller.logoUrl,
-    accent: drop.seller.accent,
+    ...orderMailPickup(drop, drop.seller),
   });
-  const smsText = `${drop.seller.storeName}: Got your order! 🎉 We'll text you when it's ready. ${orderLink}`;
+  // SMS: confirmation + pickup summary + a maps link when we have a location.
+  const mapsUrl = dropMapsUrl(drop);
+  const pickupLine = pickupSummary(drop, drop.seller.timezone);
+  const smsText =
+    `${drop.seller.storeName}: Got your order! 🎉 We'll text you when it's ready.` +
+    (pickupLine ? ` ${pickupLine}.` : "") +
+    (mapsUrl ? ` Directions: ${mapsUrl}` : "") +
+    ` ${orderLink}`;
   after(async () => {
     await sendEmail(mail);
     await sendSms(buyerPhone, smsText);
@@ -235,4 +238,52 @@ export async function placeOrderAction(
   revalidatePath(`/s/${drop.seller.slug}/${drop.id}`);
   revalidatePath(`/dashboard/drops/${drop.id}`);
   redirect(`/order/${order.id}`);
+}
+
+/**
+ * Customer taps "I'm here" on their order screen at pickup. Records the arrival
+ * and notifies the vendor (email always; SMS if they set a public number).
+ * Public action — authorized by possession of the (unguessable) order link, and
+ * scoped to a single valid order. Idempotent: only the first tap notifies.
+ */
+export async function customerArrivedAction(formData: FormData) {
+  const orderId = String(formData.get("orderId") ?? "");
+  if (!orderId) return;
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: { drop: true, seller: true },
+  });
+  // Only a real, active order can check in.
+  if (!order || ["pending", "canceled", "completed"].includes(order.status)) return;
+
+  if (!order.customerArrivedAt) {
+    await prisma.order.update({
+      where: { id: orderId },
+      data: { customerArrivedAt: new Date() },
+    });
+
+    const store = order.seller.storeName;
+    const orderNo = `#${order.id.slice(-8).toUpperCase()}`;
+    const dashLink = `${await baseUrl()}/dashboard/drops/${order.dropId}`;
+    const vendorPhone = order.seller.pickupContactPhone;
+    after(async () => {
+      await sendEmail({
+        to: order.seller.email,
+        subject: `${order.buyerName} has arrived for order ${orderNo}`,
+        html:
+          `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a">` +
+          `<p><b>${order.buyerName}</b> just tapped “I’m here” for order <b>${orderNo}</b> ` +
+          `on <b>${order.drop.title}</b>.</p>` +
+          `<p><a href="${dashLink}" style="color:#ff6268">Open the drop →</a></p></div>`,
+      });
+      if (vendorPhone) {
+        await sendSms(
+          vendorPhone,
+          `DropQ: ${order.buyerName} has arrived for order ${orderNo} (${order.drop.title}).`
+        );
+      }
+    });
+    revalidatePath(`/dashboard/drops/${order.dropId}`);
+  }
+  redirect(`/order/${orderId}?arrived=1`);
 }

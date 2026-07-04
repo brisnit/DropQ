@@ -1,4 +1,5 @@
 import "server-only";
+import { dropMapsUrl } from "@/lib/maps";
 
 // Formatting helpers for a drop's pickup window + location, shown in the store
 // timezone across the customer page, order confirmation, emails, and dashboard.
@@ -7,7 +8,10 @@ type PickupDrop = {
   pickupEndAt?: Date | null;
   pickupLocationName?: string | null;
   pickupAddress?: string | null;
+  pickupLat?: number | null;
+  pickupLng?: number | null;
   pickupNotes?: string | null;
+  pickupFindMe?: string | null;
   pickupInfo?: string | null;
   fulfillment?: string | null;
 };
@@ -41,4 +45,31 @@ export function pickupSummary(d: PickupDrop, timeZone?: string | null): string {
   const win = formatPickupWindow(d, timeZone);
   const loc = pickupLocation(d);
   return [win && `Pickup ${win}`, loc].filter(Boolean).join(" · ");
+}
+
+type MailSeller = {
+  timezone?: string | null;
+  logoUrl?: string | null;
+  accent?: string | null;
+  pickupContactPhone?: string | null;
+  pickupContactPref?: string | null;
+};
+
+/**
+ * Assemble the pickup-related fields shared by every order email
+ * (window, location, how-to-find, maps link, vendor contact, branding).
+ */
+export function orderMailPickup(d: PickupDrop, seller: MailSeller) {
+  return {
+    fulfillment: d.fulfillment ?? "pickup",
+    pickupInfo: d.pickupInfo ?? null,
+    pickupWindow: formatPickupWindow(d, seller.timezone),
+    pickupWhere: pickupLocation(d),
+    pickupFindMe: d.pickupFindMe ?? null,
+    mapsUrl: dropMapsUrl(d),
+    contactPhone: seller.pickupContactPhone ?? null,
+    contactPref: seller.pickupContactPref ?? null,
+    logoUrl: seller.logoUrl ?? null,
+    accent: seller.accent ?? null,
+  };
 }

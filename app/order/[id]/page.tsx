@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getStripe } from "@/lib/stripe";
 import { finalizePaidOrder } from "@/lib/checkout";
+import { customerArrivedAction } from "@/lib/actions/order";
 import { formatMoney } from "@/lib/format";
 import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
+import { dropMapsUrl } from "@/lib/maps";
 
 export const metadata = { title: "Order confirmed — DropQ" };
 
@@ -13,17 +15,20 @@ export default async function OrderConfirmationPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ session_id?: string }>;
+  searchParams: Promise<{ session_id?: string; arrived?: string }>;
 }) {
   const { id } = await params;
-  const { session_id } = await searchParams;
+  const { session_id, arrived } = await searchParams;
 
   const sellerSelect = {
     storeName: true,
     slug: true,
     accent: true,
+    logoUrl: true,
     stripeAccountId: true,
     timezone: true,
+    pickupContactPhone: true,
+    pickupContactPref: true,
   } as const;
 
   let order = await prisma.order.findUnique({
@@ -114,16 +119,110 @@ export default async function OrderConfirmationPage({
             {(() => {
               const win = formatPickupWindow(order.drop, order.seller.timezone);
               const where = pickupLocation(order.drop);
-              if (!win && !where && !order.drop.pickupNotes) return null;
+              const mapsUrl = dropMapsUrl(order.drop);
+              const findMe = order.drop.pickupFindMe;
+              const isDelivery = order.drop.fulfillment === "delivery";
+              const label = isDelivery ? "Delivery" : "Pickup";
+              const phone = order.seller.pickupContactPhone;
+              const pref = order.seller.pickupContactPref;
+              const canCheckIn = !["pending", "canceled", "completed"].includes(order.status);
+              const hasPickup = win || where || findMe || order.drop.pickupNotes;
+              if (!hasPickup && !phone && !canCheckIn) return null;
               return (
-                <div className="mt-4 bg-cream border border-line rounded-xl p-4">
-                  <p className="text-xs uppercase tracking-wider text-muted">
-                    {order.drop.fulfillment === "delivery" ? "Delivery" : "Pickup"} details
-                  </p>
-                  {win && <p className="text-sm mt-1"><span className="font-medium">When:</span> {win}</p>}
-                  {where && <p className="text-sm mt-0.5"><span className="font-medium">Where:</span> {where}</p>}
+                <div className="mt-5 space-y-3">
+                  {/* Vendor arrived banner */}
+                  {order.drop.vendorArrivedAt && canCheckIn && (
+                    <div className="rounded-xl bg-sage-tint border border-sage/30 text-sage px-4 py-3 text-sm font-medium">
+                      📍 {order.seller.storeName} has arrived and is ready for you.
+                    </div>
+                  )}
+
+                  {/* Pickup time */}
+                  {win && (
+                    <div className="bg-cream border border-line rounded-xl p-4">
+                      <p className="text-xs uppercase tracking-wider text-muted">{label} time</p>
+                      <p className="text-sm mt-1 font-medium">{win}</p>
+                    </div>
+                  )}
+
+                  {/* Pickup location + Open in Maps */}
+                  {where && (
+                    <div className="bg-cream border border-line rounded-xl p-4">
+                      <p className="text-xs uppercase tracking-wider text-muted">{label} location</p>
+                      <p className="text-sm mt-1">{where}</p>
+                      {mapsUrl && (
+                        <a
+                          href={mapsUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-3 inline-flex items-center justify-center gap-2 w-full sm:w-auto text-sm font-semibold rounded-xl px-4 py-2.5 text-white"
+                          style={{ backgroundColor: accent }}
+                        >
+                          📍 Open in Maps
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {/* How to find the vendor */}
+                  {findMe && (
+                    <div className="bg-cream border border-line rounded-xl p-4 flex items-start gap-3">
+                      {order.seller.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={order.seller.logoUrl} alt={order.seller.storeName} className="w-11 h-11 rounded-lg object-cover border border-line shrink-0" />
+                      ) : (
+                        <span className="w-11 h-11 rounded-lg grid place-items-center text-white font-semibold shrink-0" style={{ backgroundColor: accent }}>
+                          {order.seller.storeName.charAt(0)}
+                        </span>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-wider text-muted">How to find us</p>
+                        <p className="text-sm mt-1">{findMe}</p>
+                      </div>
+                    </div>
+                  )}
+
                   {order.drop.pickupNotes && (
-                    <p className="text-sm mt-0.5 text-ink-soft"><span className="font-medium">Notes:</span> {order.drop.pickupNotes}</p>
+                    <div className="bg-cream border border-line rounded-xl p-4">
+                      <p className="text-xs uppercase tracking-wider text-muted">Notes</p>
+                      <p className="text-sm mt-1 text-ink-soft">{order.drop.pickupNotes}</p>
+                    </div>
+                  )}
+
+                  {/* Contact vendor */}
+                  {phone && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {pref !== "text" && (
+                        <a href={`tel:${phone}`} className="inline-flex items-center justify-center gap-2 text-sm font-semibold rounded-xl px-4 py-3 border border-line-strong bg-paper hover:border-ink/30 transition">
+                          📞 Call vendor
+                        </a>
+                      )}
+                      {pref !== "call" && (
+                        <a href={`sms:${phone}`} className={`inline-flex items-center justify-center gap-2 text-sm font-semibold rounded-xl px-4 py-3 border border-line-strong bg-paper hover:border-ink/30 transition ${pref === "text" ? "col-span-2" : ""}`}>
+                          💬 Text vendor
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  {/* I'm here */}
+                  {canCheckIn && (
+                    order.customerArrivedAt || arrived ? (
+                      <div className="rounded-xl bg-grey-tint text-[#3f434b] px-4 py-3 text-sm text-center font-medium">
+                        ✓ You&apos;re checked in — {order.seller.storeName} has been notified you&apos;re here.
+                      </div>
+                    ) : (
+                      <form action={customerArrivedAction}>
+                        <input type="hidden" name="orderId" value={order.id} />
+                        <button
+                          type="submit"
+                          className="w-full inline-flex items-center justify-center gap-2 text-base font-semibold rounded-xl px-4 py-3.5 text-white"
+                          style={{ backgroundColor: accent }}
+                        >
+                          🙋 I&apos;m here
+                        </button>
+                      </form>
+                    )
                   )}
                 </div>
               );

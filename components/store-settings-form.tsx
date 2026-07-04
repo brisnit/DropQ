@@ -27,6 +27,8 @@ export type StoreFormData = {
   youtube: string | null;
   website: string | null;
   feeMode: string;
+  pickupContactPhone: string | null;
+  pickupContactPref: string;
   geofenceEnabled: boolean;
   latitude: number | null;
   longitude: number | null;
@@ -331,6 +333,40 @@ export function StoreSettingsForm({
               />
             </Field>
           ))}
+        </div>
+      </div>
+
+      {/* Pickup contact (opt-in public number) */}
+      <div className="bg-paper border border-line rounded-card p-6 sm:p-8 space-y-5">
+        <div>
+          <h2 className="font-semibold text-lg">Pickup contact</h2>
+          <p className="text-muted text-sm mt-1">
+            Optional. If you add a public number here, customers with a valid order can
+            call or text you at pickup. Leave it blank to keep your number private — your
+            account phone is never shown to customers.
+          </p>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          <Field label="Public pickup number" hint="Shown only to customers who ordered.">
+            <Input
+              name="pickupContactPhone"
+              type="tel"
+              defaultValue={seller.pickupContactPhone ?? ""}
+              placeholder="+1 512 555 0134"
+              autoComplete="off"
+            />
+          </Field>
+          <Field label="Preferred contact method">
+            <select
+              name="pickupContactPref"
+              defaultValue={seller.pickupContactPref || "text"}
+              className="w-full bg-paper border border-line-strong rounded-xl px-3.5 py-2.5 text-ink focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+            >
+              <option value="text">Text me</option>
+              <option value="call">Call me</option>
+              <option value="both">Call or text</option>
+            </select>
+          </Field>
         </div>
       </div>
 

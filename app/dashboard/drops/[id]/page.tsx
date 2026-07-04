@@ -8,6 +8,8 @@ import {
   updateDropStatusAction,
   deleteDropAction,
   updateOrderStatusAction,
+  duplicateDropAction,
+  vendorArrivedAction,
 } from "@/lib/actions/dashboard";
 import { formatMoney, formatDateTime, relativeTime, statusStyle } from "@/lib/format";
 import { vocab, showItemMeta } from "@/lib/category";
@@ -121,6 +123,16 @@ export default async function DropDetailPage({
           >
             ✏️ Edit drop
           </Link>
+          <form action={duplicateDropAction}>
+            <input type="hidden" name="dropId" value={drop.id} />
+            <button
+              type="submit"
+              className="text-sm font-medium px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
+              title="Copy this drop's items and pickup details into a new draft"
+            >
+              🔁 Relaunch
+            </button>
+          </form>
           <Link
             href={`/s/${seller.slug}/${drop.id}`}
             target="_blank"
@@ -178,6 +190,28 @@ export default async function DropDetailPage({
           </div>
         );
       })()}
+
+      {/* Vendor check-in — tell waiting customers you've arrived at pickup */}
+      {drop.status !== "draft" && drop.orders.length > 0 && (
+        <div className="mb-8 bg-paper border border-line rounded-card p-5 flex flex-wrap items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="font-semibold">
+              {drop.vendorArrivedAt ? "You're checked in 📍" : "At the pickup spot?"}
+            </p>
+            <p className="text-sm text-muted mt-0.5">
+              {drop.vendorArrivedAt
+                ? `Customers were notified you've arrived — ${formatDateTime(drop.vendorArrivedAt)}.`
+                : "Let everyone with an order know you've arrived and are ready for pickup."}
+            </p>
+          </div>
+          {!drop.vendorArrivedAt && (
+            <form action={vendorArrivedAction}>
+              <input type="hidden" name="dropId" value={drop.id} />
+              <Button type="submit">📍 I&apos;m at the pickup location</Button>
+            </form>
+          )}
+        </div>
+      )}
 
       {/* Share + QR (always visible) */}
       <div className="grid md:grid-cols-[1fr_auto] gap-4 mb-8 items-stretch">
@@ -293,11 +327,32 @@ export default async function DropDetailPage({
                     <div key={o.id} className="bg-paper border border-line rounded-card p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="font-medium">{o.buyerName}</p>
+                          <p className="font-medium flex items-center gap-2">
+                            {o.buyerName}
+                            {o.customerArrivedAt && (
+                              <Badge className="bg-sage-tint text-sage">📍 Arrived</Badge>
+                            )}
+                          </p>
                           <p className="text-xs text-muted">
                             {o.buyerEmail}
                             {o.buyerPhone ? ` · ${o.buyerPhone}` : ""} · {relativeTime(o.createdAt)}
                           </p>
+                          {o.buyerPhone && (
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <a
+                                href={`tel:${o.buyerPhone}`}
+                                className="text-xs font-medium px-2.5 py-1 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition"
+                              >
+                                📞 Call
+                              </a>
+                              <a
+                                href={`sms:${o.buyerPhone}`}
+                                className="text-xs font-medium px-2.5 py-1 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition"
+                              >
+                                💬 Text
+                              </a>
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
                           <span className="font-semibold">{formatMoney(o.totalCents)}</span>

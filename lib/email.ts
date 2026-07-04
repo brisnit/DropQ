@@ -241,19 +241,42 @@ type OrderMail = {
   fulfillment?: string;
   pickupWindow?: string | null; // formatted pickup date/time range
   pickupWhere?: string | null; // pickup location line
+  pickupFindMe?: string | null; // how to find the vendor ("Blue canopy…")
+  mapsUrl?: string | null; // "Open in Maps" link
+  contactPhone?: string | null; // public pickup contact number (opt-in)
+  contactPref?: string | null; // text | call | both
   logoUrl?: string | null;
   accent?: string | null;
 };
 
-/** Pickup details HTML block for order emails (window + location). */
+/** "Open in Maps" inline button for emails. */
+function mapsAnchor(url?: string | null): string {
+  if (!url) return "";
+  return `<br><a href="${url}" style="display:inline-block;margin-top:8px;color:#1a73e8;text-decoration:underline;font-weight:600">📍 Open in Maps</a>`;
+}
+
+/** Vendor contact line (only when a public number is provided). */
+function contactLine(phone?: string | null, pref?: string | null): string {
+  if (!phone) return "";
+  const p = phone.trim();
+  const call = `<a href="tel:${p}" style="color:#1a73e8;text-decoration:underline">Call</a>`;
+  const text = `<a href="sms:${p}" style="color:#1a73e8;text-decoration:underline">Text</a>`;
+  const both = pref === "call" ? call : pref === "text" ? text : `${call} or ${text}`;
+  return `<br><b>Contact the vendor:</b> ${both} ${esc(p)}`;
+}
+
+/** Pickup details HTML block for order emails (window + location + maps + find + contact). */
 function pickupHtml(o: OrderMail): string {
   const label = o.fulfillment === "delivery" ? "Delivery" : "Pickup";
+  const where = o.pickupWhere || o.pickupInfo;
   const lines = [
-    o.pickupWindow ? `<b>When:</b> ${o.pickupWindow}` : "",
-    (o.pickupWhere || o.pickupInfo) ? `<b>Where:</b> ${o.pickupWhere || o.pickupInfo}` : "",
+    o.pickupWindow ? `<b>When:</b> ${esc(o.pickupWindow)}` : "",
+    where ? `<b>Where:</b> ${esc(where)}${mapsAnchor(o.mapsUrl)}` : "",
+    o.pickupFindMe ? `<b>How to find us:</b> ${esc(o.pickupFindMe)}` : "",
   ].filter(Boolean);
-  if (!lines.length) return "";
-  return `<br><br><b>${label} details</b><br>${lines.join("<br>")}`;
+  const contact = contactLine(o.contactPhone, o.contactPref);
+  if (!lines.length && !contact) return "";
+  return `<br><br><b>${label} details</b><br>${lines.join("<br>")}${contact}`;
 }
 
 /** Branding block pulled from the OrderMail for the vendor-branded shell. */
@@ -270,14 +293,20 @@ export function dropClosedEmail(o: {
   pickupWindow?: string | null;
   pickupWhere?: string | null;
   pickupNotes?: string | null;
+  pickupFindMe?: string | null;
+  mapsUrl?: string | null;
+  contactPhone?: string | null;
+  contactPref?: string | null;
   logoUrl?: string | null;
   accent?: string | null;
 }): Mail {
   const pickup = [
-    o.pickupWindow ? `<b>When:</b> ${o.pickupWindow}` : "",
-    o.pickupWhere ? `<b>Where:</b> ${o.pickupWhere}` : "",
-    o.pickupNotes ? `<b>Notes:</b> ${o.pickupNotes}` : "",
+    o.pickupWindow ? `<b>When:</b> ${esc(o.pickupWindow)}` : "",
+    o.pickupWhere ? `<b>Where:</b> ${esc(o.pickupWhere)}${mapsAnchor(o.mapsUrl)}` : "",
+    o.pickupFindMe ? `<b>How to find us:</b> ${esc(o.pickupFindMe)}` : "",
+    o.pickupNotes ? `<b>Notes:</b> ${esc(o.pickupNotes)}` : "",
   ].filter(Boolean);
+  const contact = contactLine(o.contactPhone, o.contactPref);
   return {
     to: o.to,
     subject: `The ${o.storeName} drop is over — your order is locked in`,
@@ -285,8 +314,24 @@ export function dropClosedEmail(o: {
       { storeName: o.storeName, logoUrl: o.logoUrl, accent: o.accent },
       "Your order is locked in 🔒",
       `Hi ${o.buyerFirst}, the <b>${o.dropTitle}</b> drop from <b>${o.storeName}</b> is now closed and your order is locked in.` +
-        (pickup.length ? `<br><br><b>Pickup details</b><br>${pickup.join("<br>")}` : ""),
+        (pickup.length ? `<br><br><b>Pickup details</b><br>${pickup.join("<br>")}${contact}` : contact),
       { href: o.orderLink, label: "View your order" }
+    ),
+  };
+}
+
+/** Sent to every customer with an active order when the vendor checks in. */
+export function vendorArrivedEmail(o: OrderMail & { dropTitle?: string }): Mail {
+  const isPickup = (o.fulfillment ?? "pickup") === "pickup";
+  return {
+    to: o.to,
+    subject: `${o.storeName} has arrived — ready for ${isPickup ? "pickup" : "handoff"} 📍`,
+    html: vendorLayout(
+      brandOf(o),
+      `${esc(o.storeName)} is here! 📍`,
+      `Hi ${o.buyerFirst}, <b>${esc(o.storeName)}</b> has arrived and is ready for you. Head over to collect your order.` +
+        pickupHtml(o),
+      { href: o.orderLink, label: "View your order & directions" }
     ),
   };
 }
@@ -327,10 +372,7 @@ export function orderReadyEmail(o: OrderMail): Mail {
     html: vendorLayout(
       brandOf(o),
       `Your order is ready${isPickup ? " for pickup" : ""}! 🎉`,
-      `Hi ${o.buyerFirst}, your order from <b>${o.storeName}</b> is ready.` +
-        (o.pickupInfo
-          ? `<br><br><b>${isPickup ? "Pickup" : o.fulfillment}:</b> ${o.pickupInfo}`
-          : ""),
+      `Hi ${o.buyerFirst}, your order from <b>${o.storeName}</b> is ready.` + pickupHtml(o),
       { href: o.orderLink, label: "View your order" }
     ),
   };

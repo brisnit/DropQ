@@ -16,10 +16,13 @@ function toIso(d: Date | null): string {
 
 export default async function EditDropPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ copied?: string }>;
 }) {
   const { id } = await params;
+  const { copied } = await searchParams;
   const seller = await requireSeller();
   const drop = await prisma.drop.findUnique({
     where: { id },
@@ -27,12 +30,23 @@ export default async function EditDropPage({
   });
   if (!drop || drop.sellerId !== seller.id) notFound();
 
+  // Saved products the vendor can add to this drop from their library.
+  const library = await prisma.vendorProduct.findMany({
+    where: { sellerId: seller.id, isActive: true },
+    orderBy: { updatedAt: "desc" },
+  });
+
   return (
     <Section>
       <BackLink href={`/dashboard/drops/${drop.id}`}>Back to drop</BackLink>
       <h1 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight mt-3 mb-7">
         Edit drop
       </h1>
+      {copied && (
+        <div className="mb-6 rounded-card bg-sage-tint text-sage border border-sage/30 px-4 py-3 text-sm font-medium">
+          Drop copied. Set your new dates and publish when ready.
+        </div>
+      )}
       <DropEditor
         mode="edit"
         dropId={drop.id}
@@ -40,6 +54,19 @@ export default async function EditDropPage({
         category={seller.category}
         dropMode={drop.mode === "live" ? "live" : "preorder"}
         timeZone={seller.timezone ?? undefined}
+        savedProducts={library.map((vp) => ({
+          id: vp.id,
+          emoji: vp.emoji,
+          name: vp.name,
+          desc: vp.description ?? "",
+          price: (vp.priceCents / 100).toFixed(2),
+          imageUrl: vp.imageUrl,
+          images: vp.images ?? [],
+          category: vp.category ?? "",
+          productType: vp.productType ?? "",
+          condition: vp.condition ?? "",
+          rarity: vp.rarity ?? "",
+        }))}
         defaults={{
           title: drop.title,
           description: drop.description ?? "",
@@ -54,6 +81,7 @@ export default async function EditDropPage({
           pickupLat: drop.pickupLat,
           pickupLng: drop.pickupLng,
           pickupNotes: drop.pickupNotes ?? "",
+          pickupFindMe: drop.pickupFindMe ?? "",
           pickupLine1: drop.pickupLine1,
           pickupCity: drop.pickupCity,
           pickupState: drop.pickupState,
@@ -62,6 +90,7 @@ export default async function EditDropPage({
           status: drop.status,
           products: drop.products.map((p) => ({
             id: p.id,
+            vendorProductId: p.vendorProductId,
             emoji: p.emoji,
             name: p.name,
             desc: p.description ?? "",

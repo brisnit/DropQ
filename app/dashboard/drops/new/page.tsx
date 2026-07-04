@@ -1,4 +1,5 @@
 import { requireSeller } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { createDropAction } from "@/lib/actions/dashboard";
 import { DropEditor } from "@/components/drop-editor";
 import { Section, EmptyState } from "@/components/dashboard-ui";
@@ -34,6 +35,11 @@ export default async function NewDropPage({
     );
   }
 
+  const library = await prisma.vendorProduct.findMany({
+    where: { sellerId: seller.id, isActive: true },
+    orderBy: { updatedAt: "desc" },
+  });
+
   return (
     <Section>
       <BackLink href="/dashboard/drops">Back to drops</BackLink>
@@ -45,6 +51,19 @@ export default async function NewDropPage({
         category={seller.category}
         dropMode={dropMode}
         timeZone={seller.timezone ?? undefined}
+        savedProducts={library.map((vp) => ({
+          id: vp.id,
+          emoji: vp.emoji,
+          name: vp.name,
+          desc: vp.description ?? "",
+          price: (vp.priceCents / 100).toFixed(2),
+          imageUrl: vp.imageUrl,
+          images: vp.images ?? [],
+          category: vp.category ?? "",
+          productType: vp.productType ?? "",
+          condition: vp.condition ?? "",
+          rarity: vp.rarity ?? "",
+        }))}
       />
     </Section>
   );
