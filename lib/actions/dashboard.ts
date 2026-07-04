@@ -92,6 +92,11 @@ function parsePickup(formData: FormData) {
     pickupLat: numOrNull(formData.get("pickupLat")),
     pickupLng: numOrNull(formData.get("pickupLng")),
     pickupNotes: String(formData.get("pickupNotes") ?? "").trim() || null,
+    pickupLine1: String(formData.get("pickupLine1") ?? "").trim() || null,
+    pickupCity: String(formData.get("pickupCity") ?? "").trim() || null,
+    pickupState: String(formData.get("pickupState") ?? "").trim() || null,
+    pickupPostal: String(formData.get("pickupPostal") ?? "").trim() || null,
+    pickupCountry: String(formData.get("pickupCountry") ?? "").trim() || null,
   };
 }
 

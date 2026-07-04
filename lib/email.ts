@@ -261,6 +261,36 @@ function brandOf(o: OrderMail): Brand {
   return { storeName: o.storeName, logoUrl: o.logoUrl, accent: o.accent };
 }
 
+export function dropClosedEmail(o: {
+  to: string;
+  storeName: string;
+  buyerFirst: string;
+  dropTitle: string;
+  orderLink: string;
+  pickupWindow?: string | null;
+  pickupWhere?: string | null;
+  pickupNotes?: string | null;
+  logoUrl?: string | null;
+  accent?: string | null;
+}): Mail {
+  const pickup = [
+    o.pickupWindow ? `<b>When:</b> ${o.pickupWindow}` : "",
+    o.pickupWhere ? `<b>Where:</b> ${o.pickupWhere}` : "",
+    o.pickupNotes ? `<b>Notes:</b> ${o.pickupNotes}` : "",
+  ].filter(Boolean);
+  return {
+    to: o.to,
+    subject: `The ${o.storeName} drop is over — your order is locked in`,
+    html: vendorLayout(
+      { storeName: o.storeName, logoUrl: o.logoUrl, accent: o.accent },
+      "Your order is locked in 🔒",
+      `Hi ${o.buyerFirst}, the <b>${o.dropTitle}</b> drop from <b>${o.storeName}</b> is now closed and your order is locked in.` +
+        (pickup.length ? `<br><br><b>Pickup details</b><br>${pickup.join("<br>")}` : ""),
+      { href: o.orderLink, label: "View your order" }
+    ),
+  };
+}
+
 export function orderReceivedEmail(o: OrderMail): Mail {
   return {
     to: o.to,

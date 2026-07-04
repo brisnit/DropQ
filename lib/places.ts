@@ -15,6 +15,7 @@ export type PlaceResult = {
   name?: string; // place/business name if any
   lat: number;
   lng: number;
+  line1?: string;
   city?: string;
   state?: string;
   postalCode?: string;
@@ -39,11 +40,13 @@ export async function searchPlaces(query: string): Promise<PlaceResult[]> {
     return (Array.isArray(data) ? data : [])
       .map((d) => {
         const a = d.address ?? {};
+        const line1 = [a.house_number, a.road].filter(Boolean).join(" ");
         return {
           formatted: d.display_name,
           name: a.amenity || a.shop || a.building || undefined,
           lat: parseFloat(d.lat),
           lng: parseFloat(d.lon),
+          line1: line1 || undefined,
           city: a.city || a.town || a.village || a.hamlet,
           state: a.state,
           postalCode: a.postcode,

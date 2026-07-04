@@ -2,7 +2,25 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type Result = { formatted: string; name?: string; lat: number; lng: number };
+type Result = {
+  formatted: string;
+  name?: string;
+  lat: number;
+  lng: number;
+  line1?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+};
+
+type Structured = {
+  line1?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+};
 
 const inputCls =
   "w-full bg-paper border border-line-strong rounded-lg px-3 py-2 text-ink placeholder:text-muted/70 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20";
@@ -16,16 +34,20 @@ export function AddressAutocomplete({
   defaultAddress = "",
   defaultLat = null,
   defaultLng = null,
+  defaultStructured = {},
   placeholder = "Search a pickup address…",
 }: {
   defaultAddress?: string;
   defaultLat?: number | null;
   defaultLng?: number | null;
+  defaultStructured?: Structured;
   placeholder?: string;
 }) {
   const [query, setQuery] = useState(defaultAddress);
   const [lat, setLat] = useState<number | null>(defaultLat);
   const [lng, setLng] = useState<number | null>(defaultLng);
+  // Structured components — preserved on load, cleared on typing, set on pick.
+  const [structured, setStructured] = useState<Structured>(defaultStructured);
   const [results, setResults] = useState<Result[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -45,6 +67,7 @@ export function AddressAutocomplete({
     setQuery(v);
     setLat(null); // typing invalidates any previously-selected coordinates
     setLng(null);
+    setStructured({});
     if (timer.current) clearTimeout(timer.current);
     if (v.trim().length < 3) {
       setResults([]);
@@ -69,6 +92,13 @@ export function AddressAutocomplete({
     setQuery(r.formatted);
     setLat(r.lat);
     setLng(r.lng);
+    setStructured({
+      line1: r.line1,
+      city: r.city,
+      state: r.state,
+      postalCode: r.postalCode,
+      country: r.country,
+    });
     setResults([]);
     setOpen(false);
   };
@@ -86,6 +116,11 @@ export function AddressAutocomplete({
       />
       <input type="hidden" name="pickupLat" value={lat ?? ""} />
       <input type="hidden" name="pickupLng" value={lng ?? ""} />
+      <input type="hidden" name="pickupLine1" value={structured.line1 ?? ""} />
+      <input type="hidden" name="pickupCity" value={structured.city ?? ""} />
+      <input type="hidden" name="pickupState" value={structured.state ?? ""} />
+      <input type="hidden" name="pickupPostal" value={structured.postalCode ?? ""} />
+      <input type="hidden" name="pickupCountry" value={structured.country ?? ""} />
       {open && (results.length > 0 || loading) && (
         <ul className="absolute z-20 mt-1 w-full bg-paper border border-line rounded-xl shadow-[var(--shadow-lift)] max-h-64 overflow-auto">
           {loading && results.length === 0 && (

@@ -24,6 +24,11 @@ export type DropDefaults = {
   pickupLat?: number | null;
   pickupLng?: number | null;
   pickupNotes?: string;
+  pickupLine1?: string | null;
+  pickupCity?: string | null;
+  pickupState?: string | null;
+  pickupPostal?: string | null;
+  pickupCountry?: string | null;
   status?: string;
   products?: Array<{
     id?: string;
@@ -372,6 +377,13 @@ export function DropEditor({
               defaultAddress={defaults.pickupAddress ?? ""}
               defaultLat={defaults.pickupLat ?? null}
               defaultLng={defaults.pickupLng ?? null}
+              defaultStructured={{
+                line1: defaults.pickupLine1 ?? undefined,
+                city: defaults.pickupCity ?? undefined,
+                state: defaults.pickupState ?? undefined,
+                postalCode: defaults.pickupPostal ?? undefined,
+                country: defaults.pickupCountry ?? undefined,
+              }}
             />
           </Field>
 

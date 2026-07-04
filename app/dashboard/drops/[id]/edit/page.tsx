@@ -54,6 +54,11 @@ export default async function EditDropPage({
           pickupLat: drop.pickupLat,
           pickupLng: drop.pickupLng,
           pickupNotes: drop.pickupNotes ?? "",
+          pickupLine1: drop.pickupLine1,
+          pickupCity: drop.pickupCity,
+          pickupState: drop.pickupState,
+          pickupPostal: drop.pickupPostal,
+          pickupCountry: drop.pickupCountry,
           status: drop.status,
           products: drop.products.map((p) => ({
             id: p.id,
