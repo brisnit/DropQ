@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.drop-q.com"),
   title: `DropQ — ${TAGLINE}`,
   description: SHARE_DESCRIPTION,
-  other: { "dropq-deploy-check": "cron-2" }, // temp marker to confirm this deploy shipped
+  other: { "dropq-deploy-check": "cron-3" }, // temp marker to confirm this deploy shipped
   openGraph: {
     title: TAGLINE,
     description: SHARE_DESCRIPTION,
