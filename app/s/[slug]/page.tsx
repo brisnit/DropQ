@@ -9,14 +9,50 @@ import { formatMoney, formatDate } from "@/lib/format";
 import { isDemoStore } from "@/lib/demo";
 import { getCurrentSeller } from "@/lib/auth";
 
+// Absolute URL for link-preview images (blob URLs are already absolute).
+function absUrl(u?: string | null): string | null {
+  if (!u) return null;
+  return u.startsWith("http") ? u : `https://www.drop-q.com${u.startsWith("/") ? "" : "/"}${u}`;
+}
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const seller = await prisma.seller.findUnique({ where: { slug } });
-  return { title: seller ? `${seller.storeName} — DropQ` : "Store — DropQ" };
+  const seller = await prisma.seller.findUnique({
+    where: { slug },
+    select: { storeName: true, tagline: true, bio: true, logoUrl: true, headerImageUrl: true },
+  });
+  if (!seller) return { title: "Store" };
+
+  const title = seller.storeName;
+  const description =
+    seller.tagline || seller.bio || `Shop drops from ${seller.storeName}.`;
+  // Prefer the wide storefront banner for the preview, else the logo.
+  const image = absUrl(seller.headerImageUrl) || absUrl(seller.logoUrl);
+  const url = `https://www.drop-q.com/s/${slug}`;
+
+  return {
+    title,
+    description,
+    // Override DropQ's default so the shared link is branded as the vendor.
+    openGraph: {
+      title,
+      description,
+      siteName: seller.storeName,
+      url,
+      type: "website",
+      images: image ? [image] : [],
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title,
+      description,
+      images: image ? [image] : [],
+    },
+  };
 }
 
 export default async function StorePage({

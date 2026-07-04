@@ -7,17 +7,59 @@ import { WaitlistForm } from "@/components/waitlist-form";
 import { computeDropPhase, isOrderingOpen } from "@/lib/drop-status";
 import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 
+// Absolute URL for link-preview images (blob URLs are already absolute).
+function absUrl(u?: string | null): string | null {
+  if (!u) return null;
+  return u.startsWith("http") ? u : `https://www.drop-q.com${u.startsWith("/") ? "" : "/"}${u}`;
+}
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string; dropId: string }>;
 }) {
-  const { dropId } = await params;
+  const { slug, dropId } = await params;
   const drop = await prisma.drop.findUnique({
     where: { id: dropId },
-    select: { title: true, seller: { select: { storeName: true } } },
+    select: {
+      title: true,
+      description: true,
+      products: { where: { imageUrl: { not: null } }, orderBy: { sortOrder: "asc" }, take: 1, select: { imageUrl: true } },
+      seller: {
+        select: { storeName: true, tagline: true, logoUrl: true, headerImageUrl: true },
+      },
+    },
   });
-  return { title: drop ? `${drop.title} — ${drop.seller.storeName}` : "Order" };
+  if (!drop) return { title: "Order" };
+
+  const title = `${drop.title} — ${drop.seller.storeName}`;
+  const description =
+    drop.description || drop.seller.tagline || `Order “${drop.title}” from ${drop.seller.storeName}.`;
+  // Prefer a product photo, then the store banner, then the logo.
+  const image =
+    absUrl(drop.products[0]?.imageUrl) ||
+    absUrl(drop.seller.headerImageUrl) ||
+    absUrl(drop.seller.logoUrl);
+  const url = `https://www.drop-q.com/s/${slug}/${dropId}`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      siteName: drop.seller.storeName,
+      url,
+      type: "website",
+      images: image ? [image] : [],
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title,
+      description,
+      images: image ? [image] : [],
+    },
+  };
 }
 
 export default async function DropOrderPage({
