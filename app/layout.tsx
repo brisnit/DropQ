@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Varela_Round, Google_Sans_Flex } from "next/font/google";
+import { Varela_Round, Google_Sans_Flex, Allerta_Stencil } from "next/font/google";
 import "./globals.css";
 
 // Primary / display font (single weight 400 — bold is synthesized)
@@ -14,6 +14,14 @@ const varela = Varela_Round({
 const googleSans = Google_Sans_Flex({
   variable: "--font-google-sans",
   subsets: ["latin"],
+  display: "swap",
+});
+
+// Stencil face for countdown digits (the drop "closes in" callout)
+const allertaStencil = Allerta_Stencil({
+  variable: "--font-allerta-stencil",
+  subsets: ["latin"],
+  weight: "400",
   display: "swap",
 });
 
@@ -43,7 +51,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${varela.variable} ${googleSans.variable} h-full`}>
+    <html lang="en" className={`${varela.variable} ${googleSans.variable} ${allertaStencil.variable} h-full`}>
       <body className="min-h-full antialiased">{children}</body>
     </html>
   );

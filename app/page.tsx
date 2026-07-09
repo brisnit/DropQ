@@ -216,23 +216,6 @@ export default function Home() {
         <DropMockup />
       </Section>
 
-      {/* SOCIAL PROOF STRIP */}
-      <div className="border-y border-line bg-paper/60">
-        <Section className="py-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-center">
-          {[
-            ["12,000+", "independent sellers"],
-            ["$200M+", "sold through drops"],
-            ["9 min", "to a typical sell-out"],
-            ["4.9★", "seller rating"],
-          ].map(([stat, label]) => (
-            <div key={label} className="flex items-baseline gap-2">
-              <span className="font-display text-xl font-semibold text-ink">{stat}</span>
-              <span className="text-sm text-muted">{label}</span>
-            </div>
-          ))}
-        </Section>
-      </div>
-
       {/* CATEGORIES — DropQ is for every kind of seller */}
       <Section id="sell" className="pt-16 pb-6 sm:pt-20 sm:pb-10 scroll-mt-24">
         <Reveal className="max-w-2xl mx-auto text-center">

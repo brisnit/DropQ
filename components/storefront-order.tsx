@@ -72,7 +72,7 @@ function formatRemaining(ms: number): string {
   const h = Math.floor((s % 86400) / 3600);
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
-  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (d > 0) return `${d}d ${h}h ${m}m ${sec}s`;
   if (h > 0) return `${h}h ${m}m ${sec}s`;
   return `${m}m ${sec}s`;
 }
@@ -190,7 +190,12 @@ export function StorefrontOrder({
     {countdown && (
       <div className="mb-5 rounded-card bg-ink text-cream px-4 py-3 flex items-center justify-between gap-3">
         <span className="text-sm font-medium">This drop is open for orders — ordering closes in</span>
-        <span className="font-display text-lg font-semibold tabular-nums">{countdown}</span>
+        <span
+          className="text-xl font-normal tabular-nums tracking-wide"
+          style={{ fontFamily: "var(--font-allerta-stencil), monospace" }}
+        >
+          {countdown}
+        </span>
       </div>
     )}
     <form action={formAction} className="grid lg:grid-cols-[1fr_360px] gap-8 items-start">
