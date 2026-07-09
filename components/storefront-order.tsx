@@ -137,7 +137,8 @@ export function StorefrontOrder({
         // Network blip — keep the last known counts.
       }
     };
-    const id = setInterval(refresh, 20000);
+    refresh(); // sync immediately on mount so the count is current on load
+    const id = setInterval(refresh, 10000);
     const onVis = () => { if (document.visibilityState === "visible") refresh(); };
     document.addEventListener("visibilitychange", onVis);
     return () => {
@@ -250,8 +251,12 @@ export function StorefrontOrder({
                 )}
                 <p className="text-sm mt-0.5">
                   <span className="font-semibold">{formatMoney(p.priceCents)}</span>
-                  {!soldOut && remaining <= 8 && (
-                    <span className="text-brand ml-2">{remaining} left</span>
+                  {/* Always show the live available count so customers see stock
+                      tick down as orders come in; highlight when it's running low. */}
+                  {!soldOut && (
+                    <span className={`ml-2 ${remaining <= 8 ? "text-brand font-medium" : "text-muted"}`}>
+                      {remaining} left
+                    </span>
                   )}
                 </p>
               </div>
