@@ -6,6 +6,7 @@ import { StorefrontOrder } from "@/components/storefront-order";
 import { WaitlistForm } from "@/components/waitlist-form";
 import { computeDropPhase, isOrderingOpen } from "@/lib/drop-status";
 import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
+import { vendorPalette } from "@/lib/color";
 
 // Absolute URL for link-preview images (blob URLs are already absolute).
 function absUrl(u?: string | null): string | null {
@@ -81,6 +82,9 @@ export default async function DropOrderPage({
   if (!drop || drop.seller.slug !== slug || drop.seller.disabledAt) notFound();
 
   const accent = drop.seller.accent || "#ff6268";
+  // Accessible CTA color derived from the vendor's brand color — used for
+  // buttons/badges with white text so they stay readable even for light brands.
+  const cta = vendorPalette(accent).vendor_cta_color;
   const tz = drop.seller.timezone;
   const isLiveDrop = drop.mode === "live";
   const phase = computeDropPhase(drop);
@@ -142,7 +146,7 @@ export default async function DropOrderPage({
             ) : (
               <span
                 className="w-8 h-8 rounded-lg grid place-items-center font-display text-sm font-semibold text-white shrink-0"
-                style={{ backgroundColor: accent }}
+                style={{ backgroundColor: cta }}
               >
                 {drop.seller.storeName.charAt(0)}
               </span>
@@ -162,7 +166,7 @@ export default async function DropOrderPage({
         <div className="mb-7">
           {orderingOpen ? (
             <span
-              style={{ backgroundColor: accent }}
+              style={{ backgroundColor: cta }}
               className="inline-flex items-center gap-1.5 text-white text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-pill"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-white live-dot" /> {isLiveDrop ? "Live now — order here" : "Ordering open"}
@@ -241,7 +245,7 @@ export default async function DropOrderPage({
               <Link
                 href={`/s/${slug}`}
                 className="inline-block mt-5 text-sm font-semibold rounded-pill px-5 py-2.5 text-white"
-                style={{ backgroundColor: accent }}
+                style={{ backgroundColor: cta }}
               >
                 Back to {drop.seller.storeName}
               </Link>

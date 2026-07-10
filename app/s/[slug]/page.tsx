@@ -8,6 +8,7 @@ import { SocialLinks } from "@/components/social-links";
 import { formatMoney, formatDate } from "@/lib/format";
 import { isDemoStore } from "@/lib/demo";
 import { getCurrentSeller } from "@/lib/auth";
+import { vendorPalette } from "@/lib/color";
 
 // Absolute URL for link-preview images (blob URLs are already absolute).
 function absUrl(u?: string | null): string | null {
@@ -80,6 +81,8 @@ export default async function StorePage({
   const isOwner = viewer?.id === seller.id;
 
   const accent = seller.accent || "#ff6268";
+  // Accessible CTA color for buttons/badges with white text.
+  const cta = vendorPalette(accent).vendor_cta_color;
   const liveDrops = seller.drops.filter((d) => d.status === "live");
   const pastDrops = seller.drops.filter((d) => d.status === "closed");
 
@@ -187,7 +190,7 @@ export default async function StorePage({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <span
-                        style={{ backgroundColor: accent }}
+                        style={{ backgroundColor: cta }}
                         className="inline-flex items-center gap-1.5 text-white text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-pill mb-2"
                       >
                         <span className="w-1.5 h-1.5 rounded-full bg-white live-dot" /> Live
@@ -202,7 +205,7 @@ export default async function StorePage({
                     </div>
                     <span
                       className="shrink-0 text-sm font-semibold rounded-pill px-4 py-2 text-white group-hover:opacity-90"
-                      style={{ backgroundColor: accent }}
+                      style={{ backgroundColor: cta }}
                     >
                       Order →
                     </span>

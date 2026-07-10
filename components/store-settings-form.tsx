@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { Button, Field, Input, Textarea } from "@/components/ui";
 import { updateStoreAction, type StoreSaveState } from "@/lib/actions/dashboard";
 import { SOCIALS } from "@/lib/social";
+import { vendorPalette } from "@/lib/color";
 import { uploadImage, ImageTooLargeError } from "@/lib/upload-client";
 
 const ACCENTS = ["#ff6268", "#3a8895", "#3F7D5B", "#8A2D52", "#2B6CB0", "#1C1916"];
@@ -311,6 +312,25 @@ export function StoreSettingsForm({
             />
             {!isHex(accent) && <span className="text-xs text-brand-dark">Enter a hex like #ff6268</span>}
           </div>
+          {isHex(accent) && (() => {
+            const pal = vendorPalette(accent);
+            const derived = pal.vendor_cta_color.toLowerCase() !== accent.toLowerCase();
+            return (
+              <div className="mt-4 flex items-center gap-3">
+                <span
+                  className="inline-flex items-center text-white text-sm font-semibold rounded-xl px-4 py-2"
+                  style={{ backgroundColor: pal.vendor_cta_color }}
+                >
+                  Order now
+                </span>
+                <span className="text-xs text-muted">
+                  {derived
+                    ? `Buttons use ${pal.vendor_cta_color} — an accessible, darker version of your brand color so white text stays readable.`
+                    : "Your brand color already has enough contrast — buttons use it directly."}
+                </span>
+              </div>
+            );
+          })()}
         </Field>
       </div>
 

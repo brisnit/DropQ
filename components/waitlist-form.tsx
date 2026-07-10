@@ -1,16 +1,20 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
+import { vendorPalette, darkenColor } from "@/lib/color";
 import { subscribeAction, type SubscribeState } from "@/lib/actions/subscribe";
 
-function SubmitButton({ accent }: { accent: string }) {
+function SubmitButton({ cta }: { cta: string }) {
   const { pending } = useFormStatus();
+  const [hover, setHover] = useState(false);
   return (
     <button
       type="submit"
       disabled={pending}
-      style={{ backgroundColor: accent }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ backgroundColor: pending ? cta : hover ? darkenColor(cta, 0.08) : cta }}
       className="w-full text-white font-semibold rounded-xl py-3 disabled:opacity-50 transition active:scale-[0.99]"
     >
       {pending ? "Signing up…" : "Notify me about future drops"}
@@ -32,6 +36,7 @@ export function WaitlistForm({
   geofence?: boolean;
 }) {
   const [state, formAction] = useActionState<SubscribeState, FormData>(subscribeAction, {});
+  const cta = vendorPalette(accent).vendor_cta_color;
 
   if (state.ok) {
     return (
@@ -74,7 +79,7 @@ export function WaitlistForm({
       {state.error && (
         <p className="text-sm text-brand-dark bg-brand-tint rounded-lg px-3 py-2">{state.error}</p>
       )}
-      <SubmitButton accent={accent} />
+      <SubmitButton cta={cta} />
     </form>
   );
 }

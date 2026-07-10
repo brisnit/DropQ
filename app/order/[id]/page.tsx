@@ -7,6 +7,7 @@ import { customerArrivedAction } from "@/lib/actions/order";
 import { formatMoney } from "@/lib/format";
 import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 import { dropMapsUrl } from "@/lib/maps";
+import { vendorPalette } from "@/lib/color";
 
 export const metadata = { title: "Order confirmed — DropQ" };
 
@@ -64,6 +65,9 @@ export default async function OrderConfirmationPage({
   if (!order) notFound();
 
   const accent = order.seller.accent || "#ff6268";
+  // Accessible CTA color derived from the vendor's brand color for buttons/
+  // banners with white text (keeps light brand colors readable).
+  const cta = vendorPalette(accent).vendor_cta_color;
   const pending = order.status === "pending";
   const paidWithStripe = !!order.stripeSessionId && !pending;
   const payInPerson = order.paymentStatus === "unpaid" && order.source === "live";
@@ -76,7 +80,7 @@ export default async function OrderConfirmationPage({
         <div className="bg-paper border border-line rounded-card shadow-[var(--shadow-soft)] overflow-hidden">
           <div
             className="p-7 text-center text-white"
-            style={{ backgroundColor: pending ? "#79706a" : accent }}
+            style={{ backgroundColor: pending ? "#79706a" : cta }}
           >
             <div className="w-14 h-14 rounded-full bg-white/20 grid place-items-center text-3xl mx-auto">
               {pending ? "⏳" : "✓"}
@@ -156,7 +160,7 @@ export default async function OrderConfirmationPage({
                           target="_blank"
                           rel="noreferrer"
                           className="mt-3 inline-flex items-center justify-center gap-2 w-full sm:w-auto text-sm font-semibold rounded-xl px-4 py-2.5 text-white"
-                          style={{ backgroundColor: accent }}
+                          style={{ backgroundColor: cta }}
                         >
                           📍 Open in Maps
                         </a>
@@ -171,7 +175,7 @@ export default async function OrderConfirmationPage({
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={order.seller.logoUrl} alt={order.seller.storeName} className="w-11 h-11 rounded-lg object-cover border border-line shrink-0" />
                       ) : (
-                        <span className="w-11 h-11 rounded-lg grid place-items-center text-white font-semibold shrink-0" style={{ backgroundColor: accent }}>
+                        <span className="w-11 h-11 rounded-lg grid place-items-center text-white font-semibold shrink-0" style={{ backgroundColor: cta }}>
                           {order.seller.storeName.charAt(0)}
                         </span>
                       )}
@@ -217,7 +221,7 @@ export default async function OrderConfirmationPage({
                         <button
                           type="submit"
                           className="w-full inline-flex items-center justify-center gap-2 text-base font-semibold rounded-xl px-4 py-3.5 text-white"
-                          style={{ backgroundColor: accent }}
+                          style={{ backgroundColor: cta }}
                         >
                           🙋 I&apos;m here
                         </button>
@@ -235,7 +239,7 @@ export default async function OrderConfirmationPage({
             <Link
               href={`/s/${order.seller.slug}`}
               className="block text-center mt-5 text-sm font-semibold rounded-xl py-3 text-white"
-              style={{ backgroundColor: accent }}
+              style={{ backgroundColor: cta }}
             >
               Back to {order.seller.storeName}
             </Link>

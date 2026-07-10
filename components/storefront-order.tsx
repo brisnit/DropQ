@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { formatMoney } from "@/lib/format";
+import { vendorPalette, darkenColor } from "@/lib/color";
 import { placeOrderAction, type OrderState } from "@/lib/actions/order";
 
 type Product = {
@@ -37,8 +38,11 @@ function SubmitBtn({
   payInPerson?: boolean;
 }) {
   const { pending } = useFormStatus();
+  const [hover, setHover] = useState(false);
   const disabled = pending || count === 0;
   const extra = payInPerson ? { name: "payInPerson", value: "1" } : {};
+  // `accent` here is already the accessible CTA color; darken a touch on hover.
+  const hoverBg = darkenColor(accent, 0.08);
   if (outline) {
     return (
       <button
@@ -46,7 +50,7 @@ function SubmitBtn({
         {...extra}
         disabled={disabled}
         style={{ borderColor: accent, color: accent }}
-        className="w-full font-semibold rounded-xl py-3 border-2 bg-paper disabled:opacity-50 transition active:scale-[0.99]"
+        className="w-full font-semibold rounded-xl py-3 border-2 bg-paper disabled:opacity-50 transition active:scale-[0.99] hover:bg-cream"
       >
         {pending ? busy : count === 0 ? "Add items first" : label}
       </button>
@@ -57,7 +61,9 @@ function SubmitBtn({
       type="submit"
       {...extra}
       disabled={disabled}
-      style={{ backgroundColor: accent }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ backgroundColor: disabled ? accent : hover ? hoverBg : accent }}
       className="w-full text-white font-semibold rounded-xl py-3.5 flex items-center justify-between px-5 disabled:opacity-50 transition active:scale-[0.99]"
     >
       <span>{pending ? busy : count === 0 ? "Add items to order" : label}</span>
@@ -100,6 +106,11 @@ export function StorefrontOrder({
   const [state, formAction] = useActionState<OrderState, FormData>(placeOrderAction, {});
   // Lightbox: which product's photos are open, and the active photo index.
   const [zoom, setZoom] = useState<{ images: string[]; name: string; index: number } | null>(null);
+
+  // Accessible CTA color derived from the vendor's brand color (their light
+  // brand color is preserved elsewhere; buttons use the darkened, AA-contrast
+  // derivative so white text always pops).
+  const cta = vendorPalette(accent).vendor_cta_color;
 
   // Live inventory. Seeded from the server render, then kept fresh by polling so
   // an open tab flips items to "Sold out" without a manual refresh.
@@ -268,7 +279,7 @@ export function StorefrontOrder({
                 <button
                   type="button"
                   onClick={() => setItem(p.id, 1, remaining)}
-                  style={{ color: accent, borderColor: accent }}
+                  style={{ color: cta, borderColor: cta }}
                   className="shrink-0 text-sm font-semibold border rounded-pill px-4 py-1.5 hover:bg-cream transition"
                 >
                   Add
@@ -373,8 +384,8 @@ export function StorefrontOrder({
 
         {live && paymentsEnabled ? (
           <div className="space-y-2">
-            <SubmitBtn label="Pay now" busy="Redirecting…" count={count} total={total} accent={accent} />
-            <SubmitBtn label="Pay in person" busy="Placing order…" count={count} total={total} accent={accent} outline payInPerson />
+            <SubmitBtn label="Pay now" busy="Redirecting…" count={count} total={total} accent={cta} />
+            <SubmitBtn label="Pay in person" busy="Placing order…" count={count} total={total} accent={cta} outline payInPerson />
           </div>
         ) : (
           <SubmitBtn
@@ -382,7 +393,7 @@ export function StorefrontOrder({
             busy={paymentsEnabled ? "Redirecting…" : "Placing order…"}
             count={count}
             total={total}
-            accent={accent}
+            accent={cta}
           />
         )}
         <p className="text-xs text-muted text-center">
