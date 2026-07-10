@@ -7,6 +7,7 @@ import { WaitlistForm } from "@/components/waitlist-form";
 import { computeDropPhase, isOrderingOpen } from "@/lib/drop-status";
 import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 import { vendorPalette } from "@/lib/color";
+import { OriginTracker } from "@/components/origin-tracker";
 
 // Absolute URL for link-preview images (blob URLs are already absolute).
 function absUrl(u?: string | null): string | null {
@@ -263,6 +264,7 @@ export default async function DropOrderPage({
           </div>
         )}
       </div>
+      <OriginTracker vendorId={drop.seller.id} slug={slug} />
     </main>
   );
 }

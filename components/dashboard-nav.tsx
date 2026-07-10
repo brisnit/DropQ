@@ -14,6 +14,7 @@ const NAV = [
   { href: "/dashboard/payments", label: "Payments" },
   { href: "/dashboard/billing", label: "Plan" },
   { href: "/dashboard/store", label: "Store" },
+  { href: "/dashboard/discoverability", label: "Discovery" },
 ];
 
 function isActive(pathname: string, href: string, exact?: boolean) {

@@ -9,6 +9,8 @@ import { formatMoney, formatDate } from "@/lib/format";
 import { isDemoStore } from "@/lib/demo";
 import { getCurrentSeller } from "@/lib/auth";
 import { vendorPalette } from "@/lib/color";
+import { DiscoveryLink } from "@/components/discovery-link";
+import { OriginTracker } from "@/components/origin-tracker";
 
 // Absolute URL for link-preview images (blob URLs are already absolute).
 function absUrl(u?: string | null): string | null {
@@ -172,7 +174,15 @@ export default async function StorePage({
 
           {liveDrops.length === 0 && (
             <div className="bg-paper border border-dashed border-line-strong rounded-card p-6 text-center text-muted mb-4">
-              Check back soon — or sign up below to hear about the next drop.
+              <p>Check back soon — or sign up below to hear about the next drop.</p>
+              {!isDemo && (
+                <DiscoveryLink
+                  event="storefront_discovery_link"
+                  className="inline-block mt-3 text-sm font-medium text-brand hover:underline"
+                >
+                  Explore more DropQ vendors near you →
+                </DiscoveryLink>
+              )}
             </div>
           )}
 
@@ -324,12 +334,20 @@ export default async function StorePage({
           </section>
         )}
 
-        <footer className="py-10 border-t border-line flex items-center justify-center gap-2 text-sm text-muted">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/dropq-mark.png" alt="DropQ" className="h-[18px] w-auto" /> Want a store like this?{" "}
-          <Link href="/" className="text-ink font-medium hover:underline">Start free on DropQ</Link>
+        <footer className="py-10 border-t border-line flex flex-col items-center gap-3 text-sm text-muted">
+          <div className="flex items-center justify-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/dropq-mark.png" alt="DropQ" className="h-[18px] w-auto" /> Want a store like this?{" "}
+            <Link href="/" className="text-ink font-medium hover:underline">Start free on DropQ</Link>
+          </div>
+          {!isDemo && (
+            <DiscoveryLink event="storefront_discovery_link" className="text-muted hover:text-ink hover:underline">
+              Explore more DropQ vendors near you
+            </DiscoveryLink>
+          )}
         </footer>
       </div>
+      <OriginTracker vendorId={seller.id} slug={seller.slug} />
     </main>
   );
 }

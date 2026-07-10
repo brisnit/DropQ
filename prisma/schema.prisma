@@ -86,6 +86,20 @@ model Seller {
   pickupContactPhone String? // public pickup contact number (opt-in)
   pickupContactPref  String  @default("text") // text | call | both — preferred CTA
 
+  // Vendor Finder / Discovery — strictly opt-in. A vendor only appears on
+  // /discover when isDiscoverable is true. Public location fields are safe to
+  // show (city/neighborhood level); exact addresses live on the drop and are
+  // never exposed in discovery. Reusable by a future DropMaps feature.
+  isDiscoverable             Boolean @default(false) // master opt-in switch
+  showActiveDropsInDiscovery Boolean @default(true)  // show my live/upcoming drops
+  showEventsInDiscovery      Boolean @default(true)  // show my pop-ups / markets (live drops)
+  hideExactAddress           Boolean @default(true)  // never expose exact address in discovery
+  publicNeighborhood String? // e.g. "East Austin"
+  publicCity         String? // shown publicly; falls back to `location`
+  publicState        String? // e.g. "TX"
+  publicZip          String? // for zip-based search matching
+  discoveryRadius    Int     @default(25) // vendor service radius in miles (informational)
+
   drops          Drop[]
   orders         Order[]
   tokens         Token[]
@@ -254,11 +268,18 @@ model Drop {
 
   vendorArrivedAt DateTime? // vendor checked in at the pickup location
 
+  // Discovery: a drop is eligible for /discover only when its vendor is
+  // discoverable AND this is true. Defaults true so existing drops surface once
+  // their vendor opts in; a vendor can mark a specific drop private.
+  isPublic    Boolean   @default(true)
+
   createdAt   DateTime  @default(now())
 
   products    Product[]
   orders      Order[]
   subscribers Subscriber[]
+
+  @@index([status])
 }
 
 // A vendor's reusable product/menu-item library. Independent from any drop so

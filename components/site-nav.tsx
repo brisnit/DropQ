@@ -4,8 +4,8 @@ import { LinkButton } from "@/components/ui";
 import { getCurrentSeller } from "@/lib/auth";
 
 const LINKS = [
+  { href: "/discover", label: "Find Drops" },
   { href: "/#how", label: "How it works" },
-  { href: "/#drops", label: "Drops" },
   { href: "/#features", label: "Features" },
   { href: "/pricing", label: "Pricing" },
 ];

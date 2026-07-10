@@ -184,6 +184,60 @@ export async function updateStoreAction(
   }
 }
 
+/* --------------------------- Discoverability ---------------------------- */
+export type DiscoverabilityState = { saved?: boolean; error?: string };
+
+/**
+ * Vendor Finder opt-in settings. Discovery is strictly opt-in — a vendor only
+ * appears on /discover when isDiscoverable is on. When enabled, we geocode the
+ * public city/ZIP so the vendor can be placed on the distance-based search
+ * (city-level coordinates only — never a residential address).
+ */
+export async function updateDiscoverabilityAction(
+  _prev: DiscoverabilityState,
+  formData: FormData
+): Promise<DiscoverabilityState> {
+  const seller = await requireSeller();
+  try {
+    const isDiscoverable = formData.get("isDiscoverable") === "on";
+    const publicNeighborhood = String(formData.get("publicNeighborhood") ?? "").trim() || null;
+    const publicCity = String(formData.get("publicCity") ?? "").trim() || null;
+    const publicState = String(formData.get("publicState") ?? "").trim() || null;
+    const publicZip = String(formData.get("publicZip") ?? "").trim() || null;
+    const radiusRaw = parseInt(String(formData.get("discoveryRadius") ?? "25"), 10) || 25;
+    const discoveryRadius = [10, 25, 50, 100].includes(radiusRaw) ? radiusRaw : 25;
+
+    // Geocode a city-level point for distance search (best-effort).
+    let latitude = seller.latitude;
+    let longitude = seller.longitude;
+    if (isDiscoverable) {
+      const q = [publicCity, publicState, publicZip].filter(Boolean).join(", ");
+      if (q) {
+        const geo = await geocode(q);
+        if (geo) { latitude = geo.lat; longitude = geo.lng; }
+      }
+    }
+
+    await prisma.seller.update({
+      where: { id: seller.id },
+      data: {
+        isDiscoverable,
+        showActiveDropsInDiscovery: formData.get("showActiveDropsInDiscovery") === "on",
+        showEventsInDiscovery: formData.get("showEventsInDiscovery") === "on",
+        hideExactAddress: formData.get("hideExactAddress") === "on",
+        publicNeighborhood, publicCity, publicState, publicZip, discoveryRadius,
+        latitude, longitude,
+      },
+    });
+    revalidatePath("/dashboard/discoverability");
+    revalidatePath("/discover");
+    return { saved: true };
+  } catch (e) {
+    console.error("updateDiscoverabilityAction failed:", e);
+    return { error: "Couldn't save your discovery settings. Please try again." };
+  }
+}
+
 /* ------------------------------ Gallery --------------------------------- */
 export async function addGalleryImagesAction(formData: FormData) {
   const seller = await requireSeller();

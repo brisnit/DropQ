@@ -5,13 +5,15 @@ import { isOrderingOpen } from "@/lib/drop-status";
 // Live inventory for an open storefront tab. Lets a customer sitting on the
 // page see items flip to "Sold out" without a manual refresh, so they can't
 // try to add something that's already gone.
+// NOTE: uses the [id] slug to match /api/drops/[id]/orders — Next requires a
+// single slug name per dynamic path position.
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ dropId: string }> },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { dropId } = await params;
+  const { id } = await params;
   const drop = await prisma.drop.findUnique({
-    where: { id: dropId },
+    where: { id },
     select: {
       status: true,
       mode: true,

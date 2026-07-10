@@ -15,6 +15,7 @@ const NAV = [
   { href: "/dashboard/payments", label: "Payments" },
   { href: "/dashboard/billing", label: "Plan" },
   { href: "/dashboard/store", label: "Store" },
+  { href: "/dashboard/discoverability", label: "Discovery" },
 ];
 
 const DIVIDER = "my-1 border-t border-line/70";
