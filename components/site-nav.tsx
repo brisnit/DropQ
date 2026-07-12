@@ -5,7 +5,7 @@ import { getCurrentSeller } from "@/lib/auth";
 
 const LINKS = [
   { href: "/discover", label: "Find Drops" },
-  { href: "/#how", label: "How it works" },
+  { href: "/#how", label: "How It Works" },
   { href: "/#features", label: "Features" },
   { href: "/pricing", label: "Pricing" },
 ];
