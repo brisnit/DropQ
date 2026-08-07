@@ -194,6 +194,16 @@ export default async function OrderConfirmationPage({
                     </div>
                   )}
 
+                  {/* Message the vendor inside DropQ — the conversation lives
+                      here, so replies land in their dashboard rather than a
+                      personal phone. Signing in is a one-tap emailed link. */}
+                  <Link
+                    href="/messages"
+                    className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold rounded-xl px-4 py-3.5 min-h-[48px] bg-ink text-cream hover:bg-ink-soft transition"
+                  >
+                    💬 Message {order.seller.storeName}
+                  </Link>
+
                   {/* Contact vendor */}
                   {phone && (
                     <div className="grid grid-cols-2 gap-2">

@@ -11,6 +11,7 @@ import { orderMailPickup, pickupSummary } from "@/lib/pickup";
 import { dropMapsUrl } from "@/lib/maps";
 import { sendSms } from "@/lib/notifications";
 import { isDemoStore } from "@/lib/demo";
+import { upsertCustomer } from "@/lib/customer-auth";
 
 export type OrderState = { error?: string };
 
@@ -87,6 +88,19 @@ export async function placeOrderAction(
     !!drop.seller.stripeAccountId &&
     !payInPerson;
 
+  // Give the buyer a durable Customer identity at checkout so messaging works
+  // from their very first order. Never blocks the sale — if this fails the
+  // order still goes through and the backfill picks it up later.
+  const customer = await upsertCustomer({
+    email: buyerEmail,
+    name: buyerName,
+    phone: buyerPhone,
+  }).catch((e) => {
+    console.error("upsertCustomer at checkout failed:", e);
+    return null;
+  });
+  const customerId = customer?.id ?? null;
+
   // ----- Real payments via Stripe Connect (destination charge + platform fee) -----
   if (useStripe && stripe) {
     const order = await prisma.order.create({
@@ -96,6 +110,7 @@ export async function placeOrderAction(
         buyerName,
         buyerEmail,
         buyerPhone,
+        customerId,
         note,
         totalCents,
         feeCents,
@@ -186,6 +201,7 @@ export async function placeOrderAction(
           buyerName,
           buyerEmail,
           buyerPhone,
+          customerId,
           note,
           totalCents,
           feeCents,

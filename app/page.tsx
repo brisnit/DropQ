@@ -435,6 +435,87 @@ export default function Home() {
         </Section>
       </div>
 
+      {/* DROPMEET — the community/discovery layer */}
+      <div className="bg-tertiary-tint/50 border-b border-line">
+        <Section id="dropmeet" className="py-20 sm:py-28">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            <Reveal>
+              <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-tertiary">
+                <span className="w-1.5 h-1.5 rounded-full bg-tertiary" aria-hidden />
+                New · San Diego County
+              </span>
+              <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-3">
+                DropMeet: the map of local commerce.
+              </h2>
+              <p className="text-lg text-ink-soft mt-5">
+                Discover local markets, vendors, drops, and gathering places. Farmers markets, flea
+                markets, vintage and makers markets, breweries, food halls — every place where small
+                sellers actually show up.
+              </p>
+              <p className="text-ink-soft mt-4">
+                Selling well shouldn&apos;t mean going it alone. DropMeet exists to build the drop
+                community: connect the places people already gather with the makers selling there,
+                so a customer can find a market, see who&apos;s attending, and preorder before they
+                arrive.
+              </p>
+
+              <div className="flex flex-wrap gap-3 mt-8">
+                <LinkButton href="/dropmeet" variant="tertiary" size="lg">
+                  Explore DropMeet
+                </LinkButton>
+                <LinkButton href="/dropmeet/add" variant="secondary" size="lg">
+                  Add a place
+                </LinkButton>
+              </div>
+              <p className="text-sm text-muted mt-4">
+                Starting in San Diego County. Know a market we&apos;re missing? Add it — our team
+                reviews every submission.
+              </p>
+            </Reveal>
+
+            {/* The product thesis, as three beats */}
+            <div className="space-y-4">
+              {[
+                [
+                  "📍",
+                  "Where people gather",
+                  "Markets, breweries, churches, parks, pop-ups — the real places local commerce happens.",
+                ],
+                [
+                  "🧑‍🍳",
+                  "Who's selling there",
+                  "See which DropQ vendors are attending, on which day, at which booth.",
+                ],
+                [
+                  "🛍️",
+                  "What you can preorder",
+                  "Reserve from a vendor's drop before you go, then pick it up when you arrive.",
+                ],
+              ].map(([emoji, title, body], i) => (
+                <Reveal key={title} delay={i * 90}>
+                  <div className="flex items-start gap-4 bg-paper border border-line rounded-card p-5 shadow-[var(--shadow-soft)]">
+                    <div className="text-2xl shrink-0" aria-hidden>
+                      {emoji}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-semibold">{title}</h3>
+                      <p className="text-sm text-muted mt-1 leading-relaxed">{body}</p>
+                    </div>
+                  </div>
+                </Reveal>
+              ))}
+
+              <Reveal delay={270}>
+                <p className="text-sm text-ink-soft text-center pt-2">
+                  Every market brings vendors. Every vendor runs drops. Every drop brings customers
+                  — who find the next market.
+                </p>
+              </Reveal>
+            </div>
+          </div>
+        </Section>
+      </div>
+
       {/* TESTIMONIAL */}
       <Section id="stories" className="py-20 sm:py-28">
         <Reveal>

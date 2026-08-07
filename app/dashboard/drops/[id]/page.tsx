@@ -23,6 +23,9 @@ import { Countdown } from "@/components/countdown";
 import { computeDropPhase } from "@/lib/drop-status";
 import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 import { BackLink } from "@/components/back-link";
+import { DropCommunicationSection } from "@/components/drop-communication";
+import { MessageCustomerButton } from "@/components/message-customer-button";
+import { dropCommunicationSummary } from "@/lib/messaging";
 
 export default async function DropDetailPage({
   params,
@@ -58,6 +61,8 @@ export default async function DropDetailPage({
   const revenue = drop.orders.reduce((s, o) => s + o.totalCents, 0);
   const sold = drop.products.reduce((s, p) => s + p.sold, 0);
   const stock = drop.products.reduce((s, p) => s + p.inventory, 0);
+
+  const communication = await dropCommunicationSummary(seller.id, drop.id);
 
   const v = vocab(seller.category);
   const meta = showItemMeta(seller.category);
@@ -310,6 +315,11 @@ export default async function DropDetailPage({
           </div>
         </div>
 
+        {/* Customer Communication — launchpad into Messages for this drop */}
+        <div className="lg:col-span-3">
+          <DropCommunicationSection dropId={drop.id} data={communication} />
+        </div>
+
         {/* Orders — live polling feed for live drops, static list otherwise */}
         <div className="lg:col-span-3">
           {isLiveDrop ? (
@@ -337,22 +347,25 @@ export default async function DropDetailPage({
                             {o.buyerEmail}
                             {o.buyerPhone ? ` · ${o.buyerPhone}` : ""} · {relativeTime(o.createdAt)}
                           </p>
-                          {o.buyerPhone && (
-                            <div className="flex items-center gap-2 mt-1.5">
-                              <a
-                                href={`tel:${o.buyerPhone}`}
-                                className="text-xs font-medium px-2.5 py-1 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition"
-                              >
-                                📞 Call
-                              </a>
-                              <a
-                                href={`sms:${o.buyerPhone}`}
-                                className="text-xs font-medium px-2.5 py-1 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition"
-                              >
-                                💬 Text
-                              </a>
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            <MessageCustomerButton orderId={o.id} label="Message" />
+                            {o.buyerPhone && (
+                              <>
+                                <a
+                                  href={`tel:${o.buyerPhone}`}
+                                  className="inline-flex items-center min-h-[38px] px-3 rounded-pill border border-line-strong bg-paper text-sm font-medium hover:border-ink/30 transition"
+                                >
+                                  📞 Call
+                                </a>
+                                <a
+                                  href={`sms:${o.buyerPhone}`}
+                                  className="inline-flex items-center min-h-[38px] px-3 rounded-pill border border-line-strong bg-paper text-sm font-medium hover:border-ink/30 transition"
+                                >
+                                  💬 Text
+                                </a>
+                              </>
+                            )}
+                          </div>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
                           <span className="font-semibold">{formatMoney(o.totalCents)}</span>

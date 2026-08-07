@@ -63,12 +63,45 @@ export function WaitlistForm({
       </div>
       <input name="name" placeholder="Your name" className={inputCls} />
       <input name="email" type="email" placeholder="Email" className={inputCls} />
-      <input name="phone" type="tel" placeholder="Phone (for text alerts)" className={inputCls} />
+      <input name="phone" type="tel" placeholder="Mobile number (optional)" className={inputCls} />
 
       <label className="flex items-start gap-2.5 text-sm text-ink-soft">
-        <input type="checkbox" name="optIn" defaultChecked className="mt-0.5 w-4 h-4 accent-[#ff6268]" />
-        <span>Yes, notify me about future drops by email{" "}{/* */}and/or text. I can opt out anytime.</span>
+        <input
+          type="checkbox"
+          name="optInEmail"
+          defaultChecked
+          className="mt-0.5 w-4 h-4 accent-[#ff6268]"
+        />
+        <span>Email me when {storeName} has a new drop.</span>
       </label>
+
+      {/*
+        SMS consent must stay unchecked, unbundled from email, and carry the
+        full disclosure set (sender, recurring, not-a-condition-of-purchase,
+        frequency, rates, STOP/HELP, terms + privacy links). This exact block
+        is what carriers review during A2P 10DLC campaign registration — don't
+        pre-check it or trim the copy.
+      */}
+      <label className="flex items-start gap-2.5 text-sm text-ink-soft">
+        <input type="checkbox" name="optInSms" className="mt-0.5 w-4 h-4 accent-[#ff6268]" />
+        <span>
+          <span className="font-medium text-ink">Text me when {storeName} has a new drop.</span>{" "}
+          <span className="text-muted text-xs leading-snug block mt-1">
+            By checking this box you agree to receive recurring marketing text messages from
+            DropQ on behalf of {storeName} at the number provided, including messages sent by
+            autodialer. Consent is not a condition of purchase. Msg frequency varies (typically
+            2–6/month). Msg &amp; data rates may apply. Reply STOP to opt out, HELP for help.{" "}
+            <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline">
+              Terms
+            </a>{" "}
+            ·{" "}
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline">
+              Privacy Policy
+            </a>
+          </span>
+        </span>
+      </label>
+
       {geofence && (
         <label className="flex items-start gap-2.5 text-sm text-ink-soft">
           <input type="checkbox" name="optInGeofence" className="mt-0.5 w-4 h-4 accent-[#ff6268]" />

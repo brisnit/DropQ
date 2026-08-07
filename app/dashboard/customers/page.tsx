@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { formatMoney, formatDate } from "@/lib/format";
 import { PageHeader, EmptyState, Section } from "@/components/dashboard-ui";
 import { Badge } from "@/components/ui";
+import { Avatar } from "@/components/avatar";
+import { MessageCustomerButton } from "@/components/message-customer-button";
 
 export const metadata = { title: "Customers — DropQ" };
 
@@ -95,20 +97,24 @@ export default async function CustomersPage() {
               {customers.map((c) => (
                 <div
                   key={c.email}
-                  className="grid grid-cols-2 sm:grid-cols-[2fr_1fr_1fr_1fr] gap-2 sm:gap-4 px-5 py-3.5 items-center"
+                  className="grid grid-cols-2 sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 sm:gap-4 px-5 py-3.5 items-center"
                 >
                   <div className="min-w-0 col-span-2 sm:col-span-1">
                     <div className="flex items-center gap-2">
+                      <Avatar name={c.name} size="sm" seed={c.email} />
                       <span className="font-medium truncate">{c.name}</span>
                       {c.orders > 1 && <Badge className="bg-grey-tint text-[#3f434b]">Regular</Badge>}
                     </div>
-                    <p className="text-xs text-muted truncate">{c.email}</p>
+                    <p className="text-xs text-muted truncate mt-1">{c.email}</p>
                   </div>
                   <span className="text-sm text-right sm:text-right">
                     <span className="sm:hidden text-muted text-xs">Orders </span>{c.orders}
                   </span>
                   <span className="text-sm font-semibold text-right">{formatMoney(c.spent)}</span>
                   <span className="text-sm text-muted text-right hidden sm:block">{formatDate(c.last)}</span>
+                  <div className="col-span-2 sm:col-span-1 sm:justify-self-end">
+                    <MessageCustomerButton email={c.email} />
+                  </div>
                 </div>
               ))}
             </div>

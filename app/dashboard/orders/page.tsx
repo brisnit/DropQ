@@ -7,6 +7,7 @@ import { orderStatusLabel, paymentLabel, paymentStyle } from "@/lib/orders";
 import { PageHeader, EmptyState, Section } from "@/components/dashboard-ui";
 import { Badge } from "@/components/ui";
 import { StatusSelect } from "@/components/status-select";
+import { MessageCustomerButton } from "@/components/message-customer-button";
 
 export const metadata = { title: "Orders — DropQ" };
 
@@ -101,8 +102,9 @@ export default async function OrdersPage({
                     ))}
                   </ul>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap">
                   <span className="font-semibold">{formatMoney(o.totalCents)}</span>
+                  <MessageCustomerButton orderId={o.id} />
                   <StatusSelect action={updateOrderStatusAction} orderId={o.id} value={o.status} />
                 </div>
               </div>

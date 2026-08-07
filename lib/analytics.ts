@@ -19,7 +19,31 @@ export type DiscoveryEvent =
   | "storefront_discovery_link"
   | "order_placed_from_discovery"
   | "vendor_discoverability_enabled"
-  | "vendor_discoverability_disabled";
+  | "vendor_discoverability_disabled"
+  // ── DropMeet ──────────────────────────────────────────────────────────
+  // Same beacon, same sink. Names are <noun>_<verb> so they group cleanly
+  // when this is pointed at a real analytics pipeline.
+  | "dropmeet_opened"
+  | "map_moved"
+  | "search_used"
+  | "location_viewed"
+  | "market_viewed"
+  | "event_viewed"
+  | "vendor_appearance_viewed"
+  | "drop_opened_from_dropmeet"
+  | "preorder_initiated_from_dropmeet"
+  | "directions_clicked"
+  | "location_followed"
+  | "location_unfollowed"
+  | "market_followed"
+  | "market_unfollowed"
+  | "location_submitted"
+  | "market_submitted"
+  | "claim_requested"
+  | "vendor_appearance_created"
+  | "vendor_invited"
+  | "location_approved"
+  | "location_rejected";
 
 const ORIGIN_KEY = "dropq_origin_vendor";
 

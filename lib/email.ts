@@ -407,3 +407,64 @@ export function orderCanceledEmail(o: OrderMail): Mail {
     ),
   };
 }
+
+// ── Messaging ──────────────────────────────────────────────────────────────
+
+/** Passwordless sign-in link for a customer opening their DropQ inbox. */
+export function customerMagicLinkEmail(to: string, link: string): Mail {
+  return {
+    to,
+    subject: "Your DropQ sign-in link",
+    html: layout(
+      "Open your messages",
+      "Tap below to see your conversations with the businesses you order from. " +
+        "This link works once and expires in 30 minutes. If you didn't request it, ignore this email.",
+      { href: link, label: "Open my messages" }
+    ),
+  };
+}
+
+/**
+ * Notifies a customer that a vendor messaged them *inside DropQ*. The email is
+ * a pointer, never the message store — it carries a short preview and a link
+ * back to the real conversation. Same shape an SMS will take later.
+ */
+export function newMessageEmail(o: {
+  to: string;
+  storeName: string;
+  logoUrl?: string | null;
+  accent?: string | null;
+  preview: string;
+  link: string;
+  announcement?: boolean;
+}): Mail {
+  const kind = o.announcement ? "posted an announcement" : "sent you a message";
+  return {
+    to: o.to,
+    subject: `${o.storeName} ${kind} on DropQ`,
+    html: vendorLayout(
+      { storeName: o.storeName, logoUrl: o.logoUrl, accent: o.accent },
+      `${esc(o.storeName)} ${kind}`,
+      `“${esc(o.preview)}”<br><br>Open DropQ to read it and reply.`,
+      { href: o.link, label: "Read and reply" }
+    ),
+  };
+}
+
+/** Notifies a vendor that a customer replied. Plain DropQ branding. */
+export function vendorNewMessageEmail(o: {
+  to: string;
+  customerName: string;
+  preview: string;
+  link: string;
+}): Mail {
+  return {
+    to: o.to,
+    subject: `${o.customerName} messaged you on DropQ`,
+    html: layout(
+      `${esc(o.customerName)} sent you a message`,
+      `“${esc(o.preview)}”`,
+      { href: o.link, label: "Reply in DropQ" }
+    ),
+  };
+}

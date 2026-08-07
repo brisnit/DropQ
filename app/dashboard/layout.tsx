@@ -9,6 +9,10 @@ import { MobileNav } from "@/components/mobile-nav";
 import { VerifyBanner } from "@/components/verify-banner";
 import { TermsGate } from "@/components/terms-gate";
 import { TERMS_VERSION } from "@/lib/terms";
+import { NotificationBell } from "@/components/notification-bell";
+import { vendorUnreadTotal } from "@/lib/messaging";
+import { listNotifications, unreadNotificationCount, notificationHref } from "@/lib/notification-center";
+import { markAllNotificationsReadAction } from "@/lib/actions/messages";
 
 export default async function DashboardLayout({
   children,
@@ -27,15 +31,36 @@ export default async function DashboardLayout({
   // Show the Referral Dashboard link only to an active linked sales rep.
   const isRep = !!(await salesRepForSeller(seller));
 
+  const viewer = { kind: "vendor", sellerId: seller.id } as const;
+  const [unread, notifications, notificationUnread] = await Promise.all([
+    vendorUnreadTotal(seller.id),
+    listNotifications(viewer),
+    unreadNotificationCount(viewer),
+  ]);
+  const bellItems = notifications.map((n) => ({
+    id: n.id,
+    title: n.title,
+    body: n.body,
+    href: notificationHref(viewer, n),
+    createdAt: n.createdAt.toISOString(),
+    read: !!n.readAt,
+  }));
+
   return (
     <div className="min-h-screen md:grid md:grid-cols-[260px_1fr]">
       {/* Sidebar — desktop only */}
       <aside className="hidden md:flex md:border-r border-line bg-cream md:h-screen md:sticky md:top-0 flex-col">
-        <div className="px-5 py-4 border-b border-line/70">
+        <div className="px-5 py-4 border-b border-line/70 flex items-center justify-between gap-2">
           <Logo href="/dashboard" />
+          <NotificationBell
+            viewer="vendor"
+            initialItems={bellItems}
+            initialUnread={notificationUnread}
+            markAllAction={markAllNotificationsReadAction}
+          />
         </div>
         <div className="p-4 flex-1">
-          <DashboardNav />
+          <DashboardNav unread={unread} />
           {isRep && (
             <>
               <div className="my-1 border-t border-line/70" aria-hidden />
@@ -89,7 +114,15 @@ export default async function DashboardLayout({
         <div className="md:hidden sticky top-0 z-30 bg-cream/95 backdrop-blur border-b border-line">
           <div className="flex items-center justify-between px-5 h-14">
             <Logo href="/dashboard" />
-            <MobileNav admin={admin} isRep={isRep} slug={seller.slug} />
+            <div className="flex items-center gap-1">
+              <NotificationBell
+                viewer="vendor"
+                initialItems={bellItems}
+                initialUnread={notificationUnread}
+                markAllAction={markAllNotificationsReadAction}
+              />
+              <MobileNav admin={admin} isRep={isRep} slug={seller.slug} unread={unread} />
+            </div>
           </div>
         </div>
         <Suspense fallback={null}>

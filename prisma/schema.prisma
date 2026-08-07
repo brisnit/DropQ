@@ -113,6 +113,24 @@ model Seller {
   salesRep    SalesRep?          @relation("SalesRepVendors", fields: [salesRepId], references: [id], onDelete: SetNull)
   commissions CommissionLedger[] @relation("VendorCommissions")
 
+  conversations Conversation[]
+  sentMessages  Message[]      @relation("MessageSenderSeller")
+  notifications Notification[]
+  broadcasts    Broadcast[]
+
+  // DropMeet
+  appearances        VendorAppearance[]
+  submittedLocations Location[]          @relation("LocationSubmittedBySeller")
+  approvedLocations  Location[]          @relation("LocationApprovedByAdmin")
+  submittedMarkets   Market[]            @relation("MarketSubmittedBySeller")
+  approvedMarkets    Market[]            @relation("MarketApprovedByAdmin")
+  claimedMarkets     Market[]            @relation("MarketClaimedBy")
+  submittedEvents    Event[]             @relation("EventSubmittedBySeller")
+  approvedEvents     Event[]             @relation("EventApprovedByAdmin")
+  reviewedCandidates DropMeetCandidate[] @relation("CandidateReviewedBy")
+  claimsMade         ClaimRequest[]      @relation("ClaimClaimant")
+  claimsReviewed     ClaimRequest[]      @relation("ClaimReviewedBy")
+
   @@index([salesRepId])
 }
 
@@ -279,6 +297,13 @@ model Drop {
   orders      Order[]
   subscribers Subscriber[]
 
+  conversations Conversation[] @relation("ConversationLastDrop")
+  messages      Message[]      @relation("MessageDrop")
+  broadcasts    Broadcast[]
+
+  // DropMeet — appearances where this drop is preorderable
+  appearances VendorAppearance[]
+
   @@index([status])
 }
 
@@ -346,6 +371,12 @@ model Order {
   buyerName  String
   buyerEmail String
   buyerPhone String?
+  // Buyer contact stays denormalized on the order (it's a historical record of
+  // what they typed at checkout). customerId links it to the durable Customer
+  // identity used for messaging — nullable because pre-messaging orders are
+  // backfilled by email, and SetNull so deleting a Customer never voids orders.
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   note       String?
   totalCents Int
   feeCents   Int      @default(0) // DropQ platform fee taken from this order
@@ -360,6 +391,11 @@ model Order {
 
   items  OrderItem[]
   events OrderEvent[]
+
+  conversations Conversation[] @relation("ConversationLastOrder")
+  messages      Message[]      @relation("MessageOrder")
+
+  @@index([customerId])
 }
 
 // Timestamped audit trail of order lifecycle events.
@@ -397,7 +433,15 @@ model Subscriber {
   name      String?
   email     String?
   phone     String?
-  optInNotifications Boolean @default(true) // future drops / marketing
+  // Consent is tracked per channel. SMS marketing needs *express written
+  // consent* under the TCPA and carriers (via A2P 10DLC review) can ask us to
+  // produce it, so optInSms is its own unbundled, default-false field and we
+  // stamp the moment it was given. optInNotifications is kept as the
+  // any-channel rollup for existing reads.
+  optInNotifications Boolean @default(true) // future drops / marketing (email OR sms)
+  optInEmail         Boolean @default(true)
+  optInSms           Boolean @default(false)
+  smsConsentAt       DateTime? // when the SMS box was checked — proof of consent
   optInGeofence      Boolean @default(false)
   source    String   @default("waitlist") // waitlist | checkout | manual
   createdAt DateTime @default(now())
@@ -415,4 +459,676 @@ model ReminderLog {
   sentAt   DateTime @default(now())
 
   @@unique([sellerId, email, kind])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MESSAGING
+//
+// DropQ is the canonical store for every message. Email/SMS/push are delivery
+// channels layered on top (see MessageDelivery) — they are never the source of
+// truth. A vendor's outbound text is a Message row first; any SMS that goes out
+// is a *notification about* that Message, not the message itself.
+//
+//   Customer / Seller → Conversation → Message → Notification → MessageDelivery
+// ─────────────────────────────────────────────────────────────────────────────
+
+// A buyer's durable identity, global across vendors (a customer can hold
+// conversations with several stores). Keyed on email, which is what checkout
+// already collects and what the Customers page groups by today. Customers have
+// no password — they authenticate with an emailed magic link (CustomerToken).
+model Customer {
+  id         String    @id @default(cuid())
+  email      String    @unique
+  name       String?
+  phone      String?
+  avatarUrl  String?
+  lastSeenAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  orders        Order[]
+  conversations Conversation[]
+  sentMessages  Message[]       @relation("MessageSenderCustomer")
+  notifications Notification[]
+  tokens        CustomerToken[]
+
+  // DropMeet
+  submittedLocations Location[]       @relation("LocationSubmittedByCustomer")
+  submittedMarkets   Market[]         @relation("MarketSubmittedByCustomer")
+  locationFollows    LocationFollow[]
+  marketFollows      MarketFollow[]
+}
+
+// Single-use, expiring magic-link tokens for customer sign-in. Mirrors the
+// vendor-side Token model but kept separate so customer auth can never widen
+// the blast radius of vendor auth.
+model CustomerToken {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([customerId])
+}
+
+// The durable vendor↔customer relationship — exactly one per pair, reused
+// across every drop they participate in. Drop/order context is *metadata*
+// (lastDrop/lastOrder) plus per-message context, never a reason to fork a new
+// thread.
+model Conversation {
+  id         String   @id @default(cuid())
+  sellerId   String
+  seller     Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  // Most recent context, for the header and list rows. SetNull so deleting a
+  // drop or order never destroys the conversation.
+  lastDropId  String?
+  lastDrop    Drop?   @relation("ConversationLastDrop", fields: [lastDropId], references: [id], onDelete: SetNull)
+  lastOrderId String?
+  lastOrder   Order?  @relation("ConversationLastOrder", fields: [lastOrderId], references: [id], onDelete: SetNull)
+
+  // Denormalized so the list renders in one query instead of N.
+  lastMessageAt      DateTime @default(now())
+  lastMessagePreview String?
+  lastMessageSender  String? // vendor | customer | system
+
+  // Per-participant unread counters — cheap badges without aggregating Message.
+  vendorUnread       Int       @default(0)
+  customerUnread     Int       @default(0)
+  vendorLastReadAt   DateTime?
+  customerLastReadAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages      Message[]
+  notifications Notification[]
+
+  @@unique([sellerId, customerId])
+  @@index([sellerId, lastMessageAt])
+  @@index([customerId, lastMessageAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  // Polymorphic sender: senderType is the discriminator, and exactly one of the
+  // two FKs is set (system messages set neither).
+  senderType       String // vendor | customer | system
+  senderSellerId   String?
+  senderSeller     Seller?   @relation("MessageSenderSeller", fields: [senderSellerId], references: [id], onDelete: SetNull)
+  senderCustomerId String?
+  senderCustomer   Customer? @relation("MessageSenderCustomer", fields: [senderCustomerId], references: [id], onDelete: SetNull)
+
+  body        String
+  messageType String @default("text") // text | announcement | system | order_update
+
+  // Optional context this specific message is about.
+  dropId  String?
+  drop    Drop?   @relation("MessageDrop", fields: [dropId], references: [id], onDelete: SetNull)
+  orderId String?
+  order   Order?  @relation("MessageOrder", fields: [orderId], references: [id], onDelete: SetNull)
+
+  // Set when this message was fanned out from a broadcast. Each recipient still
+  // gets their own Message in their own Conversation — never a group thread.
+  broadcastId String?
+  broadcast   Broadcast? @relation(fields: [broadcastId], references: [id], onDelete: SetNull)
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  deliveries    MessageDelivery[]
+  notifications Notification[]
+
+  @@index([conversationId, createdAt])
+  @@index([broadcastId])
+}
+
+// One announcement the vendor composed, plus the audience it went to. The
+// individual Messages are the real delivery; this row exists for reporting and
+// as the hook for future scheduled/segmented sends.
+model Broadcast {
+  id       String  @id @default(cuid())
+  sellerId String
+  seller   Seller  @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  dropId   String?
+  drop     Drop?   @relation(fields: [dropId], references: [id], onDelete: SetNull)
+
+  audience       String // drop_all | active_orders | ready_pickup | selected
+  body           String
+  recipientCount Int    @default(0)
+  createdAt      DateTime @default(now())
+
+  messages Message[]
+
+  @@index([sellerId, createdAt])
+}
+
+// Per-user, per-event notification with deep-link context. recipientType is the
+// discriminator; exactly one of sellerId/customerId is set.
+model Notification {
+  id            String  @id @default(cuid())
+  recipientType String // vendor | customer
+  sellerId      String?
+  seller        Seller? @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  type  String // message | announcement | order_update | system
+  title String
+  body  String?
+
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  messageId      String?
+  message        Message?      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  dropId         String?
+  orderId        String?
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([sellerId, readAt, createdAt])
+  @@index([customerId, readAt, createdAt])
+}
+
+// Audit of what we attempted per delivery channel for a message. in_app is
+// always recorded; email/sms/push are opt-in add-ons. This is the seam that
+// lets SMS be switched on later without the conversation system changing at
+// all — a failed SMS never loses the message, it just marks a failed delivery.
+model MessageDelivery {
+  id        String  @id @default(cuid())
+  messageId String
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  channel String // in_app | email | sms | push
+  status  String @default("pending") // pending | sent | skipped | failed
+  detail  String? // provider id, or the reason it was skipped/failed
+  sentAt  DateTime?
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, channel])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DROPMEET — the local discovery layer.
+//
+//   Region → Location → Market → MarketSchedule
+//                    ↘ Event
+//   Seller → VendorAppearance → (Location | Market | Event) + optional Drop
+//
+// Nothing here is public until an admin approves it. Every public-facing model
+// carries status + verificationStatus + provenance (sourceType/sourceName/
+// sourceUrl), so we can always answer "how did this record get here?".
+//
+// Status vocabulary (shared):
+//   pending | approved | rejected | duplicate | needs_information
+// Verification vocabulary (shared):
+//   verified | organizer_claimed | community_submitted | imported | needs_verification
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A geographic area DropMeet is switched on for. Launch is San Diego County
+/// only; adding Orange County later is a row, not a rewrite. boundaryGeoJson
+/// holds the authoritative polygon (US Census TIGER) used for server-side
+/// point-in-polygon checks; the bbox columns are a cheap pre-filter so most
+/// rejects never touch the polygon math.
+model Region {
+  id       String @id @default(cuid())
+  name     String
+  slug     String @unique
+  /// GeoJSON Polygon/MultiPolygon geometry, stored as text.
+  boundaryGeoJson String?
+  /// Provenance for the boundary itself.
+  boundarySource  String?
+  boundaryFetchedAt DateTime?
+
+  minLatitude  Float?
+  minLongitude Float?
+  maxLatitude  Float?
+  maxLongitude Float?
+
+  defaultCenterLatitude  Float
+  defaultCenterLongitude Float
+  defaultZoom            Float @default(9)
+
+  active    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  locations  Location[]
+  markets    Market[]
+  events     Event[]
+  candidates DropMeetCandidate[]
+}
+
+/// A physical place where local commerce happens. Markets and Events point at
+/// one; vendors appear at one.
+model Location {
+  id       String @id @default(cuid())
+  regionId String
+  region   Region @relation(fields: [regionId], references: [id], onDelete: Cascade)
+
+  name         String
+  slug         String  @unique
+  locationType String  @default("other")
+  description  String?
+
+  address    String?
+  city       String?
+  state      String?
+  postalCode String?
+  latitude   Float
+  longitude  Float
+
+  websiteUrl   String?
+  instagramUrl String?
+  facebookUrl  String?
+  phone        String?
+  imageUrl     String?
+
+  status             String @default("pending")
+  verificationStatus String @default("community_submitted")
+
+  sourceType String  @default("community_submission")
+  sourceName String?
+  sourceUrl  String?
+
+  // Who put it here, who let it through.
+  submittedBySellerId   String?
+  submittedBySeller     Seller?   @relation("LocationSubmittedBySeller", fields: [submittedBySellerId], references: [id], onDelete: SetNull)
+  submittedByCustomerId String?
+  submittedByCustomer   Customer? @relation("LocationSubmittedByCustomer", fields: [submittedByCustomerId], references: [id], onDelete: SetNull)
+  approvedByAdminId     String?
+  approvedByAdmin       Seller?   @relation("LocationApprovedByAdmin", fields: [approvedByAdminId], references: [id], onDelete: SetNull)
+  approvedAt            DateTime?
+  rejectedAt            DateTime?
+  rejectionReason       String?
+  reviewNotes           String?
+  lastVerifiedAt        DateTime?
+
+  /// Set when this row was promoted out of the ingestion queue.
+  candidateId String?
+  /// Points at the surviving record when this one is closed as a duplicate.
+  duplicateOfId String?
+  duplicateOf   Location?  @relation("LocationDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates    Location[] @relation("LocationDuplicates")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  markets     Market[]
+  events      Event[]
+  appearances VendorAppearance[]
+  follows     LocationFollow[]
+  claims      ClaimRequest[]
+  vendorLeads VendorLead[]
+
+  @@index([regionId, status])
+  @@index([latitude, longitude])
+  @@index([status, locationType])
+}
+
+/// A recurring organized marketplace at a Location.
+model Market {
+  id       String @id @default(cuid())
+  regionId String
+  region   Region @relation(fields: [regionId], references: [id], onDelete: Cascade)
+
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  name        String
+  slug        String  @unique
+  description String?
+  marketType  String  @default("other")
+
+  websiteUrl   String?
+  instagramUrl String?
+  phone        String?
+  imageUrl     String?
+
+  organizerName  String?
+  organizerEmail String?
+
+  /// Claiming is a request an admin grants — never self-service.
+  claimedBySellerId String?
+  claimedBySeller   Seller? @relation("MarketClaimedBy", fields: [claimedBySellerId], references: [id], onDelete: SetNull)
+  isClaimed         Boolean @default(false)
+  claimedAt         DateTime?
+
+  status             String @default("pending")
+  verificationStatus String @default("community_submitted")
+
+  sourceType String  @default("community_submission")
+  sourceName String?
+  sourceUrl  String?
+
+  submittedBySellerId   String?
+  submittedBySeller     Seller?   @relation("MarketSubmittedBySeller", fields: [submittedBySellerId], references: [id], onDelete: SetNull)
+  submittedByCustomerId String?
+  submittedByCustomer   Customer? @relation("MarketSubmittedByCustomer", fields: [submittedByCustomerId], references: [id], onDelete: SetNull)
+  approvedByAdminId     String?
+  approvedByAdmin       Seller?   @relation("MarketApprovedByAdmin", fields: [approvedByAdminId], references: [id], onDelete: SetNull)
+  approvedAt            DateTime?
+  rejectedAt            DateTime?
+  rejectionReason       String?
+  reviewNotes           String?
+  lastVerifiedAt        DateTime?
+
+  candidateId   String?
+  duplicateOfId String?
+  duplicateOf   Market?  @relation("MarketDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates    Market[] @relation("MarketDuplicates")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  schedules   MarketSchedule[]
+  exceptions  MarketScheduleException[]
+  events      Event[]
+  appearances VendorAppearance[]
+  follows     MarketFollow[]
+  claims      ClaimRequest[]
+  vendorLeads VendorLead[]
+
+  @@index([regionId, status])
+  @@index([status, marketType])
+  @@index([locationId])
+}
+
+/// Structured recurrence for a market — never free text. One market can hold
+/// several rules (e.g. a summer evening schedule alongside a winter one).
+model MarketSchedule {
+  id       String @id @default(cuid())
+  marketId String
+  market   Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  /// weekly | monthly | one_time | seasonal
+  recurrence String @default("weekly")
+
+  /// 0=Sunday … 6=Saturday. Null for one_time.
+  dayOfWeek Int?
+  /// For monthly rules: 1–4 = first…fourth, -1 = last.
+  weekOfMonth Int?
+  /// For one_time rules, and the window bounds for seasonal rules.
+  startDate DateTime?
+  endDate   DateTime?
+
+  /// Local wall-clock times, "HH:MM" 24h — a market opens at 9am local
+  /// regardless of DST, so these are deliberately not UTC instants.
+  ///
+  /// Nullable because a source often gives us the day without the hours
+  /// ("Sundays"). Recording the day is real information; inventing 9am–2pm to
+  /// satisfy a NOT NULL would be fabrication. A rule with no times still drives
+  /// the Today/This Weekend filters and renders as "Sundays · hours not listed".
+  startTime String?
+  endTime   String?
+  timezone  String @default("America/Los_Angeles")
+
+  notes  String?
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([marketId, active])
+}
+
+/// A specific date a market is closed, moved, or special.
+model MarketScheduleException {
+  id       String @id @default(cuid())
+  marketId String
+  market   Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  /// The local calendar date affected (midnight local, stored UTC).
+  date DateTime
+  /// cancelled | closed | special_hours
+  type String @default("cancelled")
+  /// Overrides for special_hours.
+  startTime String?
+  endTime   String?
+  note      String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([marketId, date])
+  @@index([marketId, date])
+}
+
+/// A dated occurrence. May stand alone or belong to a market.
+model Event {
+  id       String @id @default(cuid())
+  regionId String
+  region   Region @relation(fields: [regionId], references: [id], onDelete: Cascade)
+
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  marketId   String?
+  market     Market?   @relation(fields: [marketId], references: [id], onDelete: SetNull)
+
+  name        String
+  slug        String  @unique
+  description String?
+  eventType   String  @default("other")
+
+  startDateTime DateTime
+  endDateTime   DateTime?
+
+  latitude  Float
+  longitude Float
+
+  imageUrl   String?
+  websiteUrl String?
+
+  status             String @default("pending")
+  verificationStatus String @default("community_submitted")
+
+  sourceType String  @default("community_submission")
+  sourceName String?
+  sourceUrl  String?
+
+  submittedBySellerId String?
+  submittedBySeller   Seller?   @relation("EventSubmittedBySeller", fields: [submittedBySellerId], references: [id], onDelete: SetNull)
+  approvedByAdminId   String?
+  approvedByAdmin     Seller?   @relation("EventApprovedByAdmin", fields: [approvedByAdminId], references: [id], onDelete: SetNull)
+  approvedAt          DateTime?
+  rejectedAt          DateTime?
+  rejectionReason     String?
+  reviewNotes         String?
+  lastVerifiedAt      DateTime?
+
+  candidateId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  appearances VendorAppearance[]
+
+  @@index([regionId, status, startDateTime])
+  @@index([status, startDateTime])
+  @@index([latitude, longitude])
+}
+
+/// "This vendor will be at this place on this date." Explicitly per-occurrence:
+/// a vendor at a weekly market is a row per week, never a standing assumption
+/// that they attend every time.
+model VendorAppearance {
+  id       String @id @default(cuid())
+  sellerId String
+  seller   Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  marketId   String?
+  market     Market?   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  eventId    String?
+  event      Event?    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  /// The drop customers can preorder ahead of this appearance.
+  dropId String?
+  drop   Drop?   @relation(fields: [dropId], references: [id], onDelete: SetNull)
+
+  startDateTime DateTime
+  endDateTime   DateTime?
+
+  boothInfo String?
+  notes     String?
+
+  /// scheduled | confirmed | cancelled | completed
+  status String @default("scheduled")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sellerId, startDateTime])
+  @@index([marketId, startDateTime, status])
+  @@index([locationId, startDateTime, status])
+  @@index([eventId, startDateTime, status])
+  @@index([status, startDateTime])
+}
+
+model LocationFollow {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([customerId, locationId])
+  @@index([locationId])
+}
+
+model MarketFollow {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  marketId   String
+  market     Market   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([customerId, marketId])
+  @@index([marketId])
+}
+
+/// Raw inbound record from any ingestion provider, before it is anything real.
+/// Nothing is promoted to a Location/Market/Event without an admin acting on it.
+model DropMeetCandidate {
+  id       String  @id @default(cuid())
+  regionId String?
+  region   Region? @relation(fields: [regionId], references: [id], onDelete: SetNull)
+
+  /// location | market | event
+  entityType String
+  /// community_submission | manual_research | import | places_api | organizer
+  sourceType String
+  sourceName String?
+  sourceUrl  String?
+  /// Provider's own id, for idempotent re-imports.
+  externalId String?
+
+  rawName        String
+  rawAddress     String?
+  rawSchedule    String?
+  rawDescription String?
+  rawWebsite     String?
+  rawPhone       String?
+
+  latitude  Float?
+  longitude Float?
+
+  /// Cleaned, admin-editable payload applied on approval.
+  normalizedData  Json?
+  confidenceScore Float?
+
+  /// Result of the server-side region check at ingest time.
+  insideRegion Boolean?
+
+  /// pending | approved | rejected | duplicate | needs_review
+  status String @default("pending")
+
+  /// Set once promoted, so we can trace a live record back to its source.
+  promotedLocationId String?
+  promotedMarketId   String?
+  promotedEventId    String?
+
+  suggestedDuplicateId String?
+  reviewNotes          String?
+  reviewedByAdminId    String?
+  reviewedByAdmin      Seller?   @relation("CandidateReviewedBy", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  reviewedAt           DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sourceType, externalId])
+  @@index([status, entityType])
+  @@index([regionId, status])
+}
+
+/// "I run this market" — a request, never an automatic grant.
+model ClaimRequest {
+  id String @id @default(cuid())
+
+  /// location | market
+  entityType String
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  marketId   String?
+  market     Market?   @relation(fields: [marketId], references: [id], onDelete: Cascade)
+
+  name         String
+  email        String
+  role         String?
+  organization String?
+  message      String?
+
+  /// Set when the claimant was signed in as a vendor.
+  claimantSellerId String?
+  claimantSeller   Seller? @relation("ClaimClaimant", fields: [claimantSellerId], references: [id], onDelete: SetNull)
+
+  /// pending | approved | rejected
+  status            String    @default("pending")
+  reviewedByAdminId String?
+  reviewedByAdmin   Seller?   @relation("ClaimReviewedBy", fields: [reviewedByAdminId], references: [id], onDelete: SetNull)
+  reviewedAt        DateTime?
+  reviewNotes       String?
+
+  createdAt DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@index([locationId])
+  @@index([marketId])
+}
+
+/// "Know a vendor who sells here?" — a growth lead, not an account.
+model VendorLead {
+  id String @id @default(cuid())
+
+  locationId String?
+  location   Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  marketId   String?
+  market     Market?   @relation(fields: [marketId], references: [id], onDelete: SetNull)
+
+  businessName   String
+  website        String?
+  email          String?
+  phone          String?
+  submitterEmail String?
+
+  /// new | contacted | joined | rejected
+  status String @default("new")
+  notes  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
 }

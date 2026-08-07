@@ -10,6 +10,7 @@ import {
 } from "@/lib/orders";
 import { updateOrderStatusAction } from "@/lib/actions/dashboard";
 import { StatusSelect } from "@/components/status-select";
+import { MessageCustomerButton } from "@/components/message-customer-button";
 
 export type LiveOrder = {
   id: string;
@@ -115,6 +116,10 @@ export function LiveOrders({
                     {o.buyerPhone ? `${o.buyerPhone} · ` : ""}
                     {o.buyerEmail} · {relativeTime(new Date(o.createdAt))}
                   </p>
+                  {/* Reach the buyer without leaving the live feed. */}
+                  <div className="mt-2">
+                    <MessageCustomerButton orderId={o.id} label="Message" />
+                  </div>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="font-semibold">{formatMoney(o.totalCents)}</span>

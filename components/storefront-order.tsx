@@ -367,9 +367,15 @@ export function StorefrontOrder({
             required
             className="w-full bg-cream/60 border border-line-strong rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-ink/40"
           />
+          {/*
+            Transactional-only notice for the required phone field. These texts
+            are order status updates, not marketing — marketing consent is
+            collected separately and unbundled on the waitlist form. STOP/HELP
+            is handled automatically by the Twilio Messaging Service.
+          */}
           <p className="text-xs text-muted leading-snug">
             We&apos;ll text you order updates (received &amp; ready for pickup). Msg &amp; data
-            rates may apply.
+            rates may apply. Reply STOP to opt out, HELP for help.
           </p>
           <textarea
             name="note"
