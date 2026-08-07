@@ -186,7 +186,7 @@ export default async function AdminHome({
               className="flex flex-wrap items-center justify-end gap-3"
             >
               <p className="text-sm text-muted">Sends to {me.email}.</p>
-              <Button type="submit" variant="dark">Send test email to me</Button>
+              <Button type="submit" variant="dark" className="w-56">Send test email to me</Button>
             </form>
 
             <div>
@@ -202,7 +202,7 @@ export default async function AdminHome({
                   aria-label="Phone number for the test message"
                   className="w-48 bg-paper border border-line-strong rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition"
                 />
-                <Button type="submit" variant="secondary">Send test SMS</Button>
+                <Button type="submit" variant="secondary" className="w-56">Send test SMS</Button>
               </form>
               <p className="text-sm text-muted mt-1.5">Texts that number via Twilio.</p>
             </div>
