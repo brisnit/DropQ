@@ -50,14 +50,8 @@ export default async function DashboardLayout({
     <div className="min-h-screen md:grid md:grid-cols-[260px_1fr]">
       {/* Sidebar — desktop only */}
       <aside className="hidden md:flex md:border-r border-line bg-cream md:h-screen md:sticky md:top-0 flex-col">
-        <div className="px-5 py-4 border-b border-line/70 flex items-center justify-between gap-2">
+        <div className="px-5 py-4 border-b border-line/70">
           <Logo href="/dashboard" />
-          <NotificationBell
-            viewer="vendor"
-            initialItems={bellItems}
-            initialUnread={notificationUnread}
-            markAllAction={markAllNotificationsReadAction}
-          />
         </div>
         <div className="p-4 flex-1">
           <DashboardNav unread={unread} />
@@ -125,6 +119,19 @@ export default async function DashboardLayout({
             </div>
           </div>
         </div>
+        {/* Desktop chrome. Lives in <main>, not the sidebar, so the bell sits
+            at the far right of the screen on every dashboard page. Height
+            matches the mobile bar (3.5rem) so full-height pages can use one
+            calc for both breakpoints. */}
+        <div className="hidden md:flex sticky top-0 z-30 h-14 items-center justify-end px-5 bg-cream/95 backdrop-blur border-b border-line">
+          <NotificationBell
+            viewer="vendor"
+            initialItems={bellItems}
+            initialUnread={notificationUnread}
+            markAllAction={markAllNotificationsReadAction}
+          />
+        </div>
+
         <Suspense fallback={null}>
           <VerifyBanner verified={seller.emailVerified} />
         </Suspense>
