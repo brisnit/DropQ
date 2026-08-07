@@ -408,7 +408,7 @@ export function DropMeetMap({ items, selectedId, onSelect, onBoundsChange, class
   if (!TOKEN || failure) {
     return (
       <div
-        className={`relative bg-cream border border-line flex items-center justify-center ${className ?? ""}`}
+        className={`w-full h-full bg-cream border border-line flex items-center justify-center ${className ?? ""}`}
       >
         <div className="text-center p-6 max-w-xs">
           <div className="text-3xl">🗺️</div>
@@ -427,5 +427,18 @@ export function DropMeetMap({ items, selectedId, onSelect, onBoundsChange, class
     );
   }
 
-  return <div ref={containerRef} className={className} aria-label="Map of DropMeet places" />;
+  /**
+   * w-full h-full, never `absolute inset-0`. mapbox-gl.css declares
+   * `.mapboxgl-map { position: relative }` and loads after Tailwind — same
+   * specificity, so it wins and any `absolute` class here is silently
+   * overridden, which collapses the container to 0px. Sizing by width/height
+   * doesn't care what `position` ends up being.
+   */
+  return (
+    <div
+      ref={containerRef}
+      className={`w-full h-full ${className ?? ""}`}
+      aria-label="Map of DropMeet places"
+    />
+  );
 }

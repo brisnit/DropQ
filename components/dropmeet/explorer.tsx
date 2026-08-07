@@ -161,7 +161,6 @@ export function DropMeetExplorer({
             }
           }}
           onBoundsChange={onBoundsChange}
-          className="absolute inset-0"
         />
 
         {/* Mobile search + filters float over the map */}
