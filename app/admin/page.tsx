@@ -122,30 +122,11 @@ export default async function AdminHome({
 
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
-        <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">Vendors</h1>
-          <p className="text-muted mt-1">Every vendor on DropQ.</p>
-        </div>
-        <form action={grantAdminByEmailAction} className="flex items-end gap-2">
-          <div>
-            <label className="block text-xs font-medium text-muted mb-1">Grant admin by email</label>
-            <Input name="email" type="email" placeholder="teammate@email.com" className="w-56" />
-          </div>
-          <Button type="submit" variant="dark">🛡️ Make admin</Button>
-        </form>
+      <div className="mb-6">
+        <h1 className="font-display text-3xl font-semibold tracking-tight">Vendors</h1>
+        <p className="text-muted mt-1">Every vendor on DropQ.</p>
       </div>
 
-      {sp.admin === "granted" && (
-        <p className="mb-5 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">
-          ✓ {sp.email} is now a DropQ admin.
-        </p>
-      )}
-      {sp.admin === "notfound" && (
-        <p className="mb-5 text-sm bg-brand-tint text-brand-dark rounded-lg px-3 py-2">
-          No DropQ account found for {sp.email}. They need to sign up first, then grant admin.
-        </p>
-      )}
       {sp.deleted && (
         <p className="mb-5 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">
           ✓ Vendor deleted.
@@ -421,6 +402,33 @@ export default async function AdminHome({
             );
           })}
         </div>
+      </div>
+
+      {/* Grant admin — parked at the bottom left. It's a rare, privileged
+          action, so it shouldn't compete with the page heading. Its result
+          messages live here too; confirming a submit at the top of a long page
+          would land off-screen. */}
+      <div className="mt-10 pt-6 border-t border-line max-w-md">
+        {sp.admin === "granted" && (
+          <p className="mb-4 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">
+            ✓ {sp.email} is now a DropQ admin.
+          </p>
+        )}
+        {sp.admin === "notfound" && (
+          <p className="mb-4 text-sm bg-brand-tint text-brand-dark rounded-lg px-3 py-2">
+            No DropQ account found for {sp.email}. They need to sign up first, then grant admin.
+          </p>
+        )}
+        <form action={grantAdminByEmailAction} className="flex flex-wrap items-end gap-2">
+          <div>
+            <label className="block text-xs font-medium text-muted mb-1">Grant admin by email</label>
+            <Input name="email" type="email" placeholder="teammate@email.com" className="w-56" />
+          </div>
+          <Button type="submit" variant="dark">Make admin</Button>
+        </form>
+        <p className="text-xs text-muted mt-2">
+          Full access to every vendor, order, and payout. They must already have a DropQ account.
+        </p>
       </div>
     </div>
   );
