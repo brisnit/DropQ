@@ -131,6 +131,10 @@ model Seller {
   claimsMade         ClaimRequest[]      @relation("ClaimClaimant")
   claimsReviewed     ClaimRequest[]      @relation("ClaimReviewedBy")
 
+  // Customer relationships
+  acquiredCustomers   Customer[]       @relation("CustomerFirstVendor")
+  customerRelationships CustomerVendor[]
+
   @@index([salesRepId])
 }
 
@@ -303,6 +307,9 @@ model Drop {
 
   // DropMeet — appearances where this drop is preorderable
   appearances VendorAppearance[]
+
+  // Customers whose very first DropQ touch was this drop
+  acquiredCustomers Customer[] @relation("CustomerFirstDrop")
 
   @@index([status])
 }
@@ -486,6 +493,22 @@ model Customer {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
+  /// ── First-touch acquisition ──────────────────────────────────────────
+  /// Which vendor brought this person to DropQ, and how. Written once, on
+  /// the first interaction we can attribute, and never overwritten — a
+  /// customer who later discovers ten other vendors is still *originally*
+  /// vendor A's. Per-vendor relationships live on CustomerVendor.
+  firstVendorId String?
+  firstVendor   Seller? @relation("CustomerFirstVendor", fields: [firstVendorId], references: [id], onDelete: SetNull)
+  firstDropId   String?
+  firstDrop     Drop?   @relation("CustomerFirstDrop", fields: [firstDropId], references: [id], onDelete: SetNull)
+  /// storefront | drop | qr | dropmeet | checkout | direct | admin
+  signupSource     String?
+  /// Free-form provenance for the entry point (a slug, a ref code, a share id).
+  signupSourceDetail String?
+  firstTouchAt     DateTime?
+  firstPurchaseAt  DateTime?
+
   orders        Order[]
   conversations Conversation[]
   sentMessages  Message[]       @relation("MessageSenderCustomer")
@@ -497,6 +520,10 @@ model Customer {
   submittedMarkets   Market[]         @relation("MarketSubmittedByCustomer")
   locationFollows    LocationFollow[]
   marketFollows      MarketFollow[]
+
+  vendorRelationships CustomerVendor[]
+
+  @@index([firstVendorId])
 }
 
 // Single-use, expiring magic-link tokens for customer sign-in. Mirrors the
@@ -1131,4 +1158,40 @@ model VendorLead {
   updatedAt DateTime @updatedAt
 
   @@index([status, createdAt])
+}
+
+
+/// The customer↔vendor relationship. One row per pair, created the first time
+/// they interact — a follow, a purchase, or signing up through that vendor.
+///
+/// Distinct from Customer.firstVendorId on purpose: that records who brought
+/// them to the platform and never changes, while this accumulates every vendor
+/// they go on to deal with. A customer acquired by vendor A who later buys from
+/// vendor B has one CustomerVendor row per vendor and still attributes their
+/// acquisition to A.
+model CustomerVendor {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  sellerId   String
+  seller     Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  /// Set when they explicitly follow. Null means the relationship exists
+  /// (they bought something) but they haven't opted into hearing from them.
+  followedAt DateTime?
+
+  firstPurchaseAt DateTime?
+  lastPurchaseAt  DateTime?
+  orderCount      Int       @default(0)
+  totalSpentCents Int       @default(0)
+
+  /// How the relationship started: purchase | follow | signup | dropmeet | import
+  relationshipSource String @default("purchase")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([customerId, sellerId])
+  @@index([sellerId, followedAt])
+  @@index([customerId, lastPurchaseAt])
 }

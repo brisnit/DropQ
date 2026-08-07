@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { consumeMagicLinkToken, createCustomerSession } from "@/lib/customer-auth";
+import { applyFirstTouch } from "@/lib/attribution";
 
 /**
  * Magic-link landing. Burns the token, opens a customer session, and forwards
@@ -22,6 +23,10 @@ export async function GET(request: Request) {
   await prisma.customer
     .update({ where: { id: customerId }, data: { lastSeenAt: new Date() } })
     .catch(() => {});
+
+  // Attribute the account to whichever vendor's page they entered through, if
+  // they don't already have a first touch.
+  await applyFirstTouch(customerId);
 
   return NextResponse.redirect(new URL(next, url.origin));
 }

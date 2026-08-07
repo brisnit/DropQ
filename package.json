@@ -11,7 +11,8 @@
     "db:seed": "node --env-file=.env prisma/seed.mjs",
     "db:backfill-customers": "node --env-file=.env prisma/backfill-customers.mjs",
     "db:seed-region": "node --env-file=.env prisma/seed-region.mjs",
-    "db:seed-dropmeet": "node --env-file=.env prisma/seed-dropmeet-sd.mjs"
+    "db:seed-dropmeet": "node --env-file=.env prisma/seed-dropmeet-sd.mjs",
+    "db:backfill-attribution": "node --env-file=.env prisma/backfill-attribution.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

@@ -12,6 +12,7 @@ import { dropMapsUrl } from "@/lib/maps";
 import { sendSms } from "@/lib/notifications";
 import { isDemoStore } from "@/lib/demo";
 import { upsertCustomer } from "@/lib/customer-auth";
+import { applyFirstTouch, recordRelationship } from "@/lib/attribution";
 
 export type OrderState = { error?: string };
 
@@ -100,6 +101,25 @@ export async function placeOrderAction(
     return null;
   });
   const customerId = customer?.id ?? null;
+
+  // Attribution. Best-effort and never allowed to block a sale: a customer who
+  // reached checkout through this vendor is attributed to them if they have no
+  // earlier first touch, and the vendor relationship is recorded either way.
+  if (customerId) {
+    await applyFirstTouch(customerId, {
+      vendorId: drop.sellerId,
+      dropId: drop.id,
+      source: "checkout",
+      detail: drop.seller.slug,
+    }).catch(() => {});
+    await recordRelationship({
+      customerId,
+      sellerId: drop.sellerId,
+      source: "purchase",
+      // Buying is not consent to be marketed to — no implicit follow.
+      purchase: { at: new Date(), amountCents: totalCents },
+    }).catch(() => {});
+  }
 
   // ----- Real payments via Stripe Connect (destination charge + platform fee) -----
   if (useStripe && stripe) {
