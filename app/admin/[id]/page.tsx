@@ -88,24 +88,11 @@ export default async function AdminClientPage({
             {seller.location ? ` · ${seller.location}` : ""}
           </p>
         </div>
+        {/* Admin grant/revoke lives with the other account-level actions at the
+            bottom of the page, so the header carries only navigation. */}
         <div className="flex items-center gap-2">
-          {seller.id === me.id ? (
+          {seller.id === me.id && (
             <span className="text-sm text-muted px-3 py-2.5">That&apos;s you</span>
-          ) : (
-            <form action={setAdminAction}>
-              <input type="hidden" name="targetId" value={seller.id} />
-              <input type="hidden" name="makeAdmin" value={seller.isAdmin ? "false" : "true"} />
-              {seller.isAdmin ? (
-                <ConfirmSubmit
-                  message={`Remove admin access from ${seller.email}?`}
-                  className="text-sm font-medium px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-brand hover:text-brand transition"
-                >
-                  Revoke admin
-                </ConfirmSubmit>
-              ) : (
-                <Button type="submit" variant="dark">Make admin</Button>
-              )}
-            </form>
           )}
           <Link
             href={`/s/${seller.slug}`}
@@ -229,7 +216,7 @@ export default async function AdminClientPage({
         </div>
       </div>
 
-      {/* Danger zone — remove a vendor entirely */}
+      {/* Account-level actions — admin access, suspension, deletion */}
       {suspend === "on" && (
         <p className="mt-6 text-sm bg-brand-tint text-brand-dark rounded-lg px-3 py-2">🚫 Vendor suspended — they can no longer log in and their storefront is offline.</p>
       )}
@@ -239,8 +226,36 @@ export default async function AdminClientPage({
 
       {seller.id !== me.id && (
         <div className="mt-10 pt-6 border-t border-line space-y-5">
-          {/* Suspend / reinstate */}
+          {/* Admin access */}
           <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold">
+                {seller.isAdmin ? "Revoke admin access" : "Make this vendor an admin"}
+              </p>
+              <p className="text-sm text-muted">
+                {seller.isAdmin
+                  ? `${seller.storeName} can currently see every vendor, order, and payout on DropQ. Revoking leaves their own store untouched.`
+                  : "Grants access to the whole DropQ admin area — every vendor, order, payout, and setting across the platform."}
+              </p>
+            </div>
+            <form action={setAdminAction}>
+              <input type="hidden" name="targetId" value={seller.id} />
+              <input type="hidden" name="makeAdmin" value={seller.isAdmin ? "false" : "true"} />
+              <ConfirmSubmit
+                message={
+                  seller.isAdmin
+                    ? `Remove admin access from ${seller.email}?`
+                    : `Give ${seller.email} admin access to all of DropQ? They'll be able to see and change every vendor, order, and payout.`
+                }
+                className="text-sm font-semibold px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
+              >
+                {seller.isAdmin ? "Revoke admin" : "Make admin"}
+              </ConfirmSubmit>
+            </form>
+          </div>
+
+          {/* Suspend / reinstate */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-5 border-t border-line">
             <div>
               <p className="font-semibold">{seller.disabledAt ? "Reinstate this vendor" : "Suspend this vendor"}</p>
               <p className="text-sm text-muted">
