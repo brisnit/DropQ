@@ -78,7 +78,8 @@ export function DropMeetMap({ items, selectedId, onSelect, onBoundsChange, class
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [ready, setReady] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const onBoundsRef = useRef(onBoundsChange);
   const onSelectRef = useRef(onSelect);
   const itemsRef = useRef(items);
@@ -130,7 +131,7 @@ export function DropMeetMap({ items, selectedId, onSelect, onBoundsChange, class
         });
       } catch (e) {
         console.error("Mapbox failed to initialise:", e);
-        setFailed(true);
+        setFailure(e instanceof Error ? e.message : "The map failed to start.");
         return;
       }
 
@@ -141,7 +142,34 @@ export function DropMeetMap({ items, selectedId, onSelect, onBoundsChange, class
         "top-right"
       );
 
-      map.on("error", (e) => console.error("Mapbox error:", e?.error ?? e));
+      /**
+       * Mapbox reports a bad token asynchronously — the constructor succeeds and
+       * the 401 arrives here when the style request fails. Without surfacing it
+       * the user just gets a blank canvas, so fatal errors are promoted to the
+       * fallback panel. Transient tile errors are logged and ignored.
+       */
+      map.on("error", (e) => {
+        const err = e?.error as (Error & { status?: number }) | undefined;
+        console.error("Mapbox error:", err ?? e);
+
+        const status = err?.status;
+        const message = err?.message ?? "";
+        if (status === 401 || status === 403) {
+          setFailure(
+            "Mapbox rejected the token (HTTP " +
+              status +
+              "). Check NEXT_PUBLIC_MAPBOX_TOKEN is a public 'pk.' token and that this domain is allowed in its URL restrictions."
+          );
+        } else if (/style/i.test(message) && /load|fetch|not found/i.test(message)) {
+          setFailure("The map style failed to load. " + message);
+        }
+      });
+
+      // A zero-height container at init leaves Mapbox with a 0x0 canvas that
+      // never repaints — likely here because we await the region fetch first.
+      const ro = new ResizeObserver(() => map.resize());
+      ro.observe(containerRef.current);
+      resizeObserverRef.current = ro;
 
       map.on("load", () => {
         if (cancelled) return;
@@ -288,12 +316,16 @@ export function DropMeetMap({ items, selectedId, onSelect, onBoundsChange, class
           });
         };
         map.on("moveend", emit);
+        // Re-measure now the style is up, in case layout settled after init.
+        map.resize();
         setReady(true);
       });
     })();
 
     return () => {
       cancelled = true;
+      resizeObserverRef.current?.disconnect();
+      resizeObserverRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
     };
@@ -319,7 +351,7 @@ export function DropMeetMap({ items, selectedId, onSelect, onBoundsChange, class
   }, [selectedId, items, ready]);
 
   // ── No token / failure fallback ──────────────────────────────────────────
-  if (!TOKEN || failed) {
+  if (!TOKEN || failure) {
     return (
       <div
         className={`relative bg-cream border border-line flex items-center justify-center ${className ?? ""}`}
@@ -327,13 +359,15 @@ export function DropMeetMap({ items, selectedId, onSelect, onBoundsChange, class
         <div className="text-center p-6 max-w-xs">
           <div className="text-3xl">🗺️</div>
           <p className="font-display font-semibold mt-2">
-            {failed ? "Map unavailable" : "Map not configured"}
+            {failure ? "Map unavailable" : "Map not configured"}
           </p>
-          <p className="text-sm text-muted mt-1">
-            {failed
-              ? "The map failed to load. The list below still works."
-              : "Add NEXT_PUBLIC_MAPBOX_TOKEN to switch the map on. Everything else works without it."}
+          <p className="text-sm text-muted mt-1 break-words">
+            {failure ??
+              "Add NEXT_PUBLIC_MAPBOX_TOKEN to switch the map on. Everything else works without it."}
           </p>
+          {failure && (
+            <p className="text-xs text-muted mt-2">Everything else on this page still works.</p>
+          )}
         </div>
       </div>
     );
