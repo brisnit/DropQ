@@ -243,6 +243,23 @@ export default async function MarketPage({ params }: Params) {
         </section>
 
         {/* Organizer */}
+
+        {/* Community CTA — noticing a gap usually happens while looking at a
+            place you already know. */}
+        <section className="mt-6 bg-paper border border-dashed border-line-strong rounded-card p-5 text-center">
+          <p className="font-display font-semibold">Know another place we&apos;re missing?</p>
+          <p className="text-sm text-muted mt-1">
+            Add any San Diego County spot where local vendors sell. Our team reviews every
+            submission.
+          </p>
+          <Link
+            href="/dropmeet/add"
+            className="mt-4 inline-flex items-center justify-center gap-2 min-h-[48px] px-6 rounded-pill bg-ink text-cream text-sm font-semibold transition active:scale-[0.98] hover:bg-ink-soft"
+          >
+            <span aria-hidden>📍</span> Add a place
+          </Link>
+        </section>
+
         <section className="mt-8">
           <ClaimPanel entityType="market" entityId={market.id} name={market.name} />
         </section>

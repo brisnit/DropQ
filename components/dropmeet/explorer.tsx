@@ -125,9 +125,27 @@ export function DropMeetExplorer({
           </Link>
         </div>
       ) : (
-        items.map((i) => (
-          <DropMeetCard key={i.id} item={i} active={highlighted === i.id} onHover={setHovered} />
-        ))
+        <>
+          {items.map((i) => (
+            <DropMeetCard key={i.id} item={i} active={highlighted === i.id} onHover={setHovered} />
+          ))}
+
+          {/* Closing invitation. Reaching the end of the list is the moment
+              someone is most likely to notice what's missing. */}
+          <div className="p-5 text-center border-t border-line bg-cream/40">
+            <p className="font-display font-semibold">Know a place we&apos;re missing?</p>
+            <p className="text-sm text-muted mt-1 max-w-xs mx-auto">
+              DropMeet is built by the community — markets, breweries, churches, pop-ups. Add one
+              and we&apos;ll review it.
+            </p>
+            <Link
+              href="/dropmeet/add"
+              className="mt-4 inline-flex items-center justify-center gap-2 min-h-[48px] px-6 rounded-pill bg-ink text-cream text-sm font-semibold transition active:scale-[0.98] hover:bg-ink-soft"
+            >
+              <span aria-hidden>📍</span> Add a place
+            </Link>
+          </div>
+        </>
       )}
     </>
   );
@@ -229,18 +247,31 @@ export function DropMeetExplorer({
           <div
             className={`lg:hidden absolute inset-x-0 bottom-0 z-20 bg-paper border-t border-line rounded-t-3xl shadow-[var(--shadow-lift)] flex flex-col transition-[height] duration-200 ${SHEET_CLASS[sheet]}`}
           >
-            <button
-              type="button"
-              onClick={() => setSheet((s) => (s === "peek" ? "half" : s === "half" ? "full" : "peek"))}
-              aria-label="Resize results panel"
-              className="shrink-0 py-3 flex flex-col items-center gap-1.5"
-            >
-              <span className="w-10 h-1 rounded-full bg-line-strong" aria-hidden />
-              <span className="text-xs font-semibold text-ink-soft">
-                {counts.total} place{counts.total === 1 ? "" : "s"}
-                {counts.preorder > 0 ? ` · ${counts.preorder} with preorders` : ""}
-              </span>
-            </button>
+            {/* Grab handle doubles as the resize control. The Add CTA sits
+                beside it rather than inside it — a link nested in a button is
+                invalid, and this keeps both reachable one-handed. */}
+            <div className="shrink-0 flex items-center gap-2 pl-3 pr-3">
+              <button
+                type="button"
+                onClick={() =>
+                  setSheet((s) => (s === "peek" ? "half" : s === "half" ? "full" : "peek"))
+                }
+                aria-label={`Results panel, ${sheet}. Tap to resize.`}
+                className="flex-1 min-w-0 py-3 flex flex-col items-center gap-1.5"
+              >
+                <span className="w-10 h-1 rounded-full bg-line-strong" aria-hidden />
+                <span className="text-xs font-semibold text-ink-soft truncate max-w-full">
+                  {counts.total} place{counts.total === 1 ? "" : "s"}
+                  {counts.preorder > 0 ? ` · ${counts.preorder} with preorders` : ""}
+                </span>
+              </button>
+              <Link
+                href="/dropmeet/add"
+                className="shrink-0 inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 rounded-pill bg-ink text-cream text-sm font-semibold transition active:scale-[0.98]"
+              >
+                <span aria-hidden>📍</span> Add
+              </Link>
+            </div>
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">{list}</div>
           </div>
         )}
@@ -330,15 +361,20 @@ function Header({
 }) {
   return (
     <div className="shrink-0 p-4 border-b border-line">
-      <div className="flex items-baseline justify-between gap-2">
-        <h1 className="font-display text-xl font-semibold">DropMeet</h1>
-        <Link href="/dropmeet/add" className="text-xs font-semibold text-brand hover:underline">
-          Add a place
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-xl font-semibold">DropMeet</h1>
+          <p className="text-sm text-muted mt-0.5">
+            Discover local markets, vendors, drops, and gathering places in {regionName}.
+          </p>
+        </div>
+        <Link
+          href="/dropmeet/add"
+          className="shrink-0 inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 rounded-pill bg-ink text-cream text-sm font-semibold transition active:scale-[0.98] hover:bg-ink-soft"
+        >
+          <span aria-hidden>📍</span> Add
         </Link>
       </div>
-      <p className="text-sm text-muted mt-0.5">
-        Discover local markets, vendors, drops, and gathering places in {regionName}.
-      </p>
       <div className="mt-3">
         <SearchBox query={query} setQuery={setQuery} />
       </div>
