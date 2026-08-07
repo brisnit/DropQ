@@ -178,24 +178,34 @@ export default async function AdminHome({
               </div>
             </dl>
           </div>
+          {/* Each test sits on one line — its context to the left, its action
+              right-aligned so the two buttons stack in a clean column. */}
           <div className="shrink-0 space-y-3">
-            <form action={sendTestEmailAction}>
+            <form
+              action={sendTestEmailAction}
+              className="flex flex-wrap items-center justify-end gap-3"
+            >
+              <p className="text-sm text-muted">Sends to {me.email}.</p>
               <Button type="submit" variant="dark">Send test email to me</Button>
-              <p className="text-xs text-muted mt-1.5 max-w-[13rem]">Sends to {me.email}.</p>
             </form>
-            <form action={sendTestSmsAction} className="flex flex-col gap-1.5">
-              <div className="flex gap-2">
+
+            <div>
+              <form
+                action={sendTestSmsAction}
+                className="flex flex-wrap items-center justify-end gap-3"
+              >
                 <input
                   name="phone"
                   type="tel"
                   required
                   placeholder="+1 555 000 1234"
-                  className="w-40 bg-paper border border-line-strong rounded-lg px-3 py-2 text-sm"
+                  aria-label="Phone number for the test message"
+                  className="w-48 bg-paper border border-line-strong rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition"
                 />
                 <Button type="submit" variant="secondary">Send test SMS</Button>
-              </div>
-              <p className="text-xs text-muted max-w-[13rem]">Texts that number via Twilio.</p>
-            </form>
+              </form>
+              <p className="text-sm text-muted mt-1.5">Texts that number via Twilio.</p>
+            </div>
           </div>
         </div>
 
