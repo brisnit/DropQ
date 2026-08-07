@@ -140,9 +140,9 @@ export function DropMeetExplorer({
             </p>
             <Link
               href="/dropmeet/add"
-              className="mt-4 inline-flex items-center justify-center gap-2 min-h-[48px] px-6 rounded-pill bg-ink text-cream text-sm font-semibold transition active:scale-[0.98] hover:bg-ink-soft"
+              className="mt-4 inline-flex items-center justify-center min-h-[48px] px-6 rounded-pill bg-ink text-cream text-sm font-semibold transition active:scale-[0.98] hover:bg-ink-soft"
             >
-              <span aria-hidden>📍</span> Add a place
+              Add a place
             </Link>
           </div>
         </>
@@ -267,9 +267,9 @@ export function DropMeetExplorer({
               </button>
               <Link
                 href="/dropmeet/add"
-                className="shrink-0 inline-flex items-center justify-center gap-1.5 min-h-[40px] px-4 rounded-pill bg-ink text-cream text-sm font-semibold transition active:scale-[0.98]"
+                className="shrink-0 inline-flex items-center justify-center min-h-[40px] px-4 rounded-pill bg-ink text-cream text-sm font-semibold transition active:scale-[0.98]"
               >
-                <span aria-hidden>📍</span> Add
+                Add a place
               </Link>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">{list}</div>
@@ -370,9 +370,9 @@ function Header({
         </div>
         <Link
           href="/dropmeet/add"
-          className="shrink-0 inline-flex items-center justify-center gap-1.5 min-h-[44px] px-5 rounded-pill bg-ink text-cream text-sm font-semibold transition active:scale-[0.98] hover:bg-ink-soft shadow-[0_8px_20px_-8px_rgba(26,26,26,0.45)]"
+          className="shrink-0 inline-flex items-center justify-center min-h-[44px] px-5 rounded-pill bg-ink text-cream text-sm font-semibold transition active:scale-[0.98] hover:bg-ink-soft shadow-[0_8px_20px_-8px_rgba(26,26,26,0.45)]"
         >
-          <span aria-hidden>📍</span> Add a place
+          Add a place
         </Link>
       </div>
       <div className="mt-3">

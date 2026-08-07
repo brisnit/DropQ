@@ -254,9 +254,9 @@ export default async function MarketPage({ params }: Params) {
           </p>
           <Link
             href="/dropmeet/add"
-            className="mt-4 inline-flex items-center justify-center gap-2 min-h-[48px] px-6 rounded-pill bg-ink text-cream text-sm font-semibold transition active:scale-[0.98] hover:bg-ink-soft"
+            className="mt-4 inline-flex items-center justify-center min-h-[48px] px-6 rounded-pill bg-ink text-cream text-sm font-semibold transition active:scale-[0.98] hover:bg-ink-soft"
           >
-            <span aria-hidden>📍</span> Add a place
+            Add a place
           </Link>
         </section>
 
