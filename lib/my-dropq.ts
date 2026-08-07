@@ -194,6 +194,44 @@ export async function savedPlaces(customerId: string) {
   };
 }
 
+/** Drops the customer bookmarked, newest first. */
+export async function savedDrops(customerId: string) {
+  const rows = await prisma.savedDrop.findMany({
+    where: { customerId, drop: { seller: { disabledAt: null } } },
+    orderBy: { createdAt: "desc" },
+    include: {
+      drop: {
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          opensAt: true,
+          closesAt: true,
+          mode: true,
+          products: { select: { imageUrl: true }, take: 1 },
+          seller: { select: { id: true, slug: true, storeName: true, logoUrl: true } },
+        },
+      },
+    },
+  });
+
+  const now = new Date();
+  return rows.map((r) => ({
+    id: r.drop.id,
+    title: r.drop.title,
+    href: `/s/${r.drop.seller.slug}/${r.drop.id}`,
+    image: r.drop.products[0]?.imageUrl ?? null,
+    seller: r.drop.seller,
+    // A saved drop is only worth acting on while it's actually orderable.
+    canOrder: r.drop.status === "live" && isOrderingOpen({ ...r.drop }, now),
+    status: r.drop.status,
+    closesAt: r.drop.closesAt,
+    savedAt: r.createdAt,
+  }));
+}
+
+export type SavedDropCard = Awaited<ReturnType<typeof savedDrops>>[number];
+
 /**
  * Drop History — every drop the customer took part in, as a collection rather
  * than a receipt list. Grouped by drop, because joining a drop is the thing

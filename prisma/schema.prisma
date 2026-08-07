@@ -310,6 +310,7 @@ model Drop {
 
   // Customers whose very first DropQ touch was this drop
   acquiredCustomers Customer[] @relation("CustomerFirstDrop")
+  savedBy           SavedDrop[]
 
   @@index([status])
 }
@@ -509,6 +510,10 @@ model Customer {
   firstTouchAt     DateTime?
   firstPurchaseAt  DateTime?
 
+  /// Reserved for saved payment methods (decision 2). Populated when
+  /// SetupIntent-based card management ships; unused until then.
+  stripeCustomerId String? @unique
+
   orders        Order[]
   conversations Conversation[]
   sentMessages  Message[]       @relation("MessageSenderCustomer")
@@ -522,6 +527,7 @@ model Customer {
   marketFollows      MarketFollow[]
 
   vendorRelationships CustomerVendor[]
+  savedDrops          SavedDrop[]
 
   @@index([firstVendorId])
 }
@@ -1188,10 +1194,37 @@ model CustomerVendor {
   /// How the relationship started: purchase | follow | signup | dropmeet | import
   relationshipSource String @default("purchase")
 
+  /// Marketing consent, per vendor and per channel. Never inferred: buying is
+  /// not consent, and neither is following. Following means "tell me when they
+  /// drop" in-app; these mean "you may market to me on this channel".
+  ///   has_purchased  -> orderCount > 0
+  ///   is_following   -> followedAt
+  emailMarketingConsent   Boolean   @default(false)
+  smsMarketingConsent     Boolean   @default(false)
+  pushNotificationConsent Boolean   @default(false)
+  consentUpdatedAt        DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([customerId, sellerId])
   @@index([sellerId, followedAt])
   @@index([customerId, lastPurchaseAt])
+}
+
+
+/// A drop a customer saved for later. Server-side and cross-device, unlike the
+/// localStorage-only save in lib/saved-store.ts, which is per-browser and
+/// invisible to the rest of the platform.
+model SavedDrop {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  dropId     String
+  drop       Drop     @relation(fields: [dropId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([customerId, dropId])
+  @@index([dropId])
+  @@index([customerId, createdAt])
 }

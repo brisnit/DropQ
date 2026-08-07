@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { isStripeEnabled, feePercent } from "@/lib/stripe";
 import { StorefrontOrder } from "@/components/storefront-order";
+import { SaveDropButton } from "@/components/my/save-drop-button";
 import { WaitlistForm } from "@/components/waitlist-form";
 import { computeDropPhase, isOrderingOpen } from "@/lib/drop-status";
 import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
@@ -181,9 +182,16 @@ export default async function DropOrderPage({
               {phase === "pickup" ? "Pickup available" : "Ordering closed"}
             </span>
           )}
-          <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-3">
-            {drop.title}
-          </h1>
+          <div className="flex items-start justify-between gap-4 mt-3">
+            <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight">
+              {drop.title}
+            </h1>
+            {/* Save for later. Works whether or not ordering is open — a closed
+                drop is exactly the one worth bookmarking. */}
+            <div className="shrink-0 pt-1">
+              <SaveDropButton dropId={drop.id} returnTo={`/s/${drop.seller.slug}/${drop.id}`} variant="icon" />
+            </div>
+          </div>
           {drop.description && <p className="text-lg text-ink-soft mt-2 max-w-2xl">{drop.description}</p>}
           {drop.pickupInfo && (
             <p className="text-sm text-ink-soft mt-3 inline-flex items-center gap-2 bg-paper border border-line rounded-pill px-3.5 py-1.5">

@@ -50,8 +50,9 @@ nobody had been offered a follow, so recording one would have invented consent.
 - [x] 2.2 Home: greeting, active orders, followed vendors, upcoming drops from
       those vendors, nearby DropMeet activity
 - [x] 2.3 `/my/orders` — active vs past, order detail, receipt, reorder
-- [~] 2.4 `/my/saved` — vendors, markets and places done. Saving individual
-      drops/products needs a `SavedDrop` model; today's save is localStorage only
+- [x] 2.4 `/my/saved` — saved drops, followed vendors, markets and places.
+      `SavedDrop` is server-side and cross-device. Saving individual
+      *products* is still open (lib/saved-store.ts is localStorage only)
 - [x] 2.5 Move `/messages` under the same shell so it stops being a separate
       island
 - [x] 2.6 My Drop History — the visual, collection-style view of drops joined
@@ -125,16 +126,47 @@ Adding Google/Apple means one of:
 
 ---
 
-## Open decisions for you
+## Decisions — SETTLED
 
-1. **OAuth** — Auth.js, hand-rolled, or magic-link only? (Phase 6)
-2. **Saved cards** — worth the Stripe Customer/SetupIntent work? (Phase 5.1)
-3. **Rewards** — what does a point actually represent? (Phase 7.1)
-4. **Analytics sink** — PostHog, Segment, something else? (Phase 8.2)
-5. **Auto-follow on purchase** — should buying from a vendor automatically
-   follow them? Spec says use judgment. Recommendation: create the
-   relationship record always, but only opt into *marketing* with explicit
-   consent — buying isn't consent to be marketed to.
+1. **Authentication → Auth.js.** Google OAuth, Apple OAuth, and email
+   magic-link. UI stays fully DropQ-branded, and vendor/drop context survives
+   the auth round trip. Don't build a custom framework. Note: the existing
+   hand-rolled HMAC cookie serves *vendors* too, so Phase 6 has to migrate or
+   bridge both principals without logging everyone out.
+
+2. **Saved cards → Stripe Customers, but not a launch blocker.** Ship the
+   current checkout as-is. Prepare the schema for `stripeCustomerId` on
+   Customer now; add SetupIntent card management as a follow-up. Target
+   experience is very fast repeat purchase and Buy Again.
+
+3. **Rewards → $1 spent = 1 DropPoint.** No universal dollar value yet —
+   points are an earned balance that later unlocks configurable rewards.
+   Architect for two scopes from the start: DropQ-wide and vendor-specific
+   (e.g. 100 pts → free item, 250 pts → $10 vendor credit). No complex loyalty
+   economy at this stage.
+
+4. **Analytics → PostHog.** Product analytics, funnels, acquisition
+   attribution, drop/vendor conversion, DropMeet engagement, session replay,
+   feature flags, experiments. Go through a thin in-app abstraction rather than
+   calling PostHog from components, so the provider stays swappable.
+   (`lib/analytics.ts` already is that seam — point it at PostHog.)
+
+5. **Purchase ≠ Follow ≠ Marketing consent.** ✅ Implemented in Phase 1, with
+   the consent columns added alongside SavedDrop. A purchase automatically
+   records the relationship, first/last purchase date and order count. It never
+   sets `followedAt` and never grants marketing consent. The model distinguishes
+   all five states separately:
+
+   | Concept | Where it lives |
+   |---|---|
+   | `has_purchased` | `CustomerVendor.orderCount > 0` |
+   | `is_following` | `CustomerVendor.followedAt` |
+   | `email_marketing_consent` | `CustomerVendor.emailMarketingConsent` |
+   | `sms_marketing_consent` | `CustomerVendor.smsMarketingConsent` |
+   | `push_notification_consent` | `CustomerVendor.pushNotificationConsent` |
+
+   Post-checkout CTA ("Follow {Vendor} — get notified when they launch their
+   next drop") lands in Phase 3.
 
 ## Known gaps carried over
 

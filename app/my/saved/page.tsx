@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { requireCustomer } from "@/lib/customer-auth";
-import { followedVendorCards, savedPlaces } from "@/lib/my-dropq";
+import { followedVendorCards, savedPlaces, savedDrops } from "@/lib/my-dropq";
 import { toggleVendorFollowAction } from "@/lib/actions/vendor-follow";
+import { toggleSavedDropAction } from "@/lib/actions/saved-drop";
+import { Avatar } from "@/components/avatar";
 import { toggleLocationFollowAction, toggleMarketFollowAction } from "@/lib/actions/dropmeet";
 import { VendorCard } from "@/components/my/cards";
 import { locationTypeLabel, marketTypeLabel } from "@/lib/dropmeet/types";
@@ -10,12 +12,14 @@ export const metadata = { title: "Saved — My DropQ" };
 
 export default async function SavedPage() {
   const customer = await requireCustomer("/my/saved");
-  const [vendors, places] = await Promise.all([
+  const [vendors, places, drops] = await Promise.all([
     followedVendorCards(customer.id),
     savedPlaces(customer.id),
+    savedDrops(customer.id),
   ]);
 
-  const total = vendors.length + places.markets.length + places.locations.length;
+  const total =
+    vendors.length + places.markets.length + places.locations.length + drops.length;
 
   if (total === 0) {
     return (
@@ -23,8 +27,8 @@ export default async function SavedPage() {
         <div className="text-4xl">☆</div>
         <h1 className="font-display text-xl font-semibold mt-3">Nothing saved yet</h1>
         <p className="text-muted mt-2 max-w-sm mx-auto">
-          Follow a vendor to hear about their next drop, or save a market in DropMeet to keep it
-          handy.
+          Save a drop to come back to it, follow a vendor to hear about their next one, or save a
+          market in DropMeet to keep it handy.
         </p>
         <Link
           href="/dropmeet"
@@ -39,6 +43,57 @@ export default async function SavedPage() {
   return (
     <>
       <h1 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight mb-6">Saved</h1>
+
+      {drops.length > 0 && (
+        <section className="mb-9">
+          <h2 className="font-display text-lg font-semibold mb-3">
+            Saved drops ({drops.length})
+          </h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {drops.map((d) => (
+              <div
+                key={d.id}
+                className="bg-paper border border-line rounded-card overflow-hidden flex flex-col"
+              >
+                <Link href={d.href} className="block">
+                  {d.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={d.image} alt="" className="w-full h-32 object-cover" />
+                  ) : (
+                    <div className="w-full h-32 bg-grey-tint flex items-center justify-center text-3xl">
+                      🎁
+                    </div>
+                  )}
+                  <div className="p-3.5">
+                    <div className="flex items-center gap-2">
+                      <Avatar
+                        name={d.seller.storeName}
+                        imageUrl={d.seller.logoUrl}
+                        size="sm"
+                        seed={d.seller.id}
+                      />
+                      <span className="text-xs text-muted truncate">{d.seller.storeName}</span>
+                    </div>
+                    <p className="font-display font-semibold truncate mt-1.5">{d.title}</p>
+                    <p
+                      className={`text-xs mt-1 ${d.canOrder ? "text-brand font-semibold" : "text-muted"}`}
+                    >
+                      {d.canOrder ? "Ordering open" : "Not open right now"}
+                    </p>
+                  </div>
+                </Link>
+                <form action={toggleSavedDropAction} className="px-3.5 pb-3.5 mt-auto">
+                  <input type="hidden" name="dropId" value={d.id} />
+                  <input type="hidden" name="returnTo" value="/my/saved" />
+                  <button className="w-full min-h-[40px] rounded-pill border border-line-strong text-sm font-medium text-ink-soft hover:border-ink/30 transition">
+                    ★ Saved
+                  </button>
+                </form>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {vendors.length > 0 && (
         <section className="mb-9">
@@ -140,12 +195,6 @@ export default async function SavedPage() {
         </section>
       )}
 
-      {/* Saved individual drops/products aren't persisted server-side yet — the
-          existing "save" is localStorage only. Flagged rather than faked. */}
-      <p className="text-xs text-muted">
-        Saving individual drops and products is coming — today saving works for vendors, markets and
-        places.
-      </p>
     </>
   );
 }
