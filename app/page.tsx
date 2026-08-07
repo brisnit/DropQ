@@ -463,7 +463,7 @@ export default function Home() {
                 <LinkButton href="/dropmeet" variant="tertiary" size="lg">
                   Explore DropMeet
                 </LinkButton>
-                <LinkButton href="/dropmeet/add" variant="secondary" size="lg">
+                <LinkButton href="/dropmeet/add" variant="primary" size="lg">
                   Add a place
                 </LinkButton>
               </div>
