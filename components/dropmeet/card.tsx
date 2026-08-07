@@ -1,3 +1,9 @@
+"use client";
+
+// Attaches an onMouseEnter handler, so it must be a Client Component in its
+// own right. It previously only worked because the DropMeet explorer (which
+// is "use client") imported it; rendering it from a Server Component — as My
+// DropQ does — threw "Event handlers cannot be passed to Client Component props".
 import Link from "next/link";
 import type { DropMeetItem } from "@/lib/dropmeet/types";
 

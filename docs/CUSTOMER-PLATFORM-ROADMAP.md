@@ -25,34 +25,36 @@ Status legend: `[ ]` not started · `[~]` partially exists · `[x]` done
 
 ---
 
-## PHASE 1 — Foundation: attribution and relationships
+## PHASE 1 — Foundation: attribution and relationships ✅ SHIPPED
 
-Everything else depends on this, and **every day it isn't shipped is
-attribution data lost permanently**. Nothing here is user-visible on its own.
+Live on production. Backfill reconstructed 6 attributed customers, 10
+relationships, 2 cross-vendor buyers. `followedAt` left null everywhere —
+nobody had been offered a follow, so recording one would have invented consent.
 
-- [ ] 1.1 `Customer` acquisition fields: `firstVendorId`, `firstDropId`,
+- [x] 1.1 `Customer` acquisition fields: `firstVendorId`, `firstDropId`,
       `signupSource`, `firstTouchAt`, `firstPurchaseAt`
-- [ ] 1.2 `CustomerVendor` model — the customer↔vendor relationship:
+- [x] 1.2 `CustomerVendor` model — the customer↔vendor relationship:
       `followedAt`, `firstPurchaseAt`, `lastPurchaseAt`, `orderCount`,
       `relationshipSource`
-- [ ] 1.3 Capture first-touch on entry to a vendor storefront / drop link
+- [x] 1.3 Capture first-touch on entry to a vendor storefront / drop link
       (cookie until they have an identity, then written once and never
       overwritten)
-- [ ] 1.4 Record the relationship on purchase and on follow
-- [ ] 1.5 Backfill both from existing orders
-- [ ] 1.6 Follow/unfollow a vendor (server action + button on storefront)
+- [x] 1.4 Record the relationship on purchase and on follow
+- [x] 1.5 Backfill both from existing orders
+- [x] 1.6 Follow/unfollow a vendor (server action + button on storefront)
 
-## PHASE 2 — My DropQ hub
+## PHASE 2 — My DropQ hub ✅ SHIPPED
 
-- [ ] 2.1 `/my` route + customer shell nav (Home · Orders · Saved · DropMeet ·
+- [x] 2.1 `/my` route + customer shell nav (Home · Orders · Saved · DropMeet ·
       Account) reusing the existing `/messages` chrome
-- [ ] 2.2 Home: greeting, active orders, followed vendors, upcoming drops from
+- [x] 2.2 Home: greeting, active orders, followed vendors, upcoming drops from
       those vendors, nearby DropMeet activity
-- [ ] 2.3 `/my/orders` — active vs past, order detail, receipt, reorder
-- [ ] 2.4 `/my/saved` — unified saved vendors, drops, events, places
-- [ ] 2.5 Move `/messages` under the same shell so it stops being a separate
+- [x] 2.3 `/my/orders` — active vs past, order detail, receipt, reorder
+- [~] 2.4 `/my/saved` — vendors, markets and places done. Saving individual
+      drops/products needs a `SavedDrop` model; today's save is localStorage only
+- [x] 2.5 Move `/messages` under the same shell so it stops being a separate
       island
-- [ ] 2.6 My Drop History — the visual, collection-style view of drops joined
+- [x] 2.6 My Drop History — the visual, collection-style view of drops joined
 
 ## PHASE 3 — Guest → account conversion
 
