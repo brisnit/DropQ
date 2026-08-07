@@ -103,7 +103,7 @@ export default async function AdminClientPage({
                   Revoke admin
                 </ConfirmSubmit>
               ) : (
-                <Button type="submit" variant="dark">🛡️ Make admin</Button>
+                <Button type="submit" variant="dark">Make admin</Button>
               )}
             </form>
           )}
