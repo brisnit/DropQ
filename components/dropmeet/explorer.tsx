@@ -133,7 +133,7 @@ export function DropMeetExplorer({
   );
 
   return (
-    <div className="lg:grid lg:grid-cols-[420px_1fr] lg:h-[calc(100dvh-3.5rem)]">
+    <div className="lg:grid lg:grid-cols-[420px_1fr] lg:h-[calc(100dvh_-_3.5rem)]">
       {/* ── Desktop list column ────────────────────────────────────────── */}
       <aside className="hidden lg:flex lg:flex-col lg:h-full lg:min-h-0 border-r border-line bg-paper">
         <Header

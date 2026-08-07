@@ -27,7 +27,7 @@ export default async function VendorMessagesPage() {
   }
 
   return (
-    <div className="md:h-[calc(100vh-0px)] md:flex md:flex-col">
+    <div className="md:h-screen md:flex md:flex-col">
       {/* Mobile + desktop list. On desktop the split view lives in the
           [conversationId] route; here the list owns the full width. */}
       <div className="lg:grid lg:grid-cols-[360px_1fr] lg:h-full lg:min-h-0">

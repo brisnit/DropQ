@@ -57,6 +57,41 @@ function asFeature(f: unknown): ClickedFeature | null {
   return (f as ClickedFeature) ?? null;
 }
 
+/** Shoelace signed area. Positive = counter-clockwise, negative = clockwise. */
+function signedArea(ring: number[][]): number {
+  let sum = 0;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    sum += ring[j][0] * ring[i][1] - ring[i][0] * ring[j][1];
+  }
+  return sum / 2;
+}
+
+/**
+ * Build the "everything outside the region is greyed out" polygon.
+ *
+ * A hole only punches through when it winds opposite its exterior ring. Source
+ * boundaries don't agree on this — Census TIGER emits counter-clockwise rings,
+ * the same direction as our world rectangle, so appending them as-is produced a
+ * solid fill over the entire map (including the county) rather than a mask.
+ *
+ * So the winding is normalised explicitly rather than assumed: world ring
+ * counter-clockwise, every hole forced clockwise.
+ */
+function maskPolygon(regionRings: number[][][]): number[][][] {
+  const world = [
+    [-180, -85],
+    [180, -85],
+    [180, 85],
+    [-180, 85],
+    [-180, -85],
+  ];
+  const worldCCW = signedArea(world) > 0;
+  const holes = regionRings.map((ring) =>
+    signedArea(ring) > 0 === worldCCW ? [...ring].reverse() : ring
+  );
+  return [world, ...holes];
+}
+
 function toFeatureCollection(items: DropMeetItem[]) {
   return {
     type: "FeatureCollection" as const,
@@ -204,10 +239,7 @@ export function DropMeetMap({ items, selectedId, onSelect, onBoundsChange, class
               properties: {},
               geometry: {
                 type: "Polygon",
-                coordinates: [
-                  [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]],
-                  ...region.geometry.coordinates,
-                ],
+                coordinates: maskPolygon(region.geometry.coordinates),
               },
             },
           });

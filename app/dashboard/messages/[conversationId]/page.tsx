@@ -42,7 +42,7 @@ export default async function VendorConversationPage({
   const name = customerLabel(convo.customer);
 
   return (
-    <div className="lg:grid lg:grid-cols-[360px_1fr] h-[calc(100dvh-3.5rem)] md:h-screen min-h-0">
+    <div className="lg:grid lg:grid-cols-[360px_1fr] h-[calc(100dvh_-_3.5rem)] md:h-screen min-h-0">
       {/* Conversation list — desktop only once a thread is open */}
       <aside className="hidden lg:block border-r border-line bg-paper h-full min-h-0 overflow-y-auto">
         <div className="px-4 py-4 border-b border-line sticky top-0 bg-paper z-10">
