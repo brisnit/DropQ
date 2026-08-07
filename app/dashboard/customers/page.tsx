@@ -87,17 +87,18 @@ export default async function CustomersPage() {
           </div>
 
           <div className="bg-paper border border-line rounded-card overflow-hidden">
-            <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr] gap-4 px-5 py-3 border-b border-line text-xs font-semibold uppercase tracking-wide text-muted">
+            <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_7.5rem] gap-4 px-5 py-3 border-b border-line text-xs font-semibold uppercase tracking-wide text-muted">
               <span>Customer</span>
               <span className="text-right">Orders</span>
               <span className="text-right">Spent</span>
               <span className="text-right">Last order</span>
+              <span aria-hidden />
             </div>
             <div className="divide-y divide-line">
               {customers.map((c) => (
                 <div
                   key={c.email}
-                  className="grid grid-cols-2 sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 sm:gap-4 px-5 py-3.5 items-center"
+                  className="grid grid-cols-2 sm:grid-cols-[2fr_1fr_1fr_1fr_7.5rem] gap-2 sm:gap-4 px-5 py-3.5 items-center"
                 >
                   <div className="min-w-0 col-span-2 sm:col-span-1">
                     <div className="flex items-center gap-2">
