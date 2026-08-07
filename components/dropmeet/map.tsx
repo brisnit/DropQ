@@ -80,6 +80,7 @@ export function DropMeetMap({ items, selectedId, onSelect, onBoundsChange, class
   const [ready, setReady] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onBoundsRef = useRef(onBoundsChange);
   const onSelectRef = useRef(onSelect);
   const itemsRef = useRef(items);
@@ -170,6 +171,25 @@ export function DropMeetMap({ items, selectedId, onSelect, onBoundsChange, class
       const ro = new ResizeObserver(() => map.resize());
       ro.observe(containerRef.current);
       resizeObserverRef.current = ro;
+
+      /**
+       * Watchdog. Some failures (a worker that won't start, a network block)
+       * neither throw nor emit an 'error' event — the map just never loads and
+       * the user stares at an empty box. If 'load' hasn't fired in 12s, report
+       * what we can actually measure so the problem is diagnosable from the
+       * page instead of only from the console.
+       */
+      watchdogRef.current = setTimeout(() => {
+        if (cancelled || map.loaded()) return;
+        const el = containerRef.current;
+        const w = el?.clientWidth ?? 0;
+        const h = el?.clientHeight ?? 0;
+        setFailure(
+          h === 0 || w === 0
+            ? `The map container has no size (${w}×${h}px), so there was nothing to draw into.`
+            : `The map didn't finish loading within 12s (container ${w}×${h}px). Check the browser console — a blocked worker or network request is the usual cause.`
+        );
+      }, 12_000);
 
       map.on("load", () => {
         if (cancelled) return;
@@ -318,12 +338,14 @@ export function DropMeetMap({ items, selectedId, onSelect, onBoundsChange, class
         map.on("moveend", emit);
         // Re-measure now the style is up, in case layout settled after init.
         map.resize();
+        if (watchdogRef.current) clearTimeout(watchdogRef.current);
         setReady(true);
       });
     })();
 
     return () => {
       cancelled = true;
+      if (watchdogRef.current) clearTimeout(watchdogRef.current);
       resizeObserverRef.current?.disconnect();
       resizeObserverRef.current = null;
       mapRef.current?.remove();
