@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { consumeMagicLinkToken, createCustomerSession } from "@/lib/customer-auth";
-import { applyFirstTouch } from "@/lib/attribution";
+import { applyFirstTouch, recordRelationship } from "@/lib/attribution";
 
 /**
  * Magic-link landing. Burns the token, opens a customer session, and forwards
@@ -14,7 +14,8 @@ export async function GET(request: Request) {
   const nextParam = url.searchParams.get("next") ?? "/messages";
   const next = nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/messages";
 
-  const customerId = await consumeMagicLinkToken(token);
+  const consumed = await consumeMagicLinkToken(token);
+  const customerId = consumed?.customerId ?? null;
   if (!customerId) {
     return NextResponse.redirect(new URL("/messages/login?expired=1", url.origin));
   }
@@ -27,6 +28,18 @@ export async function GET(request: Request) {
   // Attribute the account to whichever vendor's page they entered through, if
   // they don't already have a first touch.
   await applyFirstTouch(customerId);
+
+  // Apply the follow they opted into when requesting the link. Held on the
+  // token rather than the redirect URL so it can't be forged by editing the
+  // link — the opt-in happened before the token was issued.
+  if (consumed?.followSellerId) {
+    await recordRelationship({
+      customerId,
+      sellerId: consumed.followSellerId,
+      source: "signup",
+      follow: true,
+    });
+  }
 
   return NextResponse.redirect(new URL(next, url.origin));
 }

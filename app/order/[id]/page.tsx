@@ -9,6 +9,8 @@ import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 import { dropMapsUrl } from "@/lib/maps";
 import { vendorPalette } from "@/lib/color";
 import { DiscoveryLink } from "@/components/discovery-link";
+import { getCurrentCustomer } from "@/lib/customer-auth";
+import { ClaimOrderPanel } from "@/components/claim-order-panel";
 
 export const metadata = { title: "Order confirmed — DropQ" };
 
@@ -42,6 +44,12 @@ export default async function OrderConfirmationPage({
   // Returning from Stripe Checkout — verify payment and finalize (idempotent).
   // Direct-charge sessions live on the vendor's connected account, so retrieve
   // with that account context.
+  // Guest → account conversion. The order is already linked to a Customer by
+  // checkout; what's missing is proof this viewer holds that email. Only offer
+  // it when they aren't already signed in as the owner.
+  const viewer = await getCurrentCustomer();
+  const alreadyClaimed = !!viewer && viewer.id === order.customerId;
+
   const stripe = getStripe();
   if (order.status === "pending" && session_id && stripe && order.seller.stripeAccountId) {
     try {
@@ -192,6 +200,25 @@ export default async function OrderConfirmationPage({
                       <p className="text-xs uppercase tracking-wider text-muted">Notes</p>
                       <p className="text-sm mt-1 text-ink-soft">{order.drop.pickupNotes}</p>
                     </div>
+                  )}
+
+                  {!alreadyClaimed && order.customerId && (
+                    <ClaimOrderPanel
+                      email={order.buyerEmail}
+                      vendorId={order.sellerId}
+                      vendorName={order.seller.storeName}
+                      vendorLogo={order.seller.logoUrl}
+                      returnTo={`/order/${order.id}`}
+                    />
+                  )}
+
+                  {alreadyClaimed && (
+                    <Link
+                      href="/my"
+                      className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold rounded-xl px-4 py-3.5 min-h-[48px] border border-line-strong bg-paper hover:border-ink/30 transition"
+                    >
+                      View in My DropQ →
+                    </Link>
                   )}
 
                   {/* Message the vendor inside DropQ — the conversation lives

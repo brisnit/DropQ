@@ -289,9 +289,17 @@ export async function GET() {
 
     // ── 13. Magic-link tokens are single-use ───────────────────────────────
     const raw = await createMagicLinkToken(sarah!.id);
-    check("magic link resolves to its customer", (await consumeMagicLinkToken(raw)) === sarah!.id);
+    check("magic link resolves to its customer", (await consumeMagicLinkToken(raw))?.customerId === sarah!.id);
     check("magic link cannot be replayed", (await consumeMagicLinkToken(raw)) === null);
     check("garbage token rejected", (await consumeMagicLinkToken("nope")) === null);
+
+    // Follow intent rides the token, not the redirect URL, so it can't be
+    // forged by editing the link.
+    const intentRaw = await createMagicLinkToken(sarah!.id, { followSellerId: vendorA.id });
+    const consumedIntent = await consumeMagicLinkToken(intentRaw);
+    check("follow intent survives the magic link", consumedIntent?.followSellerId === vendorA.id);
+    const plainRaw = await createMagicLinkToken(sarah!.id);
+    check("no intent when none was requested", (await consumeMagicLinkToken(plainRaw))?.followSellerId === null);
 
     // ── 14. Customer context is scoped to the asking vendor ────────────────
     const ctx = await customerContext(vendorA.id, sarah!.id);

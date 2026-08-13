@@ -36,9 +36,11 @@ nobody had been offered a follow, so recording one would have invented consent.
 - [x] 1.2 `CustomerVendor` model — the customer↔vendor relationship:
       `followedAt`, `firstPurchaseAt`, `lastPurchaseAt`, `orderCount`,
       `relationshipSource`
-- [x] 1.3 Capture first-touch on entry to a vendor storefront / drop link
-      (cookie until they have an identity, then written once and never
-      overwritten)
+- [x] 1.3 Capture first-touch on entry to a vendor storefront / drop link.
+      NOTE: the helper shipped in Phase 1 never actually fired — cookies().set()
+      is Server-Function/Route-Handler only, so calling it from a page silently
+      no-ops. Fixed in Phase 3 by moving the write to middleware.ts, which
+      stores the vendor *slug* (edge runtime has no Prisma) for later resolution
 - [x] 1.4 Record the relationship on purchase and on follow
 - [x] 1.5 Backfill both from existing orders
 - [x] 1.6 Follow/unfollow a vendor (server action + button on storefront)
@@ -57,15 +59,15 @@ nobody had been offered a follow, so recording one would have invented consent.
       island
 - [x] 2.6 My Drop History — the visual, collection-style view of drops joined
 
-## PHASE 3 — Guest → account conversion
+## PHASE 3 — Guest → account conversion ✅ SHIPPED
 
-- [ ] 3.1 Post-checkout prompt on the order page: "Save your order and follow
+- [x] 3.1 Post-checkout prompt on the order page: "Save your order and follow
       *{Vendor}*", prefilled from checkout data
-- [ ] 3.2 One-tap conversion: claim guest orders by verified email, preserve
+- [x] 3.2 One-tap conversion: claim guest orders by verified email, preserve
       vendor + drop attribution and consent
-- [ ] 3.3 Vendor-first signup screen when entering via a vendor/drop link
+- [x] 3.3 Vendor-first signup screen when entering via a vendor/drop link
       (vendor logo, drop art, pickup info stay prominent)
-- [ ] 3.4 Return-to-intent after auth — back to the drop, follow, or checkout
+- [x] 3.4 Return-to-intent after auth — back to the drop, follow, or checkout
       they started, never a generic dashboard
 
 ## PHASE 4 — Account settings

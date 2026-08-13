@@ -21,7 +21,16 @@ function SubmitButton() {
  * Passwordless sign-in for buyers. Deliberately says nothing about whether an
  * address exists — the same confirmation shows either way.
  */
-export function CustomerLoginForm({ next, expired }: { next: string; expired?: boolean }) {
+export function CustomerLoginForm({
+  next,
+  expired,
+  vendorName = null,
+}: {
+  next: string;
+  expired?: boolean;
+  /** When set, the copy leads with the vendor who sent them here. */
+  vendorName?: string | null;
+}) {
   const [state, formAction] = useActionState<MagicLinkState, FormData>(requestMagicLinkAction, {});
 
   if (state.sent) {
@@ -49,10 +58,13 @@ export function CustomerLoginForm({ next, expired }: { next: string; expired?: b
     <form action={formAction} className="bg-paper border border-line rounded-card p-6 space-y-4">
       <input type="hidden" name="next" value={next} />
       <div>
-        <h1 className="font-display text-xl font-semibold">Your messages</h1>
+        <h1 className="font-display text-xl font-semibold">
+          {vendorName ? `Create your DropQ account to order from ${vendorName}` : "Sign in to DropQ"}
+        </h1>
         <p className="text-sm text-muted mt-1">
-          Enter the email you used to order and we&apos;ll send you a sign-in link — no password
-          needed.
+          {vendorName
+            ? `Enter your email and we'll send a one-tap sign-in link. Your account tracks this order and any future drops from ${vendorName}.`
+            : "Enter the email you used to order and we'll send you a sign-in link — no password needed."}
         </p>
       </div>
 

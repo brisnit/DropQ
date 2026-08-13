@@ -27,6 +27,9 @@ export async function requestMagicLinkAction(
 ): Promise<MagicLinkState> {
   const email = normalizeEmail(String(formData.get("email") ?? ""));
   const next = String(formData.get("next") ?? "") || "/messages";
+  // Opt-in captured with the request, applied on redemption.
+  const followSellerId = String(formData.get("followSellerId") ?? "") || null;
+  const wantsFollow = String(formData.get("follow") ?? "") === "on";
 
   if (!email || !EMAIL_RE.test(email)) return { error: "Enter the email you used to order." };
 
@@ -34,7 +37,18 @@ export async function requestMagicLinkAction(
   if (!customer) return { sent: true };
 
   try {
-    const raw = await createMagicLinkToken(customer.id);
+    // Only honour a follow for a vendor this person has actually dealt with —
+    // otherwise a crafted form could follow arbitrary stores on their behalf.
+    let intentSellerId: string | null = null;
+    if (wantsFollow && followSellerId) {
+      const dealtWith = await prisma.order.findFirst({
+        where: { customerId: customer.id, sellerId: followSellerId },
+        select: { id: true },
+      });
+      if (dealtWith) intentSellerId = followSellerId;
+    }
+
+    const raw = await createMagicLinkToken(customer.id, { followSellerId: intentSellerId });
     const link = `${appUrl()}/messages/verify?token=${raw}&next=${encodeURIComponent(next)}`;
     const res = await sendEmail(customerMagicLinkEmail(email, link));
     // In dev (no RESEND_API_KEY) surface the link so the flow is testable.

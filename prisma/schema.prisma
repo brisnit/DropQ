@@ -544,6 +544,11 @@ model CustomerToken {
   usedAt     DateTime?
   createdAt  DateTime @default(now())
 
+  /// Intent captured when the link was requested, applied on redemption.
+  /// Carrying it here rather than in the redirect URL means a follow can't be
+  /// forged by editing the link — the customer opted in before it was issued.
+  followSellerId String?
+
   @@index([customerId])
 }
 

@@ -25,6 +25,9 @@ const TOUCH_MAX_AGE = 60 * 60 * 24 * 30; // 30 days to convert
 export type TouchSource = "storefront" | "drop" | "qr" | "dropmeet" | "checkout" | "direct" | "admin";
 
 export type FirstTouch = {
+  /// Middleware writes the slug (edge runtime, no Prisma). Server callers may
+  /// pass an id directly — either resolves to the same vendor.
+  vendorSlug?: string | null;
   vendorId?: string | null;
   dropId?: string | null;
   source: TouchSource;
@@ -33,18 +36,19 @@ export type FirstTouch = {
 };
 
 /**
- * Remember where someone entered, before they have an identity. Anonymous —
- * just the vendor and drop they landed on. First write wins for the whole
- * cookie lifetime, so a later visit through a different vendor doesn't
- * overwrite the original entry point.
+ * The first touch is written by middleware.ts, not here: cookies().set() only
+ * works in a Server Function or Route Handler, so a page attempting it would
+ * silently do nothing. Middleware sets it on the response instead.
+ *
+ * Kept for Server Actions that legitimately establish a first touch (e.g. a
+ * follow from DropMeet, where there's no vendor URL to match on).
  */
 export async function recordTouch(touch: Omit<FirstTouch, "at">): Promise<void> {
   try {
     const jar = await cookies();
-    if (jar.get(TOUCH_COOKIE)) return; // already have a first touch
+    if (jar.get(TOUCH_COOKIE)) return; // first write wins
 
-    const payload: FirstTouch = { ...touch, at: new Date().toISOString() };
-    jar.set(TOUCH_COOKIE, JSON.stringify(payload), {
+    jar.set(TOUCH_COOKIE, JSON.stringify({ ...touch, at: new Date().toISOString() }), {
       httpOnly: true,
       sameSite: "lax",
       path: "/",
@@ -52,9 +56,26 @@ export async function recordTouch(touch: Omit<FirstTouch, "at">): Promise<void> 
       secure: process.env.NODE_ENV === "production",
     });
   } catch {
-    // Called from a context where cookies can't be set (e.g. a cached render).
-    // Attribution is best-effort; never break the page over it.
+    // Not a cookie-writable context. Attribution is best-effort — never break
+    // the page over it.
   }
+}
+
+/** Resolve a touch to a real vendor, whether it carries a slug or an id. */
+export async function resolveTouchVendor(touch: FirstTouch) {
+  if (touch.vendorId) {
+    return prisma.seller.findUnique({
+      where: { id: touch.vendorId },
+      select: { id: true, slug: true, storeName: true, logoUrl: true, accent: true },
+    });
+  }
+  if (touch.vendorSlug) {
+    return prisma.seller.findUnique({
+      where: { slug: touch.vendorSlug },
+      select: { id: true, slug: true, storeName: true, logoUrl: true, accent: true },
+    });
+  }
+  return null;
 }
 
 export async function readTouch(): Promise<FirstTouch | null> {
@@ -90,9 +111,7 @@ export async function applyFirstTouch(
 
     // Only reference a vendor/drop that still exists.
     const [vendor, drop] = await Promise.all([
-      touch.vendorId
-        ? prisma.seller.findUnique({ where: { id: touch.vendorId }, select: { id: true } })
-        : null,
+      resolveTouchVendor(touch),
       touch.dropId ? prisma.drop.findUnique({ where: { id: touch.dropId }, select: { id: true } }) : null,
     ]);
 

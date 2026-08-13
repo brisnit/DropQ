@@ -128,7 +128,10 @@ export async function upsertCustomer(input: {
  * tokens for the customer are dropped first so an old link in an inbox can't be
  * replayed after a new one is requested.
  */
-export async function createMagicLinkToken(customerId: string): Promise<string> {
+export async function createMagicLinkToken(
+  customerId: string,
+  intent?: { followSellerId?: string | null }
+): Promise<string> {
   const raw = randomBytes(32).toString("hex");
   await prisma.customerToken.deleteMany({ where: { customerId } });
   await prisma.customerToken.create({
@@ -136,13 +139,21 @@ export async function createMagicLinkToken(customerId: string): Promise<string> 
       customerId,
       tokenHash: hashToken(raw),
       expiresAt: new Date(Date.now() + LINK_TTL_MS),
+      followSellerId: intent?.followSellerId ?? null,
     },
   });
   return raw;
 }
 
-/** Validate + consume a magic-link token. Returns the customerId or null. */
-export async function consumeMagicLinkToken(raw: string | null | undefined): Promise<string | null> {
+export type ConsumedToken = { customerId: string; followSellerId: string | null };
+
+/**
+ * Validate + consume a magic-link token. Returns the customer and whatever
+ * intent was recorded when the link was issued, or null.
+ */
+export async function consumeMagicLinkToken(
+  raw: string | null | undefined
+): Promise<ConsumedToken | null> {
   if (!raw) return null;
   const tok = await prisma.customerToken.findUnique({ where: { tokenHash: hashToken(raw) } });
   if (!tok) return null;
@@ -152,5 +163,5 @@ export async function consumeMagicLinkToken(raw: string | null | undefined): Pro
 
   if (tok.usedAt) return null;
   if (tok.expiresAt.getTime() < Date.now()) return null;
-  return tok.customerId;
+  return { customerId: tok.customerId, followSellerId: tok.followSellerId };
 }
