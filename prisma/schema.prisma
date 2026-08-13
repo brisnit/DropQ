@@ -514,6 +514,25 @@ model Customer {
   /// SetupIntent-based card management ships; unused until then.
   stripeCustomerId String? @unique
 
+  /// ── SMS consent (A2P 10DLC) ──────────────────────────────────────────
+  /// Two independent consents, never inferred from each other or from any
+  /// other action. Each records WHEN it was given, WHERE, and the exact
+  /// disclosure version the customer saw, so a carrier audit can be answered
+  /// with evidence rather than assertion.
+  smsTransactionalConsent       Boolean   @default(false)
+  smsTransactionalConsentAt     DateTime?
+  smsTransactionalConsentSource String?
+  smsMarketingConsent           Boolean   @default(false)
+  smsMarketingConsentAt         DateTime?
+  smsMarketingConsentSource     String?
+  /// Version of the disclosure text accepted (see lib/sms-consent.ts).
+  smsConsentDisclosureVersion   String?
+
+  /// Set when the carrier or the customer replies STOP. A global kill switch:
+  /// while set, no non-exempt message may be sent regardless of the flags above.
+  smsOptedOutAt   DateTime?
+  smsOptOutSource String? // "stop_reply" | "support" | "admin"
+
   orders        Order[]
   conversations Conversation[]
   sentMessages  Message[]       @relation("MessageSenderCustomer")

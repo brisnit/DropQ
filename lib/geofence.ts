@@ -12,7 +12,7 @@ export async function geocode(query: string): Promise<{ lat: number; lng: number
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`,
-      { headers: { "User-Agent": "DropQ/1.0 (https://dropq.app)" } }
+      { headers: { "User-Agent": "DropQ/1.0 (https://www.drop-q.com)" } }
     );
     if (!res.ok) return null;
     const data = (await res.json()) as Array<{ lat: string; lon: string }>;

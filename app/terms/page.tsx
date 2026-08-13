@@ -44,6 +44,29 @@ export default function TermsPage() {
           If you do not agree, do not use the platform.
         </p>
 
+        <Section n="SMS" title="SMS / Text Messaging Terms">
+          <p>
+            By voluntarily opting in to DropQ SMS messaging, you consent to receive text messages
+            from DropQ at the mobile number you provide. Depending on your selections, messages may
+            include account notifications, order confirmations, payment updates, pickup information,
+            security or verification messages, and other communications related to your activity on
+            DropQ. If you separately opt in to promotional messaging, messages may also include
+            notifications concerning vendors or drops you have chosen to follow.
+          </p>
+          <p>
+            Message frequency varies. Message and data rates may apply. Consent to promotional SMS
+            is not a condition of purchase or use of DropQ. You may opt out at any time by replying{" "}
+            <b>STOP</b>. Reply <b>HELP</b> for assistance.
+          </p>
+          <p>
+            Carriers are not liable for delayed or undelivered messages. See our{" "}
+            <a href="/privacy" className="text-brand hover:underline">Privacy Policy</a> for
+            information about how we handle your information, and our{" "}
+            <a href="/sms" className="text-brand hover:underline">SMS Messaging page</a> for the
+            full opt-in details.
+          </p>
+        </Section>
+
         <Section n="1" title="The DropQ Platform">
           <p>
             DropQ provides software and online tools that allow independent food sellers to list

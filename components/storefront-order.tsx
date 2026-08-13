@@ -363,20 +363,37 @@ export function StorefrontOrder({
           <input
             name="buyerPhone"
             type="tel"
-            placeholder="Mobile number (for order texts)"
-            required
+            placeholder="Mobile number (optional)"
             className="w-full bg-cream/60 border border-line-strong rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-ink/40"
           />
+
           {/*
-            Transactional-only notice for the required phone field. These texts
-            are order status updates, not marketing — marketing consent is
-            collected separately and unbundled on the waitlist form. STOP/HELP
-            is handled automatically by the Twilio Messaging Service.
+            A2P 10DLC: SMS consent must be optional, unchecked by default, and
+            never bundled into a required checkout step. The number itself is
+            optional too — entering one grants nothing on its own.
           */}
-          <p className="text-xs text-muted leading-snug">
-            We&apos;ll text you order updates (received &amp; ready for pickup). Msg &amp; data
-            rates may apply. Reply STOP to opt out, HELP for help.
-          </p>
+          <label className="flex items-start gap-2.5 text-sm text-ink-soft cursor-pointer">
+            <input
+              type="checkbox"
+              name="smsTransactionalConsent"
+              className="mt-0.5 w-4 h-4 accent-[#ff6268] shrink-0"
+            />
+            <span className="text-xs leading-snug">
+              I agree to receive text messages from DropQ related to my account, orders, payments,
+              pickups, and activity on the DropQ platform. Message frequency varies. Message and
+              data rates may apply. Reply STOP to opt out or HELP for help. Consent is not required
+              to create an account or make a purchase. See{" "}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className="underline">
+                Terms
+              </a>{" "}
+              and{" "}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" className="underline">
+                Privacy Policy
+              </a>
+              .
+            </span>
+          </label>
+
           <textarea
             name="note"
             placeholder="Notes for the maker (optional)"

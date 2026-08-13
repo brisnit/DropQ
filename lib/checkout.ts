@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getStripe } from "@/lib/stripe";
 import { sendEmail, orderReceivedEmail } from "@/lib/email";
 import { sendSms } from "@/lib/notifications";
+import { sendGatedSms } from "@/lib/sms-gate";
 import { createCommissionForOrder } from "@/lib/commission";
 import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 
@@ -156,7 +157,7 @@ async function refundOversoldOrder(orderId: string) {
   const store = order.seller.storeName;
   const msg = `${store}: So sorry — an item in your order just sold out, so we've refunded you in full. Hope to see you at the next drop!`;
   try {
-    await sendSms(order.buyerPhone, msg);
+    await sendGatedSms({ kind: "transactional", body: msg, customerId: order.customerId, email: order.buyerEmail, to: order.buyerPhone });
     await sendEmail({
       to: order.buyerEmail,
       subject: `Your ${store} order was refunded`,

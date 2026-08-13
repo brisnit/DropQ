@@ -18,6 +18,7 @@ import {
   vendorArrivedEmail,
 } from "@/lib/email";
 import { sendSms } from "@/lib/notifications";
+import { sendGatedSms } from "@/lib/sms-gate";
 import { formatPickupWindow, pickupLocation, pickupSummary, orderMailPickup } from "@/lib/pickup";
 import { dropMapsUrl } from "@/lib/maps";
 import { geocode } from "@/lib/geofence";
@@ -52,7 +53,8 @@ async function notifyPickupChanged(dropId: string) {
   if (!drop) return;
   const orders = await prisma.order.findMany({
     where: { dropId, status: { in: ["new", "in_progress", "ready"] } },
-    select: { buyerEmail: true, buyerPhone: true, buyerName: true },
+    select: { buyerEmail: true, buyerPhone: true,
+      customerId: true, buyerName: true },
   });
   if (!orders.length) return;
 
@@ -76,7 +78,7 @@ async function notifyPickupChanged(dropId: string) {
           (notes ? `<p><b>Notes:</b> ${notes}</p>` : "") +
           `</div>`,
       });
-      await sendSms(o.buyerPhone, `${store}: your pickup details were updated. ${summary}`);
+      await sendGatedSms({ kind: "transactional", body: `${store}: your pickup details were updated. ${summary}`, customerId: o.customerId, email: o.buyerEmail, to: o.buyerPhone });
     } catch (e) {
       console.error("notifyPickupChanged send failed:", e);
     }
@@ -618,7 +620,8 @@ async function notifyVendorArrived(dropId: string) {
   if (!drop) return;
   const orders = await prisma.order.findMany({
     where: { dropId, status: { in: ["new", "in_progress", "ready"] } },
-    select: { id: true, buyerEmail: true, buyerPhone: true, buyerName: true },
+    select: { id: true, buyerEmail: true, buyerPhone: true,
+      customerId: true, buyerName: true },
   });
   if (!orders.length) return;
 
@@ -642,11 +645,15 @@ async function notifyVendorArrived(dropId: string) {
           ...mailPickup,
         })
       );
-      await sendSms(
-        o.buyerPhone,
-        `${store} has arrived and is ready for you! ${where ? `${where}. ` : ""}` +
-          `${mapsUrl ? `Directions: ${mapsUrl} ` : ""}Your order: ${orderLink}`
-      );
+      await sendGatedSms({
+        kind: "transactional",
+        customerId: o.customerId,
+        email: o.buyerEmail,
+        to: o.buyerPhone,
+        body:
+          `${store} has arrived and is ready for you! ${where ? `${where}. ` : ""}` +
+          `${mapsUrl ? `Directions: ${mapsUrl} ` : ""}Your order: ${orderLink}`,
+      });
     } catch (e) {
       console.error("notifyVendorArrived send failed:", e);
     }
@@ -736,7 +743,7 @@ export async function updateOrderStatusAction(formData: FormData) {
     if (sms || mail) {
       after(async () => {
         if (mail) await sendEmail(mail);
-        if (sms) await sendSms(order.buyerPhone, sms);
+        if (sms) await sendGatedSms({ kind: "transactional", body: sms, customerId: order.customerId, email: order.buyerEmail, to: order.buyerPhone });
       });
     }
   }

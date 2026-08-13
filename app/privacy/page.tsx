@@ -98,10 +98,13 @@ export default function PrivacyPage() {
 
         <Section n="3" title="SMS / Text Messaging">
           <p>
-            DropQ uses text messaging as a primary way to keep customers and users informed. By
-            providing your mobile number and placing an order, joining a waitlist, or creating an
-            account, you consent to receive <b>transactional and service-related SMS messages</b>{" "}
-            from DropQ and the vendors you order from (for example: order confirmations, &ldquo;your
+            DropQ uses text messaging as a primary way to keep customers and users informed. SMS is{" "}
+            <b>strictly opt-in</b>: providing a mobile number, placing an order, joining a
+            waitlist, accepting these terms, or creating an account does <b>not</b> enrol you.
+            You receive texts only if you tick an SMS consent box, which is never pre-checked and
+            never required. Depending on which box you ticked, messages may be{" "}
+            <b>transactional and service-related</b>, or notifications about vendors and drops you
+            follow (for example: order confirmations, &ldquo;your
             order is ready&rdquo; alerts, refund notices, drop go-live alerts, and account or
             referral messages).
           </p>
@@ -116,8 +119,8 @@ export default function PrivacyPage() {
           </ul>
           <p>
             <b>
-              We do not sell or share your mobile phone number or SMS opt-in/consent for marketing
-              or promotional purposes with third parties.
+              Mobile information and text messaging opt-in data and consent will not be shared with
+              third parties or affiliates for marketing or promotional purposes.
             </b>{" "}
             Your number is used only to deliver the Services (including through our messaging
             provider, Twilio) and to enable the vendor you interact with to communicate about your

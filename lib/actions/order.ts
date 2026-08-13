@@ -13,6 +13,8 @@ import { sendSms } from "@/lib/notifications";
 import { isDemoStore } from "@/lib/demo";
 import { upsertCustomer } from "@/lib/customer-auth";
 import { applyFirstTouch, recordRelationship } from "@/lib/attribution";
+import { recordSmsConsent, sendGatedSms } from "@/lib/sms-gate";
+import { DISCLOSURE_VERSION } from "@/lib/sms-consent";
 
 export type OrderState = { error?: string };
 
@@ -32,12 +34,16 @@ export async function placeOrderAction(
   const buyerEmail = String(formData.get("buyerEmail") ?? "").trim().toLowerCase();
   const buyerPhone = String(formData.get("buyerPhone") ?? "").trim() || null;
   const note = String(formData.get("note") ?? "").trim() || null;
+  // Unchecked by default; absence means no consent, never implied.
+  const smsConsent = String(formData.get("smsTransactionalConsent") ?? "") === "on";
 
   if (!buyerName) return { error: "Please add your name." };
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(buyerEmail))
     return { error: "Please add a valid email for your receipt." };
-  if ((buyerPhone ?? "").replace(/\D/g, "").length < 10)
-    return { error: "Please add a mobile number so we can text you order updates." };
+  // Phone is optional (A2P 10DLC: SMS must never gate a purchase). Validate
+  // only if one was supplied.
+  if (buyerPhone && buyerPhone.replace(/\D/g, "").length < 10)
+    return { error: "That mobile number doesn't look right." };
 
   const drop = await prisma.drop.findUnique({
     where: { id: dropId },
@@ -106,6 +112,16 @@ export async function placeOrderAction(
   // reached checkout through this vendor is attributed to them if they have no
   // earlier first touch, and the vendor relationship is recorded either way.
   if (customerId) {
+    // Only record consent when it was actually given, and only when a number
+    // was supplied to send to. Never downgrade an existing consent here.
+    if (smsConsent && buyerPhone) {
+      await recordSmsConsent({
+        customerId,
+        transactional: true,
+        source: "checkout",
+        disclosureVersion: DISCLOSURE_VERSION,
+      }).catch(() => {});
+    }
     await applyFirstTouch(customerId, {
       vendorId: drop.sellerId,
       dropId: drop.id,
@@ -268,7 +284,7 @@ export async function placeOrderAction(
     ` ${orderLink}`;
   after(async () => {
     await sendEmail(mail);
-    await sendSms(buyerPhone, smsText);
+    await sendGatedSms({ kind: "transactional", body: smsText, customerId, email: buyerEmail, to: buyerPhone });
   });
 
   revalidatePath(`/s/${drop.seller.slug}/${drop.id}`);

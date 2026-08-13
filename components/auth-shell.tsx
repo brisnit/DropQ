@@ -48,7 +48,7 @@ export function AuthShell({
         </div>
         <div className="max-w-sm w-full mx-auto pt-8 text-xs text-muted">
           <Link href="/" className="hover:text-ink">
-            ← Back to dropq.com
+            ← Back to drop-q.com
           </Link>
         </div>
       </div>

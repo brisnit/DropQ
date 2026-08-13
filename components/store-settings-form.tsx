@@ -235,7 +235,7 @@ export function StoreSettingsForm({
         </Field>
         <Field label="Store URL">
           <div className="flex items-center rounded-xl border border-line-strong bg-cream/60 px-3.5 py-2.5 text-muted">
-            <span className="text-sm">dropq.com/s/</span>
+            <span className="text-sm">drop-q.com/s/</span>
             <span className="text-ink font-medium">{seller.slug}</span>
           </div>
         </Field>

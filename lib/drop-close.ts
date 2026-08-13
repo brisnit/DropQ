@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db";
 import { sendEmail, dropClosedEmail } from "@/lib/email";
 import { sendSms } from "@/lib/notifications";
+import { sendGatedSms } from "@/lib/sms-gate";
 import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 import { dropMapsUrl } from "@/lib/maps";
 
@@ -52,7 +53,8 @@ export async function closeExpiredDrops(now: Date = new Date()): Promise<{ close
 
     const orders = await prisma.order.findMany({
       where: { dropId: d.id, status: { in: ["new", "in_progress", "ready"] } },
-      select: { id: true, buyerName: true, buyerEmail: true, buyerPhone: true },
+      select: { id: true, buyerName: true, buyerEmail: true, buyerPhone: true,
+      customerId: true },
     });
     const win = formatPickupWindow(d, d.seller.timezone);
     const where = pickupLocation(d);
@@ -84,7 +86,7 @@ export async function closeExpiredDrops(now: Date = new Date()): Promise<{ close
           `${store}: the "${d.title}" drop is over and your order is locked in.` +
           (win ? ` Pickup ${win}${where ? ` at ${where}` : ""}.` : "") +
           (mapsUrl ? ` Directions: ${mapsUrl}` : "");
-        await sendSms(o.buyerPhone, sms);
+        await sendGatedSms({ kind: "transactional", body: sms, customerId: o.customerId, email: o.buyerEmail, to: o.buyerPhone });
         notified++;
       } catch (e) {
         console.error("drop-closed broadcast failed:", e);
