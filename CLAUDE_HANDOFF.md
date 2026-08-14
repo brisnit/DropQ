@@ -43,7 +43,9 @@ customers.** `lib/auth.ts` and `lib/customer-auth.ts`.
 
 ---
 
-## 2. Work completed this session
+## 2. Work completed in session 1
+
+*(Session 2 is §5b, session 3 is §5c.)*
 
 1. **Per-channel SMS consent on `Subscriber`** (TCPA) — unbundled, unchecked
 2. **In-app messaging** — conversations, broadcast, notifications, polling
@@ -60,6 +62,35 @@ customers.** `lib/auth.ts` and `lib/customer-auth.ts`.
 
 ## 3. Database migrations — ALL APPLIED TO PRODUCTION
 
+### ⚠️ The workflow changed in session 3 — migrations are now TRACKED
+
+Everything up to and including Phase 6 was applied with `npx prisma db push`,
+which leaves no history. As of session 3 the project uses **committed Prisma
+migrations** in `prisma/migrations/`:
+
+- `0_init` — the pre-Phase-7 production schema, generated *from the live
+  database* (38 tables) and registered with `prisma migrate resolve --applied`.
+  **It has never been executed and must never be run** — it exists only so
+  Prisma has a baseline. It deliberately does not contain `PointsLedger`.
+- `20260814162909_add_points_ledger` — the first real migration.
+
+**Use `npx prisma migrate deploy` from now on, not `db push`.** Local `.env`
+points `DATABASE_URL` at the *production* Neon branch, so either command writes
+straight to prod — `db push` would also silently re-diverge the schema from the
+migration history.
+
+Verify at any time with `npx prisma migrate status` (expect "Database schema is
+up to date") and a drift check:
+
+```
+npx prisma migrate diff --from-url "$DATABASE_URL_UNPOOLED" \
+  --to-schema-datamodel prisma/schema.prisma --script
+```
+
+Expect `-- This is an empty migration.` Anything else is drift.
+
+### Applied before session 3
+
 Applied with `npx prisma db push` against `ep-rough-cake-atlwek15` (prod Neon).
 All additive; no data was deleted.
 
@@ -74,6 +105,7 @@ All additive; no data was deleted.
 | `SavedDrop`, `Customer.stripeCustomerId` | needed `--accept-data-loss` for a unique index on a brand-new column — provably safe, all NULLs |
 | `CustomerToken.followSellerId` | follow intent on magic link |
 | **SMS consent columns on `Customer`** | see §4 |
+| **`PointsLedger`** (session 3) | applied via `migrate deploy`, not `db push` |
 
 ### Backfills run (all idempotent)
 
@@ -232,30 +264,97 @@ vendor-terms changes, migration plan).
 - **Logout fixes** — vendor sidebar nav lacked `min-h-0`/`overflow`, pushing
   "Log out" off-screen; mobile menu had no max-height; **admin had no logout at
   all**.
-- **Phase 7 rewards — BUILT, MIGRATION NOT RUN.** See §6b.
+- **Phase 7 rewards — built.** *(Session 2 recorded this as "MIGRATION NOT RUN"
+  and not deployed. It was in fact already pushed and deployed — see §5c.)*
+
+---
+
+## 5c. Session 3 — Phase 7 completed (`21a5e4b`)
+
+**Phase 7 is done, migrated, deployed and verified.** See §6b for what's next.
+
+### An outage this handoff caused — read before trusting §12 again
+
+Session 2 recorded Phase 7 as "unpushed" and "NOT deployed". Both were wrong:
+`ee3c719` was pushed to `origin/main`, so Vercel deployed it — **code that
+queried `PointsLedger` was live for ~20h against a database where the table did
+not exist.** `/my/rewards` 500'd for every signed-in customer, and "Rewards" is
+an unconditional nav item in `components/my/nav.tsx`. Checkout was never at
+risk: `awardPointsForOrder` was already wrapped in `.catch()`.
+
+**Lesson: verify deployment state against the remote and the running site, not
+against a previous handoff's prose.** `git rev-list --left-right --count
+origin/main...HEAD` takes a second. A route that returns 307 rather than 404
+when signed out is deployed.
+
+### The three defects fixed while verifying
+
+1. **`reversePointsForOrder` could suppress refund notifications.** It sits
+   between issuing the Stripe refund and telling the buyer, and it threw. The
+   exception escaped `finalizePaidOrder`, skipping the apology SMS **and**
+   email; the webhook retry then found the order already `refunded`, returned
+   early, and the message was never sent. **Buyers were silently refunded with
+   no explanation.** It now never throws, with a `.catch()` at the call site as
+   belt-and-braces.
+2. **Points under-awarded in `absorb` mode.** `totalCents - feeCents` is only
+   correct in `pass` mode — `totalCents` only includes the fee when the vendor
+   passes it on (`lib/actions/order.ts:84`), and `feeMode` **defaults to
+   `absorb`**. Now summed from `OrderItem.priceCents × quantity`, which also
+   survives product edits/removal and a later `feeMode` change. Verified across
+   all 8 paid production orders: one $5.00 absorb order earned 4 points instead
+   of 5.
+3. **`catch {}` hid real failures.** A bare catch treated *every* error as
+   "already awarded" — which is exactly why a missing table was
+   indistinguishable from a retry. Narrowed to `Prisma.PrismaClientKnownRequestError`
+   with `code === "P2002"`; real errors now surface.
+
+### How Phase 7 was verified
+
+- `migrate status` clean; drift check returns an empty migration
+- All four query shapes `/my/rewards` uses executed directly against prod
+- The production build, run locally **against the production database**,
+  rendered `/my/rewards` → **200** with the correct zero state
+- Deployment confirmed via Vercel CLI: push 16:34:20 → deployment 16:34:21,
+  ● Ready, aliased to `www.drop-q.com`
+- Prod sweep: public routes 200, authenticated routes a consistent 307, no 500s
+
+⚠️ **Production's `SESSION_SECRET` differs from local `.env`** (the same minted
+cookie returns 200 locally and 307 in prod). That's correct security posture,
+but it means you cannot authenticate to production from a local session — a
+signed-in prod render has to be confirmed by a human in a browser.
+
+⚠️ **Do not run `app/api/dev/messaging-selftest` while `.env` points at prod.**
+It creates sellers, drops and orders and only cleans up on success; its own
+docstring assumes a scratch database.
 
 ---
 
 ## 6b. ⚠️ NEXT SESSION STARTS HERE — approved brief
 
-Phase 7 code is written and compiles; **`PointsLedger` has NOT been migrated**.
+**Phase 7 is COMPLETE** (migrated, deployed, verified — see §5c). Phase 8 is
+explicitly **blocked** until the pay-in-person work below is done and verified.
 Do not stack unrelated roadmap work into this change.
 
-### Already built (uncommitted or committed but unmigrated)
+### Phase 7 as shipped — the architecture to preserve
 
-- `prisma/schema.prisma` — `PointsLedger` model
-- `lib/rewards.ts` — earn/reverse/balance, $1 = 1 point, excludes service fee
+- `prisma/schema.prisma` — `PointsLedger`, append-only
+- `lib/rewards.ts` — earn/reverse/balance, $1 = 1 point on **items only**
 - `lib/checkout.ts` — awards after `finalizePaidOrder` commits; reverses on
   oversold refund
 - `app/my/rewards/page.tsx` + nav entry — real balance, **no fake redemption**
 
-### Approved, still to build
+Balance is derived from rows and never stored. Idempotency is the unique
+`(orderId, reason)`. Refunds append negative rows rather than decrementing.
+Both DropQ-wide and seller scope are recorded on every row. **No redemption** —
+that's a pricing decision, not an unfinished feature.
 
-1. **Run the `PointsLedger` migration**, then complete Phase 7. Keep the
-   approved architecture: balance derived from rows, idempotent
-   `(orderId, reason)`, refunds as negative rows, both DropQ-wide and seller
-   scope recorded, earn excludes DropQ service fees, **no redemption**.
-2. **`Drop.allowPayInPerson Boolean @default(false)`** + opt-in checkbox in the
+`PointsLedger.orderId` has **no foreign key on purpose.** The ledger is an
+append-only audit record and keeps the historical order id even if the `Order`
+row is later deleted. Don't "fix" this by adding a relation.
+
+### Approved, still to build — pay in person
+
+1. **`Drop.allowPayInPerson Boolean @default(false)`** + opt-in checkbox in the
    drop editor, labelled **"Allow customers to pay at pickup"** with copy
    *"Customers can reserve their order now and pay you in person at pickup."*
    **Do not default on.** Live-drop behaviour must not change.
@@ -263,7 +362,7 @@ Do not stack unrelated roadmap work into this change.
    **VERIFY this against the real checkout architecture before changing it.**
    Note `paymentsEnabled` is false when the vendor has no Stripe, in which case
    *all* orders are already implicitly pay-in-person.
-3. **Pay-in-person orders earn points only on explicit payment confirmation.**
+2. **Pay-in-person orders earn points only on explicit payment confirmation.**
    Do NOT award when an unpaid order is marked completed — fulfilment and
    payment are separate events. Add a **"Mark as paid in person"** vendor
    action that: verifies the order was pay-in-person, sets paid + a `paidAt`
@@ -271,23 +370,31 @@ Do not stack unrelated roadmap work into this change.
    Stripe processed it**, and triggers the same idempotent award path. Never
    award twice on retry. Reuse existing schema if it already models this
    cleanly — `Order.paymentStatus` and `OrderEvent` probably do.
-4. **ANSWER BEFORE IMPLEMENTING** — inspect and report what currently happens
+3. **ANSWER BEFORE IMPLEMENTING** — inspect and report what currently happens
    when: (a) a pay-in-person preorder is cancelled before payment; (b) the
    vendor marks it paid then refunds/voids; (c) the order is fulfilled but
    payment was never recorded. **Points must follow recorded payment, not
-   fulfilment.**
-5. **Customer UX** — at checkout, make it unmistakable that no online charge is
+   fulfilment.** Still unanswered as of session 3.
+4. **Customer UX** — at checkout, make it unmistakable that no online charge is
    being made and payment is due to the vendor at pickup.
-6. **Auditability** — cash isn't Stripe-verified, so record who marked it paid
+5. **Auditability** — cash isn't Stripe-verified, so record who marked it paid
    and when. `OrderEvent` already exists and is the cheap place for this.
 
 ### Required before any production migration
 
 Show the user: schema changes · migration SQL · affected payment/order code
 paths · how points are triggered for Stripe vs pay-in-person · how duplicate
-awards are prevented.
+awards are prevented. Wait for explicit approval.
 
-Then the safe order: **migrate → verify prod schema → deploy code.**
+Then the safe order: **migrate → verify prod schema → deploy code.** Generate
+the SQL with `prisma migrate diff` against the live database rather than
+trusting SQL pasted in a previous session, commit the migration, and apply it
+with `migrate deploy` (see §3).
+
+⚠️ **Phase 7's outage came from deploying code ahead of its migration.** With
+Vercel auto-deploying `origin/main`, pushing schema-dependent code before the
+migration lands *is* shipping a broken production site. Migrate first, or don't
+push.
 
 ---
 
@@ -304,9 +411,15 @@ See `docs/CUSTOMER-PLATFORM-ROADMAP.md` for the full ordered plan.
   new model
 - **Phase 6 Auth.js** — Google + Apple + magic link. ⚠️ the HMAC cookie serves
   **vendors too**; migration must not log vendors out
-- **Phase 7 rewards** — $1 = 1 DropPoint agreed, nothing built
+- **Phase 7 rewards — ✅ SHIPPED** (`21a5e4b`). Earning only, no redemption.
+  Open: whether the 8 historical paid orders get a backfill (§8).
 - **Phase 8 PostHog** — `lib/analytics.ts` is already the abstraction seam;
-  `/api/track` currently only `console.log`s
+  `/api/track` currently only `console.log`s. **Blocked** until pay-in-person
+  is complete and verified. Decisions already recorded in the roadmap: use
+  `lib/analytics.ts`, `NEXT_PUBLIC_POSTHOG_KEY` / `NEXT_PUBLIC_POSTHOG_HOST`,
+  identify by `Customer.id` only, no PII, app DB stays the source of truth for
+  business metrics, and inspect `Customer.firstVendorId` / `signupSource` /
+  `CustomerVendor` before building duplicate analytics infrastructure.
 
 ---
 
@@ -325,6 +438,16 @@ See `docs/CUSTOMER-PLATFORM-ROADMAP.md` for the full ordered plan.
 
 - **Stripe direct vs destination charges** (blocks 5.1/5.2) — the big one
 - What a DropPoint redeems for
+- **Whether to backfill DropPoints for historical orders — UNRESOLVED.**
+  `PointsLedger` went live empty, so **all 8 existing paid orders hold 0
+  points** even though some customers have bought repeatedly. Nothing has been
+  backfilled and nothing will be without an explicit decision. The award path
+  is idempotent on `(orderId, reason)`, so a backfill is a safe one-liner over
+  paid orders whenever you want it — and re-running it cannot double-award.
+  Deciding *not* to backfill is equally valid; the point is that it's a
+  deliberate choice, not an oversight. **Note the two are not equivalent:** a
+  backfill would use the corrected items-based rate, so an absorb-mode order
+  would award slightly more than the shipped formula would have given it.
 - Whether to keep the dev self-test route long term
 - Whether vendors need warning that checkout phone is now optional
 
@@ -343,9 +466,9 @@ See `docs/CUSTOMER-PLATFORM-ROADMAP.md` for the full ordered plan.
 - Saving individual **products** is still localStorage-only (`lib/saved-store.ts`)
 - **Checkout phone is now optional** — vendors lose SMS reach for those orders
 - **Pay-in-person orders currently earn 0 DropPoints** — points award on
-  `paymentStatus === "paid"`, which only Stripe sets. Item 3 above fixes this.
-- **Existing paid orders earned no points** (ledger is new). A backfill is
-  possible but was NOT run — the user has not decided whether history counts.
+  `paymentStatus === "paid"`, which only Stripe sets. §6b item 2 fixes this.
+- **All 8 existing paid orders hold 0 DropPoints** (the ledger shipped empty).
+  A backfill is deliberately NOT run — see §8, still undecided.
 - Stale `* 2.ts` duplicates in `.next`/`app/generated` break `tsc` intermittently
 
 ---
@@ -384,6 +507,12 @@ See `docs/CUSTOMER-PLATFORM-ROADMAP.md` for the full ordered plan.
 
 **Commerce:** `lib/actions/order.ts`, `lib/checkout.ts`, `lib/stripe.ts`
 
+**Rewards:** `lib/rewards.ts`, `app/my/rewards/page.tsx`,
+`prisma/migrations/`. Note `lib/actions/order.ts:84` — `totalCents` includes the
+DropQ fee **only** in `pass` mode, and `feeMode` defaults to `absorb`. Any money
+maths derived from `totalCents` has to account for that; getting it wrong is
+what under-awarded points in Phase 7.
+
 **DropMeet:** `lib/dropmeet/*`, `app/dropmeet/*`, `components/dropmeet/map.tsx`
 
 **Tests:** `app/api/dev/messaging-selftest/route.ts` — **49 assertions, 404s in
@@ -396,9 +525,15 @@ production.** Run it after any messaging/consent change:
 
 ## 12. Git status
 
-Working tree clean, all pushed to `origin/main`. Recent commits, newest first:
+Working tree clean, all pushed to `origin/main`, **and code and database are in
+step.** Verified with `git rev-list --left-right --count origin/main...HEAD`
+(→ `0  0`) and `npx prisma migrate status`, not from memory — session 2's
+version of this section was wrong in exactly that way and caused an outage
+(§5c). Recent commits, newest first:
 
 ```
+21a5e4b  Phase 7: migrate PointsLedger, tracked migrations, 3 rewards fixes
+ee3c719  Phase 7 rewards foundation  ← msg says "MIGRATION NOT RUN"; now run
 e293d30  Fix logout unreachable for vendors and admins
 e4f0ece  Document customer OAuth env vars; flag stays unset
 f4e32df  Phase 6: Auth.js Google sign-in for customers (front door)
@@ -411,9 +546,12 @@ f4e32df  Phase 6: Auth.js Google sign-in for customers (front door)
 2cbf47e  Phase 1: vendor attribution and customer-vendor relationships
 ```
 
-**⚠️ Code and database are NOT in step.** Phase 7 (`PointsLedger`) is written
-locally but unmigrated and unpushed. Everything through `e293d30` is deployed
-and migrated.
+Everything through `21a5e4b` is migrated **and** deployed. Deployment confirmed
+via Vercel CLI (push 16:34:20 → deployment 16:34:21, ● Ready, aliased to
+`www.drop-q.com`) — the CLI is authenticated as `brisnit-1848`, so
+`npx vercel ls drop-q --scope britt-midgettes-projects` is the fast way to
+check what is actually live. The handoff's §10 note that the CLI was
+unauthenticated is out of date.
 
 New env vars since v1: `AUTH_SECRET`, `AUTH_TRUST_HOST`, `AUTH_GOOGLE_ID`,
 `AUTH_GOOGLE_SECRET`, `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED` (all unset in prod —
@@ -426,5 +564,10 @@ Google sign-in ships inert until set).
 - Verify before claiming — render pages, measure in a browser, run the self-test
 - Never invent data (addresses, hours, consent). Unverifiable → candidate queue
 - `--accept-data-loss` only after proving no data can be lost, and say why
-- Migrate **before** pushing code that reads new columns
+- Migrate **before** pushing code that reads new columns. **This agreement was
+  broken in session 2 and took down `/my/rewards` for ~20h** (§5c) — `main`
+  auto-deploys, so an unmigrated push is a live outage, not a staging problem
 - Don't push without being asked
+- **Trust the repo over the handoff.** Check `origin/main` vs `HEAD` and
+  `prisma migrate status` before believing any claim about what is deployed or
+  migrated — including claims in this document

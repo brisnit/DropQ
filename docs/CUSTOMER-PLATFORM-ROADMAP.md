@@ -113,14 +113,64 @@ Adding Google/Apple means one of:
 - [ ] 6.3 Implement, preserving one identity per email so no duplicate
       customers are created
 
-## PHASE 7 — Rewards **[backend does not exist]**
+## PHASE 7 — Rewards ✅ SHIPPED (`21a5e4b`)
 
-- [ ] 7.1 Decide the model: DropQ-wide points, vendor-specific, or credits
-- [ ] 7.2 Schema + earn/redeem rules
-- [ ] 7.3 `/my/rewards`. Until 7.1–7.2 exist this stays a clearly-labelled
-      placeholder — no fake balances
+Live, migrated and verified. **Earning only — there is no redemption**, and the
+page says so plainly rather than implying one is coming imminently.
+
+- [x] 7.1 Model decided: **$1 spent = 1 DropPoint**, recorded with both scopes
+      (DropQ-wide *and* seller) on every row, so either redemption model can be
+      built later with no backfill
+- [x] 7.2 Schema + earn rules — `PointsLedger`, append-only. Balance is derived
+      by summing rows, never stored. Idempotent on unique `(orderId, reason)`.
+      Refunds append a negative row instead of decrementing. `orderId` carries
+      **no foreign key on purpose**: the ledger is an audit record and keeps the
+      historical order id even if the `Order` is deleted
+- [x] 7.3 `/my/rewards` — real balance, per-vendor breakdown, history, and an
+      honest "points aren't redeemable yet" note. No fake balances
+- [ ] 7.4 **Redemption** — deferred. Assigning a DropPoint a dollar value is a
+      pricing decision (see decision 3), not an engineering task
+- [ ] 7.5 **Backfill for historical orders — UNDECIDED.** The ledger shipped
+      empty, so all 8 existing paid orders hold 0 points. Deliberately not run.
+      See "Decisions — OPEN" below
+
+### Bugs found and fixed while verifying (worth not reintroducing)
+
+1. Points were derived from `totalCents - feeCents`. That is only correct in
+   `pass` mode — `totalCents` includes the DropQ fee **only** when the vendor
+   passes it on, and `Seller.feeMode` **defaults to `absorb`**. Now summed from
+   `OrderItem.priceCents × quantity`, which is also immune to a product being
+   edited or removed and to `feeMode` changing after the sale
+2. `reversePointsForOrder` threw, which suppressed the refund SMS *and* email on
+   oversold orders — buyers were silently refunded with no explanation. It now
+   never throws
+3. A bare `catch {}` treated every error as "already awarded". Narrowed to
+   Prisma `P2002`
 
 ## PHASE 8 — Analytics and admin visibility
+
+> ⛔ **Blocked.** Do not start Phase 8 until Phase 7 *and* the pay-in-person work
+> are complete and verified. Phase 7 is done; pay-in-person is not.
+
+### Settled before implementation — don't relitigate these
+
+- **Use the existing `lib/analytics.ts` abstraction** for PostHog. Do not call
+  PostHog from components; the provider stays swappable.
+- **Env vars:** `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`.
+  Remember `NEXT_PUBLIC_*` is inlined at build time — setting it in Vercel
+  requires a redeploy to take effect.
+- **Identify authenticated customers by `Customer.id` only.**
+- **Send no PII** — no name, email, phone, address, or anything else not
+  strictly needed for the analysis.
+- **The application database stays the source of truth for business metrics.**
+  Revenue, order counts and vendor payouts are answered from Postgres, never
+  from PostHog.
+- **PostHog is for behavioural analytics** — funnels, feature usage, conversion
+  analysis, session replay, experiments.
+- **Inspect `Customer.firstVendorId`, `Customer.signupSource` and
+  `CustomerVendor` first.** Phase 1 already models acquisition and the
+  customer↔vendor relationship; do not build duplicate analytics infrastructure
+  for facts the schema already records.
 
 - [ ] 8.1 Fire the customer-lifecycle events (signup, guest checkout,
       conversion, follow, save, reorder) with vendor/drop/source context
@@ -185,6 +235,31 @@ Adding Google/Apple means one of:
 
    Post-checkout CTA ("Follow {Vendor} — get notified when they launch their
    next drop") lands in Phase 3.
+
+## Decisions — OPEN
+
+1. **Do historical orders earn DropPoints? — UNRESOLVED, nothing has been run.**
+   `PointsLedger` shipped empty, so **all 8 existing paid orders currently hold
+   0 points**, including customers who have bought more than once. Points only
+   accrue from the next paid order onward.
+
+   Either answer is defensible — the point is that this is a deliberate choice,
+   not an oversight:
+   - **Backfill:** repeat customers see a balance that matches their real
+     history, and the first thing they ever see on `/my/rewards` isn't a zero.
+   - **Don't:** the programme starts clean on a stated date and nobody is
+     awarded points for a purchase made before the programme existed.
+
+   Mechanically it's cheap and safe whenever you decide: iterate paid orders
+   through the existing `awardPointsForOrder`, which is idempotent on
+   `(orderId, reason)` — re-running it **cannot** double-award. One caveat: a
+   backfill uses the corrected items-based rate, so an `absorb`-mode order would
+   award slightly more than the originally-shipped formula would have given it
+   (a real $5.00 order: 5 points rather than 4).
+
+2. **What a DropPoint redeems for** — still unset, and deliberately so. Until
+   there's an answer, `/my/rewards` states plainly that points aren't
+   redeemable rather than implying a launch date.
 
 ## Known gaps carried over
 
