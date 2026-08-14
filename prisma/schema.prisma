@@ -134,6 +134,7 @@ model Seller {
   // Customer relationships
   acquiredCustomers   Customer[]       @relation("CustomerFirstVendor")
   customerRelationships CustomerVendor[]
+  pointsAwarded         PointsLedger[]
 
   @@index([salesRepId])
 }
@@ -548,6 +549,7 @@ model Customer {
   vendorRelationships CustomerVendor[]
   savedDrops          SavedDrop[]
   oauthAccounts       CustomerAccount[]
+  pointsLedger        PointsLedger[]
 
   @@index([firstVendorId])
 }
@@ -1280,4 +1282,48 @@ model CustomerAccount {
 
   @@unique([provider, providerAccountId])
   @@index([customerId])
+}
+
+
+/// DropPoints — append-only ledger, not a balance column.
+///
+/// A balance is a derived fact; the ledger is the fact. Append-only means every
+/// point is traceable to the order that earned it, a refund is a negative row
+/// rather than a silent decrement, and the balance can always be recomputed if
+/// something goes wrong. Loyalty balances are exactly the kind of number
+/// customers notice being wrong.
+///
+/// Earn rate: $1 spent = 1 DropPoint (see lib/rewards.ts).
+///
+/// Scope: sellerId null = DropQ-wide points; sellerId set = earned with that
+/// vendor. Both are recorded on every purchase so either redemption model
+/// (DropQ-wide, or vendor-specific rules like "100 pts -> free item") can be
+/// built later without a backfill.
+///
+/// DELIBERATELY NOT BUILT YET: redemption. Points have no dollar value assigned
+/// and cannot be spent. See docs/CUSTOMER-PLATFORM-ROADMAP.md decision 3.
+model PointsLedger {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  /// null = DropQ-wide. Set = attributable to this vendor.
+  sellerId String?
+  seller   Seller? @relation(fields: [sellerId], references: [id], onDelete: SetNull)
+
+  orderId String?
+  /// Positive to earn, negative to reverse. Never update a row — append.
+  points  Int
+  /// purchase | purchase_reversal | adjustment
+  reason  String
+  note    String?
+
+  createdAt DateTime @default(now())
+
+  /// Idempotency: one earn row and one reversal row per order. Nullable
+  /// orderId means manual adjustments aren't constrained (Postgres allows
+  /// multiple NULLs in a unique index).
+  @@unique([orderId, reason])
+  @@index([customerId, createdAt])
+  @@index([sellerId, customerId])
 }

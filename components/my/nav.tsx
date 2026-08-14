@@ -15,6 +15,7 @@ const ITEMS = [
   { href: "/my", label: "Home", exact: true },
   { href: "/my/orders", label: "Orders" },
   { href: "/my/saved", label: "Saved" },
+  { href: "/my/rewards", label: "Rewards" },
   { href: "/messages", label: "Messages", badge: true },
   { href: "/dropmeet", label: "DropMeet" },
   { href: "/my/account", label: "Account" },

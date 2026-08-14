@@ -183,7 +183,7 @@ with the current model. Three options, all with tradeoffs:
    one that truly delivers cross-vendor saved cards, but changes merchant of
    record, fee bearer, and dispute handling
 
-### ✅ DECIDED — stay on direct charges
+### ✅ DECIDED — stay on direct charges (CONFIRMED)
 
 Confirmed from Stripe's documentation that for destination charges, **with or
 without `on_behalf_of`, disputes and dispute fees are debited from the platform
@@ -212,6 +212,82 @@ vendor-terms changes, migration plan).
   matched back to vendor and order, and emailed to `DROPQ_ADMIN_EMAILS` via
   `lib/disputes.ts`. Operational visibility only — under direct charges the
   money is the vendor's.
+
+---
+
+## 5b. Session 2 additions
+
+- **Phase 6 — Auth.js Google sign-in for CUSTOMERS.** Deployed but **inert**:
+  the button only renders when `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED === "true"`,
+  which is unset. Front-door pattern — Auth.js does the OAuth handshake,
+  `lib/customer-oauth.ts` resolves the Customer, then we mint the existing
+  `dq_customer` cookie. **Vendor auth untouched**; `auth.ts` has zero imports
+  of `lib/auth.ts`. Verified: pre-existing vendor AND customer sessions both
+  still return 200. `CustomerAccount` table applied to prod.
+  57/57 self-test assertions pass (8 new OAuth ones, incl. "unverified email
+  cannot claim an account").
+- **Payments bugs fixed** — refunds now pass `refund_application_fee: true`
+  (DropQ was keeping its 2% on fully-refunded orders); `charge.dispute.created`
+  /`.closed` now handled and emailed to admins via `lib/disputes.ts`.
+- **Logout fixes** — vendor sidebar nav lacked `min-h-0`/`overflow`, pushing
+  "Log out" off-screen; mobile menu had no max-height; **admin had no logout at
+  all**.
+- **Phase 7 rewards — BUILT, MIGRATION NOT RUN.** See §6b.
+
+---
+
+## 6b. ⚠️ NEXT SESSION STARTS HERE — approved brief
+
+Phase 7 code is written and compiles; **`PointsLedger` has NOT been migrated**.
+Do not stack unrelated roadmap work into this change.
+
+### Already built (uncommitted or committed but unmigrated)
+
+- `prisma/schema.prisma` — `PointsLedger` model
+- `lib/rewards.ts` — earn/reverse/balance, $1 = 1 point, excludes service fee
+- `lib/checkout.ts` — awards after `finalizePaidOrder` commits; reverses on
+  oversold refund
+- `app/my/rewards/page.tsx` + nav entry — real balance, **no fake redemption**
+
+### Approved, still to build
+
+1. **Run the `PointsLedger` migration**, then complete Phase 7. Keep the
+   approved architecture: balance derived from rows, idempotent
+   `(orderId, reason)`, refunds as negative rows, both DropQ-wide and seller
+   scope recorded, earn excludes DropQ service fees, **no redemption**.
+2. **`Drop.allowPayInPerson Boolean @default(false)`** + opt-in checkbox in the
+   drop editor, labelled **"Allow customers to pay at pickup"** with copy
+   *"Customers can reserve their order now and pay you in person at pickup."*
+   **Do not default on.** Live-drop behaviour must not change.
+   Intended condition `(live || allowPayInPerson) && paymentsEnabled` —
+   **VERIFY this against the real checkout architecture before changing it.**
+   Note `paymentsEnabled` is false when the vendor has no Stripe, in which case
+   *all* orders are already implicitly pay-in-person.
+3. **Pay-in-person orders earn points only on explicit payment confirmation.**
+   Do NOT award when an unpaid order is marked completed — fulfilment and
+   payment are separate events. Add a **"Mark as paid in person"** vendor
+   action that: verifies the order was pay-in-person, sets paid + a `paidAt`
+   timestamp, **preserves the method as cash/payInPerson rather than pretending
+   Stripe processed it**, and triggers the same idempotent award path. Never
+   award twice on retry. Reuse existing schema if it already models this
+   cleanly — `Order.paymentStatus` and `OrderEvent` probably do.
+4. **ANSWER BEFORE IMPLEMENTING** — inspect and report what currently happens
+   when: (a) a pay-in-person preorder is cancelled before payment; (b) the
+   vendor marks it paid then refunds/voids; (c) the order is fulfilled but
+   payment was never recorded. **Points must follow recorded payment, not
+   fulfilment.**
+5. **Customer UX** — at checkout, make it unmistakable that no online charge is
+   being made and payment is due to the vendor at pickup.
+6. **Auditability** — cash isn't Stripe-verified, so record who marked it paid
+   and when. `OrderEvent` already exists and is the cheap place for this.
+
+### Required before any production migration
+
+Show the user: schema changes · migration SQL · affected payment/order code
+paths · how points are triggered for Stripe vs pay-in-person · how duplicate
+awards are prevented.
+
+Then the safe order: **migrate → verify prod schema → deploy code.**
 
 ---
 
@@ -266,6 +342,10 @@ See `docs/CUSTOMER-PLATFORM-ROADMAP.md` for the full ordered plan.
 - `vendorUpcomingAppearances()` exists but isn't wired into `/s/[slug]`
 - Saving individual **products** is still localStorage-only (`lib/saved-store.ts`)
 - **Checkout phone is now optional** — vendors lose SMS reach for those orders
+- **Pay-in-person orders currently earn 0 DropPoints** — points award on
+  `paymentStatus === "paid"`, which only Stripe sets. Item 3 above fixes this.
+- **Existing paid orders earned no points** (ledger is new). A backfill is
+  possible but was NOT run — the user has not decided whether history counts.
 - Stale `* 2.ts` duplicates in `.next`/`app/generated` break `tsc` intermittently
 
 ---
@@ -319,20 +399,25 @@ production.** Run it after any messaging/consent change:
 Working tree clean, all pushed to `origin/main`. Recent commits, newest first:
 
 ```
+e293d30  Fix logout unreachable for vendors and admins
+e4f0ece  Document customer OAuth env vars; flag stays unset
+f4e32df  Phase 6: Auth.js Google sign-in for customers (front door)
+7ee7591  Payments: keep direct charges; fix refund fee, add dispute visibility
+1ce3983  Document DropQ Payments v2 architecture (design only)
+845edff  Add session handoff document
 6a211b7  Phase 4 (partial): account profile and notification preferences
-48ed15d  A2P 10DLC compliance remediation   ← msg says "NOT DEPLOYED"; it IS deployed
-d186bb4  Add a read-only Twilio readiness audit
+48ed15d  A2P 10DLC compliance remediation  ← msg says "NOT DEPLOYED"; it IS deployed
 3bc6120  Phase 3: guest to account conversion
-e0310a3  Close the SavedDrop gap; record settled architecture decisions
 2cbf47e  Phase 1: vendor attribution and customer-vendor relationships
-6f83244  Dashboard: notification bell to far right, outline icon
-1e565fd  Admin: drop shield emoji from Make admin
-00c6ee4  DropMeet map: watchdog for silent failures
-053ebbb  DropMeet map: surface async Mapbox failures
-c1eb1c6  Add DropMeet, in-app messaging, per-channel SMS consent
 ```
 
-**Code and database are in step.** No pending migrations.
+**⚠️ Code and database are NOT in step.** Phase 7 (`PointsLedger`) is written
+locally but unmigrated and unpushed. Everything through `e293d30` is deployed
+and migrated.
+
+New env vars since v1: `AUTH_SECRET`, `AUTH_TRUST_HOST`, `AUTH_GOOGLE_ID`,
+`AUTH_GOOGLE_SECRET`, `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED` (all unset in prod —
+Google sign-in ships inert until set).
 
 ---
 

@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
+import { awardPointsForOrder, reversePointsForOrder } from "@/lib/rewards";
 import { getStripe } from "@/lib/stripe";
 import { sendEmail, orderReceivedEmail } from "@/lib/email";
 import { sendSms } from "@/lib/notifications";
@@ -93,6 +94,15 @@ export async function finalizePaidOrder(
     await refundOversoldOrder(orderId);
   }
 
+  // DropPoints — $1 spent = 1 point. Awarded outside the transaction and
+  // idempotent via the unique (orderId, reason), so a webhook retry can't
+  // double-award.
+  if (result.state === "ok" && result.order) {
+    await awardPointsForOrder(orderId).catch((e) =>
+      console.error("awardPointsForOrder failed:", e)
+    );
+  }
+
   // Sales-rep commission — created exactly once (the atomic paid-claim above
   // guarantees this block runs once per order; the unique (orderId, salesRepId)
   // is a second guard). Only for orders whose vendor is tied to a sales rep.
@@ -156,6 +166,8 @@ async function refundOversoldOrder(orderId: string) {
     where: { id: orderId },
     data: { paymentStatus: "refunded" },
   });
+  // Points follow the money — a refunded order shouldn't leave points behind.
+  await reversePointsForOrder(orderId, "oversold refund");
 
   const first = order.buyerName.split(" ")[0] || order.buyerName;
   const store = order.seller.storeName;
