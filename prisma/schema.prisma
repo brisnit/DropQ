@@ -547,6 +547,7 @@ model Customer {
 
   vendorRelationships CustomerVendor[]
   savedDrops          SavedDrop[]
+  oauthAccounts       CustomerAccount[]
 
   @@index([firstVendorId])
 }
@@ -1251,4 +1252,32 @@ model SavedDrop {
   @@unique([customerId, dropId])
   @@index([dropId])
   @@index([customerId, createdAt])
+}
+
+
+/// Links an OAuth identity (Google today, Apple later) to a DropQ Customer.
+///
+/// Deliberately NOT Auth.js's default `Account` model: Auth.js's Prisma adapter
+/// expects a `User` table, which would compete with `Customer` as the identity.
+/// Auth.js runs with JWT sessions instead and this table is written by our own
+/// linking step, so `Customer` stays the single customer identity.
+///
+/// The unique on (provider, providerAccountId) is what makes repeat logins
+/// resolve to the same Customer instead of creating duplicates.
+model CustomerAccount {
+  id                String   @id @default(cuid())
+  customerId        String
+  customer          Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  provider          String   // "google" | "apple"
+  providerAccountId String   // the provider's stable subject id
+  /// Email as the provider asserted it, kept for audit. May differ from
+  /// Customer.email (e.g. a future Apple private-relay address).
+  providerEmail     String?
+
+  createdAt         DateTime @default(now())
+  lastLoginAt       DateTime?
+
+  @@unique([provider, providerAccountId])
+  @@index([customerId])
 }

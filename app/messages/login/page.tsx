@@ -22,9 +22,9 @@ export const metadata = { title: "Sign in — DropQ" };
 export default async function CustomerLoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; expired?: string }>;
+  searchParams: Promise<{ next?: string; expired?: string; error?: string }>;
 }) {
-  const { next, expired } = await searchParams;
+  const { next, expired, error } = await searchParams;
 
   const customer = await getCurrentCustomer();
   if (customer) redirect(next && next.startsWith("/") ? next : "/my");
@@ -101,6 +101,13 @@ export default async function CustomerLoginPage({
         <CustomerLoginForm
           next={next ?? "/my"}
           expired={expired === "1"}
+          oauthError={
+            error === "unverified_email"
+              ? "That Google account's email isn't verified, so we can't use it to sign in. Use the email link below instead."
+              : error === "no_email"
+                ? "That account didn't share an email address. Use the email link below instead."
+                : null
+          }
           vendorName={vendor?.storeName ?? null}
         />
 

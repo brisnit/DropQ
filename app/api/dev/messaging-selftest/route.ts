@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { upsertCustomer, createMagicLinkToken, consumeMagicLinkToken } from "@/lib/customer-auth";
+import { linkOAuthCustomer } from "@/lib/customer-oauth";
 import {
   getOrCreateConversation,
   customerForOrder,
@@ -301,6 +302,54 @@ export async function GET() {
     const plainRaw = await createMagicLinkToken(sarah!.id);
     check("no intent when none was requested", (await consumeMagicLinkToken(plainRaw))?.followSellerId === null);
 
+    // ── 13b. OAuth identity linking (Auth.js front door) ───────────────────
+    const oauthEmail = `oauth-${stamp}@example.com`;
+    const sub1 = `google-sub-${stamp}`;
+
+    // New customer from a verified Google identity.
+    const r1 = await linkOAuthCustomer({
+      provider: "google", providerAccountId: sub1,
+      email: oauthEmail, emailVerified: true, name: "OAuth Tester",
+    });
+    check("google sign-in creates a customer", r1.ok && r1.outcome === "created");
+
+    // Repeat login resolves to the SAME customer — no duplicate.
+    const r2 = await linkOAuthCustomer({
+      provider: "google", providerAccountId: sub1,
+      email: oauthEmail, emailVerified: true,
+    });
+    check("repeat google login reuses the same customer",
+      r2.ok && r1.ok && r2.customerId === r1.customerId && r2.outcome === "existing_link");
+    check("no duplicate customer created",
+      (await prisma.customer.count({ where: { email: oauthEmail } })) === 1);
+
+    // Same Google identity, email changed at Google — still the same customer.
+    const r3 = await linkOAuthCustomer({
+      provider: "google", providerAccountId: sub1,
+      email: `changed-${stamp}@example.com`, emailVerified: true,
+    });
+    check("changed google email still resolves to the same customer",
+      r3.ok && r1.ok && r3.customerId === r1.customerId);
+
+    // An existing magic-link customer signing in with Google gets LINKED.
+    const r4 = await linkOAuthCustomer({
+      provider: "google", providerAccountId: `google-sub-b-${stamp}`,
+      email: sarah!.email, emailVerified: true,
+    });
+    check("existing customer links by verified email",
+      r4.ok && r4.customerId === sarah!.id && r4.outcome === "linked_by_email");
+    check("linking did not duplicate the existing customer",
+      (await prisma.customer.count({ where: { email: sarah!.email } })) === 1);
+
+    // UNVERIFIED email must never claim an existing account.
+    const r5 = await linkOAuthCustomer({
+      provider: "google", providerAccountId: `attacker-${stamp}`,
+      email: ana!.email, emailVerified: false,
+    });
+    check("unverified email cannot claim an account", !r5.ok && r5.reason === "unverified_email");
+    check("refused sign-in created nothing",
+      (await prisma.customerAccount.count({ where: { providerAccountId: `attacker-${stamp}` } })) === 0);
+
     // ── 14. Customer context is scoped to the asking vendor ────────────────
     const ctx = await customerContext(vendorA.id, sarah!.id);
     check("context shows the customer's name", ctx?.name === "Sarah Martinez");
@@ -338,6 +387,9 @@ export async function GET() {
     );
   } catch (e) {
     check("suite ran to completion", false, e instanceof Error ? e.message : String(e));
+    await prisma.customerAccount.deleteMany({ where: { providerAccountId: { contains: stamp } } });
+    await prisma.customer.deleteMany({ where: { email: { contains: `oauth-${stamp}` } } });
+    await prisma.customer.deleteMany({ where: { email: { contains: `changed-${stamp}` } } });
   } finally {
     // Cascades clean up drops, orders, conversations, messages, notifications.
     await prisma.seller.deleteMany({ where: { id: { in: madeSellerIds } } }).catch(() => {});
