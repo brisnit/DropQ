@@ -13,6 +13,7 @@
     "db:seed-region": "node --env-file=.env prisma/seed-region.mjs",
     "db:seed-dropmeet": "node --env-file=.env prisma/seed-dropmeet-sd.mjs",
     "db:backfill-attribution": "node --env-file=.env prisma/backfill-attribution.mjs",
+    "db:backfill-points": "node --env-file=.env prisma/backfill-points.mjs",
     "twilio:audit": "node --env-file=.env.vercel.local scripts/twilio-audit.mjs"
   },
   "dependencies": {

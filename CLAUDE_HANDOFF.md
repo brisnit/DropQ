@@ -112,6 +112,7 @@ All additive; no data was deleted.
 ```
 npm run db:backfill-customers     → 12 orders → 7 customers
 npm run db:backfill-attribution   → 6 attributed, 10 relationships, 2 cross-vendor
+npm run db:backfill-points        → 8 orders, 112 points (dry run unless --commit)
 npm run db:seed-region            → San Diego County, real US Census TIGER boundary
 npm run db:seed-dropmeet          → 16 published, 4 candidates
 ```
@@ -329,6 +330,61 @@ docstring assumes a scratch database.
 
 ---
 
+## 5d. Historical DropPoints backfill — DONE (2026-08-14)
+
+`prisma/backfill-points.mjs` · `npm run db:backfill-points` · **dry run by
+default, `--commit` to write.** Ran once against production: **8 rows, 112
+points, 6 customers, 2 vendors.** Nothing further is pending.
+
+| Vendor | Points |
+|---|---|
+| The Clovery | 68 |
+| Paraiso Delicacies | 44 |
+
+Christopher Henderson (25) and Britt N. Midgette (21) hold **cross-vendor**
+balances — the first real exercise of that path, verified rendering correctly.
+
+### The design decision worth not undoing
+
+The rows use **`reason: "purchase"`, not a distinct backfill reason.** A
+separate reason reads better but silently breaks two things, because the unique
+index is `(orderId, reason)` — a different reason is a *separate* row, not a
+conflicting one:
+
+1. **Refunds would stop reversing.** `reversePointsForOrder()` looks up exactly
+   `{ orderId, reason: "purchase" }`. A backfilled order refunded later would
+   keep its points forever.
+2. **Double-awarding becomes possible.** `awardPointsForOrder()` writes
+   `reason: "purchase"`, which would NOT collide with a `purchase_backfill`
+   row — so the order could be awarded twice.
+
+Provenance lives in `note` instead: **`"Earned before DropPoints launched"`**.
+It's queryable (`note IS NOT NULL`) and reads honestly to the customer, who
+sees it in their history.
+
+⚠️ **Apply the same reasoning to any future ledger writer** (pay-in-person
+awards included): if a row represents a purchase award, its reason must be
+`"purchase"` or refunds won't reverse it.
+
+### Verified after the run
+
+19/19 automated assertions: 8 rows · 112 points · per-customer and per-vendor
+totals matching the dry run · every row `reason = "purchase"` · all 8 carrying
+the historical note · both cross-vendor customers spanning 2 vendors each.
+`Order`, `OrderItem`, `Customer` and `Seller` were verified untouched by
+**content hash**, not just row count. A second dry run reports 8 skips and 0
+proposed inserts. `/my/rewards` rendered against production data showing real
+balances (Christopher 25 = 12 + 13; Britt 21 = 8 + 13).
+
+### Known cosmetic wrinkle
+
+Ledger `createdAt` is the **backfill** date, so a July order shows in history as
+"Aug 14, 2026". The note is what explains this to the customer — which is a
+second reason not to drop it. Not worth restating `createdAt` to the order date:
+the ledger honestly records when the points were granted.
+
+---
+
 ## 6b. ⚠️ NEXT SESSION STARTS HERE — approved brief
 
 **Phase 7 is COMPLETE** (migrated, deployed, verified — see §5c). Phase 8 is
@@ -370,6 +426,8 @@ row is later deleted. Don't "fix" this by adding a relation.
    Stripe processed it**, and triggers the same idempotent award path. Never
    award twice on retry. Reuse existing schema if it already models this
    cleanly — `Order.paymentStatus` and `OrderEvent` probably do.
+   **Write the ledger row with `reason: "purchase"`** — see §5d for why a
+   distinct reason would break refund reversal and permit double-awarding.
 3. **ANSWER BEFORE IMPLEMENTING** — inspect and report what currently happens
    when: (a) a pay-in-person preorder is cancelled before payment; (b) the
    vendor marks it paid then refunds/voids; (c) the order is fulfilled but
@@ -411,8 +469,8 @@ See `docs/CUSTOMER-PLATFORM-ROADMAP.md` for the full ordered plan.
   new model
 - **Phase 6 Auth.js** — Google + Apple + magic link. ⚠️ the HMAC cookie serves
   **vendors too**; migration must not log vendors out
-- **Phase 7 rewards — ✅ SHIPPED** (`21a5e4b`). Earning only, no redemption.
-  Open: whether the 8 historical paid orders get a backfill (§8).
+- **Phase 7 rewards — ✅ SHIPPED** (`21a5e4b`) **and backfilled** (§5d).
+  Earning only, no redemption. Nothing outstanding.
 - **Phase 8 PostHog** — `lib/analytics.ts` is already the abstraction seam;
   `/api/track` currently only `console.log`s. **Blocked** until pay-in-person
   is complete and verified. Decisions already recorded in the roadmap: use
@@ -438,16 +496,9 @@ See `docs/CUSTOMER-PLATFORM-ROADMAP.md` for the full ordered plan.
 
 - **Stripe direct vs destination charges** (blocks 5.1/5.2) — the big one
 - What a DropPoint redeems for
-- **Whether to backfill DropPoints for historical orders — UNRESOLVED.**
-  `PointsLedger` went live empty, so **all 8 existing paid orders hold 0
-  points** even though some customers have bought repeatedly. Nothing has been
-  backfilled and nothing will be without an explicit decision. The award path
-  is idempotent on `(orderId, reason)`, so a backfill is a safe one-liner over
-  paid orders whenever you want it — and re-running it cannot double-award.
-  Deciding *not* to backfill is equally valid; the point is that it's a
-  deliberate choice, not an oversight. **Note the two are not equivalent:** a
-  backfill would use the corrected items-based rate, so an absorb-mode order
-  would award slightly more than the shipped formula would have given it.
+- ~~Whether to backfill DropPoints for historical orders~~ — **RESOLVED
+  2026-08-14: backfilled.** All 8 paid orders, 112 points, 6 customers, 2
+  vendors. See §5d.
 - Whether to keep the dev self-test route long term
 - Whether vendors need warning that checkout phone is now optional
 
@@ -467,8 +518,8 @@ See `docs/CUSTOMER-PLATFORM-ROADMAP.md` for the full ordered plan.
 - **Checkout phone is now optional** — vendors lose SMS reach for those orders
 - **Pay-in-person orders currently earn 0 DropPoints** — points award on
   `paymentStatus === "paid"`, which only Stripe sets. §6b item 2 fixes this.
-- **All 8 existing paid orders hold 0 DropPoints** (the ledger shipped empty).
-  A backfill is deliberately NOT run — see §8, still undecided.
+- ~~All 8 existing paid orders hold 0 DropPoints~~ — **fixed 2026-08-14**, all
+  8 backfilled for 112 points (§5d).
 - Stale `* 2.ts` duplicates in `.next`/`app/generated` break `tsc` intermittently
 
 ---

@@ -130,9 +130,13 @@ page says so plainly rather than implying one is coming imminently.
       honest "points aren't redeemable yet" note. No fake balances
 - [ ] 7.4 **Redemption** — deferred. Assigning a DropPoint a dollar value is a
       pricing decision (see decision 3), not an engineering task
-- [ ] 7.5 **Backfill for historical orders — UNDECIDED.** The ledger shipped
-      empty, so all 8 existing paid orders hold 0 points. Deliberately not run.
-      See "Decisions — OPEN" below
+- [x] 7.5 **Backfill for historical orders — DONE** (2026-08-14). All 8 paid
+      orders awarded at the corrected rate: **112 points, 6 customers, 2
+      vendors** (The Clovery 68, Paraiso Delicacies 44). Run once via
+      `npm run db:backfill-points -- --commit`; the script is dry-run by
+      default and idempotent, so it is safe to re-run and will report 8 skips.
+      The fulfilled-but-unpaid Casa Makulay order was correctly excluded —
+      points follow recorded payment, never fulfilment
 
 ### Bugs found and fixed while verifying (worth not reintroducing)
 
@@ -238,28 +242,27 @@ page says so plainly rather than implying one is coming imminently.
 
 ## Decisions — OPEN
 
-1. **Do historical orders earn DropPoints? — UNRESOLVED, nothing has been run.**
-   `PointsLedger` shipped empty, so **all 8 existing paid orders currently hold
-   0 points**, including customers who have bought more than once. Points only
-   accrue from the next paid order onward.
-
-   Either answer is defensible — the point is that this is a deliberate choice,
-   not an oversight:
-   - **Backfill:** repeat customers see a balance that matches their real
-     history, and the first thing they ever see on `/my/rewards` isn't a zero.
-   - **Don't:** the programme starts clean on a stated date and nobody is
-     awarded points for a purchase made before the programme existed.
-
-   Mechanically it's cheap and safe whenever you decide: iterate paid orders
-   through the existing `awardPointsForOrder`, which is idempotent on
-   `(orderId, reason)` — re-running it **cannot** double-award. One caveat: a
-   backfill uses the corrected items-based rate, so an `absorb`-mode order would
-   award slightly more than the originally-shipped formula would have given it
-   (a real $5.00 order: 5 points rather than 4).
-
-2. **What a DropPoint redeems for** — still unset, and deliberately so. Until
+1. **What a DropPoint redeems for** — still unset, and deliberately so. Until
    there's an answer, `/my/rewards` states plainly that points aren't
    redeemable rather than implying a launch date.
+
+## Decisions — SETTLED since the backfill
+
+**Historical orders DO earn DropPoints** (decided and executed 2026-08-14).
+All 8 pre-existing paid orders were backfilled at the corrected line-item rate.
+
+The one design point worth preserving: those rows use **`reason: "purchase"`**,
+not a separate backfill reason. Because the unique index is `(orderId, reason)`,
+a distinct reason would be a *separate* row rather than a conflicting one —
+which would have (a) stopped refunds reversing them, since
+`reversePointsForOrder()` looks up `reason: "purchase"` exactly, and (b) allowed
+a second award from `awardPointsForOrder()`. Provenance lives in `note`
+(`"Earned before DropPoints launched"`) instead, which is queryable and reads
+honestly to the customer.
+
+**Any future ledger writer must follow the same rule** — pay-in-person awards
+included. If a row represents a purchase award, its reason must be `"purchase"`
+or refunds will not reverse it.
 
 ## Known gaps carried over
 
