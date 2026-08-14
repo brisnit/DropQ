@@ -139,8 +139,12 @@ async function refundOversoldOrder(orderId: string) {
   const stripe = getStripe();
   if (stripe && order.stripePaymentIntentId && order.seller.stripeAccountId) {
     try {
+      // refund_application_fee returns DropQ's platform fee to the vendor.
+      // Without it the buyer is made whole from the vendor's balance while
+      // DropQ keeps its cut — the vendor ends up out of pocket on a sale that
+      // never happened, plus Stripe's processing fee.
       await stripe.refunds.create(
-        { payment_intent: order.stripePaymentIntentId },
+        { payment_intent: order.stripePaymentIntentId, refund_application_fee: true },
         { stripeAccount: order.seller.stripeAccountId, idempotencyKey: `oversold-refund-${order.id}` }
       );
     } catch (e) {

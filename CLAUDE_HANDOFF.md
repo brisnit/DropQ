@@ -183,8 +183,35 @@ with the current model. Three options, all with tradeoffs:
    one that truly delivers cross-vendor saved cards, but changes merchant of
    record, fee bearer, and dispute handling
 
-**This is a business decision and is unresolved.** `Customer.stripeCustomerId`
-exists but is unused.
+### ✅ DECIDED — stay on direct charges
+
+Confirmed from Stripe's documentation that for destination charges, **with or
+without `on_behalf_of`, disputes and dispute fees are debited from the platform
+account**. DropQ will not take on that exposure at this stage.
+
+- Production charge architecture **stays as-is**. Do not migrate.
+- Phase 5 saved cards, if built, are **per-vendor** (Option 1).
+- Universal cross-vendor saved cards are deferred to **Payments v2**, revisited
+  only once DropQ has volume, vendor agreements, fraud controls,
+  reserve/payout policy and cash reserves.
+- If per-vendor saved cards can't be made to feel good, **defer the feature
+  rather than change the financial liability model.**
+
+Full evaluation: `docs/PAYMENTS-V2-ARCHITECTURE.md` (flow comparison, fee
+impact, refund/dispute flows, negative-balance exposure, reserve strategy,
+vendor-terms changes, migration plan).
+
+`Customer.stripeCustomerId` exists but is unused — harmless, and reusable by v2.
+
+### Bugs fixed this session
+
+- `lib/checkout.ts` refunds now pass `refund_application_fee: true`. Previously
+  DropQ kept its 2% on fully-refunded oversold orders while the vendor absorbed
+  the loss.
+- `charge.dispute.created` / `.closed` are now handled in the Stripe webhook,
+  matched back to vendor and order, and emailed to `DROPQ_ADMIN_EMAILS` via
+  `lib/disputes.ts`. Operational visibility only — under direct charges the
+  money is the vendor's.
 
 ---
 

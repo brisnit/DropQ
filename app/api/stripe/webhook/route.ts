@@ -4,6 +4,7 @@ import { getStripe } from "@/lib/stripe";
 import { finalizePaidOrder } from "@/lib/checkout";
 import { activateGrowth } from "@/lib/billing";
 import { prisma } from "@/lib/db";
+import { notifyAdminsOfDispute } from "@/lib/disputes";
 
 export async function POST(req: NextRequest) {
   const stripe = getStripe();
@@ -67,6 +68,57 @@ export async function POST(req: NextRequest) {
         await prisma.seller.updateMany({
           where: { id: sellerId },
           data: { subscriptionStatus: "canceled", plan: "starter", stripeSubscriptionId: null },
+        });
+      }
+      break;
+    }
+    // Disputes land on the VENDOR's account under direct charges, so DropQ is
+    // not financially liable — but it has had no visibility at all, which means
+    // no support follow-up and no fraud signal. These arrive as Connect events
+    // with `event.account` set to the connected account.
+    //
+    // (If Payments v2 ever ships, disputes move to the platform balance and
+    // this handler becomes financially load-bearing. See
+    // docs/PAYMENTS-V2-ARCHITECTURE.md.)
+    case "charge.dispute.created":
+    case "charge.dispute.closed": {
+      const dispute = event.data.object as Stripe.Dispute;
+      const connectedAccountId = event.account ?? null;
+
+      const seller = connectedAccountId
+        ? await prisma.seller.findFirst({
+            where: { stripeAccountId: connectedAccountId },
+            select: { id: true, storeName: true, email: true },
+          })
+        : null;
+
+      // Best-effort link back to the order via the payment intent.
+      const paymentIntentId =
+        typeof dispute.payment_intent === "string"
+          ? dispute.payment_intent
+          : (dispute.payment_intent?.id ?? null);
+      const order = paymentIntentId
+        ? await prisma.order.findFirst({
+            where: { stripePaymentIntentId: paymentIntentId },
+            select: { id: true, buyerName: true, buyerEmail: true, totalCents: true },
+          })
+        : null;
+
+      console.error(
+        `[stripe] ${event.type} — vendor=${seller?.storeName ?? connectedAccountId ?? "unknown"} ` +
+          `order=${order?.id ?? "unmatched"} amount=${dispute.amount} reason=${dispute.reason} ` +
+          `status=${dispute.status} dispute=${dispute.id}`
+      );
+
+      if (event.type === "charge.dispute.created") {
+        await notifyAdminsOfDispute({
+          disputeId: dispute.id,
+          reason: dispute.reason,
+          amountCents: dispute.amount,
+          storeName: seller?.storeName ?? null,
+          vendorEmail: seller?.email ?? null,
+          orderId: order?.id ?? null,
+          buyerName: order?.buyerName ?? null,
         });
       }
       break;

@@ -80,10 +80,16 @@ nobody had been offered a follow, so recording one would have invented consent.
 
 ## PHASE 5 — Commerce depth
 
-- [ ] 5.1 **[YOU]** Stripe: saved payment methods needs Stripe Customers +
-      SetupIntents + a webhook. Today checkout is Connect Checkout with no
-      stored customer. Confirm you want this before I start.
-- [ ] 5.2 `/my/payments` — list, add, remove, set default. Never store card data.
+- [x] 5.1 **DECIDED — stay on direct charges.** Confirmed from Stripe's docs
+      that for destination charges, *with or without* `on_behalf_of`, disputes
+      and dispute fees are debited from the **platform** account. DropQ will not
+      assume that exposure at this stage. See
+      `docs/PAYMENTS-V2-ARCHITECTURE.md`.
+- [ ] 5.2 `/my/payments` — **per-vendor** saved cards only (a card saved on a
+      connected account cannot be used at another vendor). Universal
+      cross-vendor saved cards are deferred to Payments v2. Never store card
+      data. If per-vendor can't be made to feel good, defer rather than change
+      the charge architecture.
 - [ ] 5.3 Verified-purchase reviews: extend `Review` with `customerId` +
       `orderId` (currently `authorName` is a free string, so reviews can't be
       verified today)
@@ -129,6 +135,16 @@ Adding Google/Apple means one of:
 ---
 
 ## Decisions — SETTLED
+
+0. **Payments → stay on Stripe Connect DIRECT charges.** Vendor is merchant of
+   record, pays Stripe processing, and bears refunds and chargebacks. DropQ
+   carries no payment-processing financial exposure and keeps the full 2%.
+   Destination charges + universal cross-vendor saved cards become a future
+   **Payments v2** project, revisited only once DropQ has the transaction
+   volume, vendor agreements, fraud controls, reserve/payout policy and cash
+   reserves to absorb platform-level dispute liability. Two supporting facts:
+   at 2%, plain destination charges are loss-making per order (~-$0.51 on $24),
+   and `on_behalf_of` moves settlement but **not** dispute liability.
 
 1. **Authentication → Auth.js.** Google OAuth, Apple OAuth, and email
    magic-link. UI stays fully DropQ-branded, and vendor/drop context survives
