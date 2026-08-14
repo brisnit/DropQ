@@ -82,7 +82,7 @@ export function MobileNav({
             onClick={close}
             className="fixed inset-0 z-40 cursor-default"
           />
-          <div className="absolute right-0 top-full mt-2 z-50 w-60 bg-paper border border-line rounded-2xl shadow-[var(--shadow-lift)] p-2">
+          <div className="absolute right-0 top-full mt-2 z-50 w-60 max-h-[calc(100dvh-5rem)] overflow-y-auto overscroll-contain bg-paper border border-line rounded-2xl shadow-[var(--shadow-lift)] p-2">
             {NAV.map((item, i) => {
               const active = isActive(pathname, item.href, item.exact);
               const badge = item.href === "/dashboard/messages" ? unread : 0;

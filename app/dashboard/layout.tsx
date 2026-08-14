@@ -53,7 +53,10 @@ export default async function DashboardLayout({
         <div className="px-5 py-4 border-b border-line/70">
           <Logo href="/dashboard" />
         </div>
-        <div className="p-4 flex-1">
+        {/* min-h-0 + overflow-y-auto: without these the nav grows past the
+            h-screen aside and pushes "View Your Store" and "Log out" off the
+            bottom of the viewport, where they can't be reached. */}
+        <div className="p-4 flex-1 min-h-0 overflow-y-auto">
           <DashboardNav unread={unread} />
           {isRep && (
             <>
@@ -78,7 +81,7 @@ export default async function DashboardLayout({
             </>
           )}
         </div>
-        <div className="p-4 border-t border-line/70 space-y-3">
+        <div className="p-4 border-t border-line/70 space-y-3 shrink-0">
           {/* View Your Store — single, prominent storefront CTA */}
           <Link
             href={`/s/${seller.slug}`}
