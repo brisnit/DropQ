@@ -167,7 +167,12 @@ async function refundOversoldOrder(orderId: string) {
     data: { paymentStatus: "refunded" },
   });
   // Points follow the money — a refunded order shouldn't leave points behind.
-  await reversePointsForOrder(orderId, "oversold refund");
+  // reversePointsForOrder already swallows its own failures; the catch here is
+  // belt-and-braces so nothing added to it later can stop the refund
+  // notification below from reaching the customer.
+  await reversePointsForOrder(orderId, "oversold refund").catch((e) =>
+    console.error("reversePointsForOrder failed:", e)
+  );
 
   const first = order.buyerName.split(" ")[0] || order.buyerName;
   const store = order.seller.storeName;

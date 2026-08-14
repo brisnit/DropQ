@@ -1,4 +1,5 @@
 import "server-only";
+import { Prisma } from "@/app/generated/prisma";
 import { prisma } from "@/lib/db";
 
 /**
@@ -24,20 +25,44 @@ export function pointsForCents(cents: number): number {
 }
 
 /**
+ * A unique-constraint violation is the ONE error that means "this row already
+ * exists" — i.e. we already awarded or reversed this order and a retry landed.
+ * Everything else (table missing, connection dropped, constraint we didn't
+ * anticipate) is a real failure and must not be disguised as a duplicate.
+ */
+function isDuplicateRow(e: unknown): boolean {
+  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002";
+}
+
+/**
  * Award points for a paid order. Idempotent via the unique (orderId, reason) —
  * a webhook retry or a double finalize cannot double-award.
  */
 export async function awardPointsForOrder(orderId: string): Promise<number> {
   const order = await prisma.order.findUnique({
     where: { id: orderId },
-    select: { id: true, customerId: true, sellerId: true, totalCents: true, feeCents: true, paymentStatus: true },
+    select: {
+      id: true,
+      customerId: true,
+      sellerId: true,
+      paymentStatus: true,
+      items: { select: { priceCents: true, quantity: true } },
+    },
   });
   if (!order?.customerId) return 0;
   if (order.paymentStatus !== "paid") return 0;
 
-  // Earn on what the customer actually paid for goods. In "pass" mode the
-  // service fee is on top of the items, so it isn't spend with the vendor.
-  const points = pointsForCents(order.totalCents - order.feeCents);
+  // Earn on the goods themselves, summed from the order's own line items.
+  //
+  // Deriving this from `totalCents - feeCents` was wrong: totalCents only
+  // includes the DropQ fee in "pass" mode (lib/actions/order.ts:84), so under
+  // the default "absorb" mode subtracting feeCents quietly under-awards. A real
+  // $5.00 absorb-mode order earned 4 points instead of 5. OrderItem also
+  // snapshots price and quantity, so this stays accurate even if the product is
+  // later edited or removed from the drop, and it can't drift if the seller
+  // changes feeMode after the sale.
+  const itemsCents = order.items.reduce((sum, it) => sum + it.priceCents * it.quantity, 0);
+  const points = pointsForCents(itemsCents);
   if (points <= 0) return 0;
 
   try {
@@ -51,21 +76,32 @@ export async function awardPointsForOrder(orderId: string): Promise<number> {
       },
     });
     return points;
-  } catch {
-    // Unique violation = already awarded. Not an error.
-    return 0;
+  } catch (e) {
+    if (isDuplicateRow(e)) return 0; // already awarded — a retry, not a failure
+    throw e; // real failure: let the caller log it rather than hide it
   }
 }
 
-/** Reverse points when an order is refunded. Appends, never deletes. */
+/**
+ * Reverse points when an order is refunded. Appends, never deletes.
+ *
+ * **This function never throws.** It runs inside the oversold-refund path, in
+ * between issuing the Stripe refund and telling the customer their money is
+ * coming back. An exception here used to escape all the way out of
+ * `finalizePaidOrder`, skipping that SMS and email — and because the retry then
+ * found the order already `refunded`, the message was never sent at all. The
+ * buyer was silently refunded with no explanation. A loyalty-points problem is
+ * never worth costing someone that notification, so failures are logged and
+ * swallowed for reconciliation instead of propagating.
+ */
 export async function reversePointsForOrder(orderId: string, note?: string): Promise<void> {
-  const earned = await prisma.pointsLedger.findUnique({
-    where: { orderId_reason: { orderId, reason: "purchase" } },
-  });
-  if (!earned) return;
+  try {
+    const earned = await prisma.pointsLedger.findUnique({
+      where: { orderId_reason: { orderId, reason: "purchase" } },
+    });
+    if (!earned) return;
 
-  await prisma.pointsLedger
-    .create({
+    await prisma.pointsLedger.create({
       data: {
         customerId: earned.customerId,
         sellerId: earned.sellerId,
@@ -74,8 +110,11 @@ export async function reversePointsForOrder(orderId: string, note?: string): Pro
         reason: "purchase_reversal",
         note: note ?? "order refunded",
       },
-    })
-    .catch(() => {}); // already reversed
+    });
+  } catch (e) {
+    if (isDuplicateRow(e)) return; // already reversed — a retry, not a failure
+    console.error("reversePointsForOrder failed:", orderId, e);
+  }
 }
 
 /** DropQ-wide balance. Derived from the ledger, never stored. */
