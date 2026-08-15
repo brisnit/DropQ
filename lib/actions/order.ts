@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getStripe, calcFeeCents } from "@/lib/stripe";
 import { isVendorSellable } from "@/lib/payments";
+import { buildCheckoutSessionParams, defaultExpiresAt } from "@/lib/checkout-session";
 import { sendEmail, orderReceivedEmail } from "@/lib/email";
 import { orderMailPickup, pickupSummary } from "@/lib/pickup";
 import { dropMapsUrl } from "@/lib/maps";
@@ -174,50 +175,29 @@ export async function placeOrderAction(
     });
 
     const base = await baseUrl();
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      customer_email: buyerEmail,
-      line_items: [
-        ...lines.map((l) => ({
-          quantity: l.qty,
-          price_data: {
-            currency: "usd",
-            unit_amount: l.product.priceCents,
-            product_data: {
-              name: l.product.name,
-              ...(l.product.description ? { description: l.product.description } : {}),
-            },
-          },
-        })),
-        // In "pass" mode, the DropQ fee is a separate line the customer pays.
-        ...(passFee
-          ? [
-              {
-                quantity: 1,
-                price_data: {
-                  currency: "usd" as const,
-                  unit_amount: feeCents,
-                  product_data: { name: "Service fee" },
-                },
-              },
-            ]
-          : []),
-      ],
-      payment_intent_data: {
-        // DropQ's clean platform cut. The vendor (merchant of record on this
-        // direct charge) covers Stripe's processing fee.
-        application_fee_amount: feeCents,
-        metadata: { orderId: order.id },
-      },
-      metadata: { orderId: order.id },
-      // Bound how long the order can sit "pending" so reconciliation can
-      // definitively release/cancel abandoned checkouts (min 30 min).
-      expires_at: Math.floor(Date.now() / 1000) + 60 * 60,
-      success_url: `${base}/order/${order.id}?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${base}/s/${drop.seller.slug}/${drop.id}?canceled=1`,
-    },
-    // Direct charge: create the Checkout Session on the vendor's connected account.
-    { stripeAccount: drop.seller.stripeAccountId! });
+    // Session parameters come from the shared builder (Phase C2) so the future
+    // walk-up flow cannot drift from online checkout. The Stripe call stays
+    // here: the connected-account context belongs to the caller.
+    const params = buildCheckoutSessionParams({
+      orderId: order.id,
+      buyerEmail,
+      lines: lines.map((l) => ({
+        priceCents: l.product.priceCents,
+        quantity: l.qty,
+        name: l.product.name,
+        description: l.product.description,
+      })),
+      feeCents,
+      passFee,
+      successUrl: `${base}/order/${order.id}?session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${base}/s/${drop.seller.slug}/${drop.id}?canceled=1`,
+      expiresAt: defaultExpiresAt(),
+    });
+    const session = await stripe.checkout.sessions.create(
+      params,
+      // Direct charge: create the Checkout Session on the vendor's connected account.
+      { stripeAccount: drop.seller.stripeAccountId! }
+    );
 
     await prisma.order.update({
       where: { id: order.id },

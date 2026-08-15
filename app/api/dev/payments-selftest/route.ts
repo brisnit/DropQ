@@ -2,6 +2,11 @@ import { readFileSync } from "node:fs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { canStartInPersonSale, isVendorSellable } from "@/lib/payments";
+import {
+  buildCheckoutSessionParams,
+  defaultExpiresAt,
+  SESSION_TTL_SECONDS,
+} from "@/lib/checkout-session";
 
 /**
  * Development-only self-test for the payment pipeline invariants that Phases
@@ -239,6 +244,170 @@ export async function GET() {
       /sold \+ \$\{it\.quantity\} <= inventory/.test(src));
   }
 
+  /* ---- C2: the extracted builder must equal the pre-extraction object ---- */
+  // GOLDEN SNAPSHOTS. These literals were transcribed from the inline object in
+  // lib/actions/order.ts as it stood at commit 9beccc1, BEFORE the extraction.
+  // They are the definition of "unchanged online checkout behaviour" — if the
+  // builder ever stops matching them, live checkout has changed. Do not
+  // regenerate them from the builder; that would make the test tautological.
+  {
+    const EXPIRES = 1_760_000_000;
+    const common = {
+      orderId: "ord_123",
+      buyerEmail: "buyer@example.com",
+      feeCents: 13,
+      successUrl: "https://www.drop-q.com/order/ord_123?session_id={CHECKOUT_SESSION_ID}",
+      cancelUrl: "https://www.drop-q.com/s/the-clovery/drop_1?canceled=1",
+      expiresAt: EXPIRES,
+    };
+    const twoLines = [
+      { priceCents: 650, quantity: 2, name: "Sweet corn custard filled donut",
+        description: "Seasonal" },
+      { priceCents: 400, quantity: 1, name: "Sticker pack", description: null },
+    ];
+
+    const GOLDEN_ITEMS = [
+      {
+        quantity: 2,
+        price_data: {
+          currency: "usd",
+          unit_amount: 650,
+          product_data: { name: "Sweet corn custard filled donut", description: "Seasonal" },
+        },
+      },
+      {
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: 400,
+          // description omitted entirely when null — NOT description: null
+          product_data: { name: "Sticker pack" },
+        },
+      },
+    ];
+
+    const GOLDEN_ABSORB = {
+      mode: "payment",
+      customer_email: "buyer@example.com",
+      line_items: GOLDEN_ITEMS,
+      payment_intent_data: {
+        application_fee_amount: 13,
+        metadata: { orderId: "ord_123" },
+      },
+      metadata: { orderId: "ord_123" },
+      expires_at: EXPIRES,
+      success_url: common.successUrl,
+      cancel_url: common.cancelUrl,
+    };
+
+    const GOLDEN_PASS = {
+      ...GOLDEN_ABSORB,
+      line_items: [
+        ...GOLDEN_ITEMS,
+        {
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: 13,
+            product_data: { name: "Service fee" },
+          },
+        },
+      ],
+    };
+
+    const absorb = buildCheckoutSessionParams({ ...common, lines: twoLines, passFee: false });
+    const pass = buildCheckoutSessionParams({ ...common, lines: twoLines, passFee: true });
+    const eq = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+    check("C2 ABSORB mode params equal the pre-extraction object",
+      eq(absorb, GOLDEN_ABSORB), JSON.stringify(absorb));
+    check("C2 PASS mode params equal the pre-extraction object",
+      eq(pass, GOLDEN_PASS), JSON.stringify(pass));
+    check("C2 absorb mode adds NO service-fee line",
+      absorb.line_items!.length === 2);
+    check("C2 pass mode appends the service-fee line LAST",
+      pass.line_items!.length === 3 &&
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (pass.line_items![2] as any).price_data.product_data.name === "Service fee");
+    check("C2 application_fee_amount is feeCents in BOTH modes",
+      absorb.payment_intent_data!.application_fee_amount === 13 &&
+      pass.payment_intent_data!.application_fee_amount === 13);
+    check("C2 orderId metadata is on the session AND the PaymentIntent",
+      absorb.metadata!.orderId === "ord_123" &&
+      absorb.payment_intent_data!.metadata!.orderId === "ord_123");
+    check("C2 mode is payment", absorb.mode === "payment");
+    check("C2 customer_email is the buyer's", absorb.customer_email === "buyer@example.com");
+    check("C2 success_url carries the Stripe session placeholder",
+      String(absorb.success_url).includes("{CHECKOUT_SESSION_ID}"));
+    check("C2 cancel_url returns to the drop", String(absorb.cancel_url).endsWith("?canceled=1"));
+    check("C2 a null description is omitted, never sent as null",
+      !JSON.stringify(absorb).includes('"description":null'));
+    check("C2 every line is USD",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      pass.line_items!.every((li: any) => li.price_data.currency === "usd"));
+    check("C2 no field was added beyond the original set",
+      JSON.stringify(Object.keys(absorb).sort()) === JSON.stringify([
+        "cancel_url", "customer_email", "expires_at", "line_items",
+        "metadata", "mode", "payment_intent_data", "success_url",
+      ]));
+    check("C2 the builder is pure — same input, same output",
+      eq(buildCheckoutSessionParams({ ...common, lines: twoLines, passFee: false }), absorb));
+
+    check("C2 session TTL is still 60 minutes", SESSION_TTL_SECONDS === 3600);
+    check("C2 defaultExpiresAt is now + TTL in unix seconds",
+      defaultExpiresAt(1_000_000_000_000) === 1_000_000_000 + 3600);
+    check("C2 zero fee still yields a valid absorb session",
+      buildCheckoutSessionParams({ ...common, feeCents: 0, lines: twoLines, passFee: false })
+        .payment_intent_data!.application_fee_amount === 0);
+  }
+
+  /* ------- C2 kept the Stripe call at the call site, with the account ----- */
+  {
+    const orderSrc = readFileSync("lib/actions/order.ts", "utf8");
+    check("C2 placeOrderAction uses the shared builder",
+      /buildCheckoutSessionParams\(\{/.test(orderSrc));
+    check("C2 the Stripe create call stays at the call site",
+      /stripe\.checkout\.sessions\.create\(\s*params,/.test(orderSrc));
+    check("C2 the connected-account context is still passed",
+      /stripeAccount: drop\.seller\.stripeAccountId!/.test(orderSrc));
+    check("C2 the inline session object is gone (single source of truth)",
+      !/mode: "payment",\s*\n\s*customer_email/.test(orderSrc));
+    check("C2 the session id is still persisted to the order",
+      /data: \{ stripeSessionId: session\.id \}/.test(orderSrc));
+    check("C2 still redirects to the Stripe-hosted page",
+      /redirect\(session\.url!\)/.test(orderSrc));
+    check("C2 the order is still created pending/pending before the session",
+      orderSrc.indexOf('status: "pending"') <
+        orderSrc.indexOf("const params = buildCheckoutSessionParams("));
+    // Strip comments first: the builder's docblock deliberately *describes* the
+    // create call it must never make, and that prose must not trip the check.
+    const builderCode = readFileSync("lib/checkout-session.ts", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/[^\n]*/g, "");
+    // Case-SENSITIVE: the Stripe client variable is lowercase `stripe`, while
+    // `Stripe.Checkout.SessionCreateParams` is the type-only import and is
+    // exactly what we want the builder to use.
+    check("C2 the builder never calls Stripe", !/\bstripe\./.test(builderCode));
+    check("C2 the builder has no second create path", !/sessions\.create/.test(builderCode));
+    check("C2 the builder imports Stripe types only",
+      /import type Stripe from "stripe"/.test(readFileSync("lib/checkout-session.ts", "utf8")));
+    check("C2 nothing else consumes the builder yet", (() => {
+      const hits: string[] = [];
+      const walk = (dir: string) => {
+        for (const e of require("node:fs").readdirSync(dir, { withFileTypes: true })) {
+          const full = `${dir}/${e.name}`;
+          if (e.isDirectory()) { if (!full.includes("generated")) walk(full); continue; }
+          if (!/\.tsx?$/.test(e.name)) continue;
+          if (full.includes("api/dev/")) continue;
+          if (readFileSync(full, "utf8").includes("buildCheckoutSessionParams")) hits.push(full);
+        }
+      };
+      ["lib", "app", "components"].forEach(walk);
+      return hits.filter((h) => !h.endsWith("lib/checkout-session.ts")).length === 1 &&
+        hits.some((h) => h.endsWith("lib/actions/order.ts"));
+    })());
+  }
+
   /* --------------------- C1 is inert: prove it stays so ------------------ */
   {
     const app = ["lib", "app", "components"];
@@ -260,9 +429,15 @@ export async function GET() {
     })());
     check("C1 wrote no WalkUpSale rows", (await prisma.walkUpSale.count()) === 0);
     const orderSrc = readFileSync("lib/actions/order.ts", "utf8");
-    check("C1 did not touch online checkout's Stripe session creation",
-      /stripe\.checkout\.sessions\.create\(\{/.test(orderSrc) &&
+    // Updated by C2: the params are now built by the shared builder, so the
+    // call takes `params` rather than an inline object literal. What must stay
+    // true is that there is exactly ONE create call and it still carries the
+    // connected-account context.
+    check("online checkout still creates the session on the connected account",
+      /stripe\.checkout\.sessions\.create\(/.test(orderSrc) &&
       /stripeAccount: drop\.seller\.stripeAccountId!/.test(orderSrc));
+    check("online checkout has exactly one Stripe session create call",
+      (orderSrc.match(/sessions\.create\(/g) ?? []).length === 1);
     check("C1 did not move recordRelationship (still a Phase E concern)",
       orderSrc.indexOf("recordRelationship") < orderSrc.indexOf("useStripe && stripe"));
     check("C1 did not change Order.source derivation",
