@@ -236,6 +236,44 @@ export function resetEmail(to: string, link: string): Mail {
   };
 }
 
+/**
+ * Stripe has turned off card payments for a connected account, so the vendor
+ * can no longer sell. Sent from the account.updated webhook on the
+ * charge-ready -> not-charge-ready transition only.
+ *
+ * The urgency is real and the vendor has no other way to find out: their
+ * storefront stops accepting orders the moment the flag flips, and until this
+ * email existed the only signal was a dashboard banner they'd have to happen to
+ * look at. A vendor whose Stripe breaks the night before a market needs to know
+ * that night.
+ */
+export function sellingPausedEmail(o: {
+  to: string;
+  storeName: string;
+  liveDrops: number;
+  paymentsLink: string;
+}): Mail {
+  const impact =
+    o.liveDrops > 0
+      ? `Your ${o.liveDrops === 1 ? "live drop has" : `${o.liveDrops} live drops have`} stopped accepting orders, and customers see a “not accepting orders right now” message.`
+      : `You won't be able to publish a drop or take orders until it's resolved.`;
+  return {
+    to: o.to,
+    subject: `Action needed: card payments are paused for ${o.storeName}`,
+    html: layout(
+      "Card payments are paused",
+      `Stripe has turned off card payments for <b>${esc(o.storeName)}</b>. ` +
+        `${impact}<br><br>` +
+        `This usually means Stripe needs something from you — identity verification, an updated document, or extra business details. ` +
+        `Open your payments settings to see exactly what Stripe is asking for.<br><br>` +
+        `<b>Nothing has been lost.</b> Your drops, products, orders and customers are all safe, ` +
+        `you can keep editing drafts, and you can still close or unpublish a live drop. ` +
+        `Selling resumes automatically as soon as Stripe clears your account.`,
+      { href: o.paymentsLink, label: "Fix this in payments settings" }
+    ),
+  };
+}
+
 type OrderMail = {
   to: string;
   storeName: string;

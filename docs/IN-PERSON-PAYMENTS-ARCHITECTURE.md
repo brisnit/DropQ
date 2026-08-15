@@ -1599,13 +1599,60 @@ confirmed in a browser.
   Stripe breaks **after** publishing — the publish gate prevents every other
   route into it.
 
-### 15.5 Follow-up, approved and deliberately not implemented
+### 15.5 Follow-up — SHIPPED
 
 > **When `account.updated` flips a vendor from charge-ready to not charge-ready,
 > email them that selling is paused and action is required.**
 
-The webhook handler at `app/api/stripe/webhook/route.ts:126-132` already writes
-the flag and is the natural trigger; it currently has no notification. Until
-this ships, a vendor whose Stripe breaks overnight discovers it only from the
-dashboard banner — which is exactly the mid-drop case §1.6(c) describes. This is
-the highest-value small change on the board and should land before Phase B.
+Closes the last gap in §1.6(c): a vendor whose Stripe broke overnight previously
+found out only from a dashboard banner they had no reason to open.
+
+| File | Change |
+|---|---|
+| `lib/vendor-alerts.ts` **(new)** | `notifyVendorSellingPaused()` — looks up the vendor, counts live drops, logs an operational breadcrumb, sends the email. **Never throws.** |
+| `lib/email.ts` | `sellingPausedEmail()` on the DropQ-branded `layout()` shell. |
+| `app/api/stripe/webhook/route.ts` | `account.updated` now detects the *transition* rather than reacting to the event. |
+
+**The design point that matters: fire on the transition, not the event.**
+Stripe emits `account.updated` constantly — onboarding steps, document uploads,
+periodic re-verification — and retries webhooks. Emailing per event would spam
+vendors. The handler now uses a conditional `updateMany`:
+
+```ts
+const flipped = await prisma.seller.updateMany({
+  where: { stripeAccountId: account.id, stripeChargesEnabled: !chargesEnabled },
+  data:  { stripeChargesEnabled: chargesEnabled },
+});
+if (flipped.count > 0 && !chargesEnabled) await notifyVendorSellingPaused(account.id);
+```
+
+Only the call that actually flips the flag matches a row — the same
+single-winner primitive `finalizePaidOrder` uses, one layer up. Retries and
+repeat events match zero rows and stay silent.
+
+Three deliberate choices:
+
+- **No email when charges come back.** The storefront simply starts working and
+  the banner disappears; a "you're fine now" email is noise. Easy to add later
+  — the transition detector already distinguishes the direction.
+- **Admin-suspended vendors are skipped.** They already can't sell and have been
+  told why; a second, differently-worded pause email would confuse.
+- **The alert never throws.** A webhook that 500s gets retried, but the flag is
+  already flipped by then, so the retry detects no transition and the email
+  would be lost anyway. Swallowing keeps the webhook 200 and keeps the failure
+  in the logs.
+
+The email states the impact precisely (`N live drops have stopped accepting
+orders` vs `you won't be able to publish`), says what Stripe usually wants, and
+explicitly reassures that **drops, products, orders and customers are safe,
+drafts stay editable, and a live drop can still be closed** — the Phase A
+guarantees, restated at the moment the vendor is most worried.
+
+**Tests:** the 8 transition cases (lose charges, retry, repeat-while-disabled,
+regain, no-op, mid-onboarding) plus 11 source assertions, inside
+`npm run test:phase-a` → **77 passed, 0 failed**. `tsc` and `next build` clean.
+
+**Not yet observed in production**, and it shouldn't be: it requires Stripe to
+actually disable a live vendor's charges. The trigger is verified by test, not
+by a real event. Watch for the `[stripe] charges disabled — vendor=…` log line
+the first time it fires.

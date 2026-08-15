@@ -5,6 +5,7 @@ import { finalizePaidOrder } from "@/lib/checkout";
 import { activateGrowth } from "@/lib/billing";
 import { prisma } from "@/lib/db";
 import { notifyAdminsOfDispute } from "@/lib/disputes";
+import { notifyVendorSellingPaused } from "@/lib/vendor-alerts";
 
 export async function POST(req: NextRequest) {
   const stripe = getStripe();
@@ -123,12 +124,30 @@ export async function POST(req: NextRequest) {
       }
       break;
     }
+    // Keeps Seller.stripeChargesEnabled in step with Stripe, and tells the
+    // vendor when that flag going false has just stopped them selling.
+    //
+    // Stripe emits account.updated constantly (onboarding steps, document
+    // uploads, periodic re-verification) and retries webhooks, so the email
+    // must fire on the TRANSITION, not on the event. The conditional
+    // updateMany below is the transition detector: only the call that actually
+    // flips the flag matches a row, exactly as finalizePaidOrder claims an
+    // order. Everything else updates nothing and stays silent.
     case "account.updated": {
       const account = event.data.object as Stripe.Account;
-      await prisma.seller.updateMany({
-        where: { stripeAccountId: account.id },
-        data: { stripeChargesEnabled: !!account.charges_enabled },
+      const chargesEnabled = !!account.charges_enabled;
+
+      const flipped = await prisma.seller.updateMany({
+        where: { stripeAccountId: account.id, stripeChargesEnabled: !chargesEnabled },
+        data: { stripeChargesEnabled: chargesEnabled },
       });
+
+      // Only on charge-ready -> not charge-ready. Becoming ready again needs no
+      // alert: the vendor's storefront simply starts working and the dashboard
+      // banner disappears.
+      if (flipped.count > 0 && !chargesEnabled) {
+        await notifyVendorSellingPaused(account.id);
+      }
       break;
     }
   }

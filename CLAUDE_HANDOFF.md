@@ -488,14 +488,36 @@ Any future vendor-authenticated check has the same constraint.
 editable while Stripe is disconnected. Automated assertions cover it
 (`draft -> draft` allowed, not flagged blocked); the user is verifying.
 
-### 🔜 Approved follow-up, NOT implemented — do this before Phase B
+### Follow-up — ✅ SHIPPED: vendor alert when Stripe pauses selling
 
-> **When `account.updated` flips a vendor from charge-ready to not charge-ready,
-> email them that selling is paused and action is required.**
+`lib/vendor-alerts.ts` → `notifyVendorSellingPaused()`, `sellingPausedEmail()`
+in `lib/email.ts`, wired into the `account.updated` webhook.
 
-`app/api/stripe/webhook/route.ts:126-132` already writes the flag and is the
-natural trigger. Until this ships, a vendor whose Stripe breaks overnight finds
-out only from the dashboard banner.
+**Fires on the TRANSITION, never on the event.** Stripe emits `account.updated`
+constantly (onboarding, document uploads, re-verification) and retries webhooks
+— emailing per event would spam vendors. The handler uses a conditional
+`updateMany` keyed on `stripeChargesEnabled: !chargesEnabled`, so only the call
+that actually flips the flag matches a row. Same single-winner primitive as
+`finalizePaidOrder`. **Don't "simplify" this back to an unconditional update —
+that reintroduces the spam.**
+
+- No email when charges are *restored* (the banner just disappears)
+- Admin-suspended vendors skipped — they've already been told why
+- `notifyVendorSellingPaused` **never throws**: a 500 would make Stripe retry,
+  but the flag is already flipped, so the retry finds no transition and the
+  email would be lost anyway
+
+⚠️ **Not yet observed in production** — it needs Stripe to genuinely disable a
+vendor. Verified by test only. The first real firing logs
+`[stripe] charges disabled — vendor=…` in Vercel.
+
+### Live production note (2026-08-15)
+
+A new vendor **Grandies** signed up (`slug: grandies`, no Stripe) and created a
+drop `"jnjn"` — it is a **draft**, which is the state Phase A enforces for a
+non-charge-ready vendor. Real traffic through the new code path. Production is
+now **9 sellers / 10 drops / still 9 orders**; five vendors are not
+charge-ready and correctly blocked from selling.
 
 ---
 

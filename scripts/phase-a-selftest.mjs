@@ -183,6 +183,51 @@ function checkSourceParity() {
 section("Harness/implementation parity");
 checkSourceParity();
 
+// ── 5b. Selling-paused notification (Phase A follow-up) ─────────────────────
+// The webhook's conditional updateMany is the transition detector. Model it:
+// a row is matched only when its stored flag differs from the incoming one.
+function accountUpdated(storedEnabled, incomingEnabled) {
+  const matched = storedEnabled === !incomingEnabled; // the updateMany predicate
+  return { flippedCount: matched ? 1 : 0, emails: matched && !incomingEnabled ? 1 : 0 };
+}
+
+section("account.updated -> selling-paused email");
+ok("charge-ready vendor loses charges -> exactly one email",
+   accountUpdated(true, false).emails === 1);
+ok("...and the flag is flipped", accountUpdated(true, false).flippedCount === 1);
+ok("webhook RETRY of the same event sends no second email",
+   accountUpdated(false, false).emails === 0);
+ok("repeated account.updated while already disabled stays silent",
+   accountUpdated(false, false).flippedCount === 0);
+ok("regaining charges sends no email", accountUpdated(false, true).emails === 0);
+ok("...but does flip the flag back", accountUpdated(false, true).flippedCount === 1);
+ok("no-op event on a healthy vendor stays silent",
+   accountUpdated(true, true).emails === 0 && accountUpdated(true, true).flippedCount === 0);
+ok("a brand-new account mid-onboarding (never enabled) sends no email",
+   accountUpdated(false, false).emails === 0);
+
+const hookSrc = readFileSync("app/api/stripe/webhook/route.ts", "utf8");
+ok("webhook detects the transition with a conditional updateMany",
+   /stripeChargesEnabled: !chargesEnabled/.test(hookSrc));
+ok("webhook emails only when the flip actually happened",
+   /flipped\.count > 0 && !chargesEnabled/.test(hookSrc));
+ok("webhook no longer writes unconditionally",
+   !/where: \{ stripeAccountId: account\.id \},\s*\n\s*data: \{ stripeChargesEnabled/.test(hookSrc));
+
+const alertSrc = readFileSync("lib/vendor-alerts.ts", "utf8");
+ok("the alert never throws (webhook must stay 200)",
+   /try \{/.test(alertSrc) && /catch \(e\)/.test(alertSrc));
+ok("the alert skips admin-suspended vendors", /disabledAt/.test(alertSrc));
+ok("the alert counts live drops for the impact line", /status: "live"/.test(alertSrc));
+ok("the alert logs an operational breadcrumb", /charges disabled/.test(alertSrc));
+
+const mailSrc = readFileSync("lib/email.ts", "utf8");
+ok("sellingPausedEmail exists", /export function sellingPausedEmail/.test(mailSrc));
+ok("email links to payments settings", /dashboard\/payments/.test(readFileSync("lib/vendor-alerts.ts", "utf8")));
+ok("email reassures that drafts and data survive",
+   /Nothing has been lost/.test(mailSrc) && /close or unpublish/.test(mailSrc));
+ok("email escapes the store name", /esc\(o\.storeName\)/.test(mailSrc));
+
 // ── 6. Read-only production shape check ─────────────────────────────────────
 section("Production seller shapes (READ ONLY)");
 try {
