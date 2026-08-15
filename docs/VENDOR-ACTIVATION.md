@@ -1,6 +1,6 @@
 # DropQ Phase V — Vendor Onboarding / Activation
 
-**Status: V.0, V.1 and V.2 SHIPPED. V.3 / V.Admin / V.4 recorded, not started.**
+**Status: V.0, V.1, V.2 and V.Admin SHIPPED. V.3 / V.4 recorded, not started.**
 
 Goal: a vendor should always know **what they've done, what's next, and when
 they're ready to sell** — instead of discovering requirements when something
@@ -705,69 +705,169 @@ still stamped.
 
 ---
 
-## 12. V.Admin — Vendor Activation Operations (recorded, not started)
+## 12. V.Admin — Vendor Activation Operations ✅ SHIPPED
 
-### 12.1 It should be its own sub-phase
+Verified against the live vendor population 2026-08-15. No code written.
 
-**Recommendation: a separate `V.Admin`, sequenced after V.2.**
+### 12.1 Existing admin surface
 
-It is not V.2 (a different audience, a different route tree, `requireAdmin()`
-not `requireSeller()`) and not V.3 (nothing contextual about it). But it depends
-on V.0's derivation and reads best after V.2 has proven that derivation against
-real vendors. It is also the phase with the **highest immediate business value**:
-five of nine vendors cannot sell, and right now nobody at DropQ can see that
-without a database query.
-
-### 12.2 States — the same model, no second system
-
-Admin reuses `stripeActivationState()` verbatim. No admin-only Stripe vocabulary.
-
-| Admin label | Derivation |
+| Fact | Detail |
 |---|---|
-| **Ready** | `charge_ready` |
-| **Restricted** | `restricted` |
-| **Setup in progress** | `incomplete` / `unknown` — only meaningful because `stripeAccountId` exists. **Today this bucket would always be empty:** production has zero vendors who started Stripe and stopped (§2.2). |
-| **Not started** | `not_started` |
+| Guard | `app/admin/layout.tsx:9` calls `requireAdmin()`, **and** every page calls it again. Layered already. |
+| Nav | Vendors · Sales Reps · Commissions (`layout.tsx`) |
+| Vendors list | `app/admin/page.tsx` — already excludes `DEMO_SELLER_EMAIL` (`:65`) and already badges `isAdmin` (`:399`). Its status column is Live drop / Selling / New. |
+| Vendor detail | `app/admin/[id]/page.tsx` — already shows **email**, slug, join date, plan, `payouts on`, `suspended`, drops, orders. |
+| Admin actions | `lib/actions/admin.ts` — plan, admin grant, disable, delete, test email/SMS |
 
-### 12.3 Outreach priority — from real behaviour, not tiers invented up front
+**Recommendation: a new `/admin/activation` page + a nav entry, plus an
+activation block on `/admin/[id]`. Leave the main Vendors table alone.**
 
-The signal that matters is **effort already invested without payments**, because
-that vendor has demonstrated intent and is one conversation from selling.
+`/admin` is already doing five jobs (email/SMS config, plan analytics, partners,
+referrals, pro waitlist, *and* the vendor table). Activation ops is a distinct
+task — *"who do I contact today"* — that wants its own ordering (by attention,
+not by signup date), which would fight the existing table. It is not a
+disconnected system: same layout, same nav, same `requireAdmin()`, same
+`lib/activation.ts`.
 
-| Priority | Rule | Today |
+### 12.2 How the real vendors classify
+
+| Vendor | Stripe | Stage | Prog | Drops | Paid | Attention |
+|---|---|---|---|---|---|---|
+| Grandies | not_started | activating | 2/5 | 1 (1 draft) | 0 | **Needs help** |
+| Elias test | not_started | activating | 2/5 | 1 | 0 | **Needs help** |
+| California Vintage Sales | not_started | activating | 3/5 | 1 | 0 | **Needs help** |
+| Casa Makulay | charge_ready | ready_no_sale | 4/5 | 3 | 0 | none |
+| Paraiso Delicacies | charge_ready | complete | 5/5 | 1 | 3 | none |
+| The Clovery | charge_ready | complete | 5/5 | 1 | 5 | none |
+| Britts Bunnies **(isAdmin)** | charge_ready | ready_no_sale | 3/5 | 0 | 0 | internal |
+| DropQ Admin **(isAdmin)** | not_started | activating | 2/5 | 0 | 0 | internal |
+| Marble & Crumb | not_started | activating | 3/5 | 2 | 0 | **excluded (demo)** |
+
+**Half the outreachable base — 3 of 6 — has built a drop and never touched
+Stripe.** That is the entire business case for this phase in one number.
+
+### 12.3 Attention model — three states, not five
+
+I proposed High/Medium/Low tiers earlier. **Run against real data, the middle
+tiers are empty**: every non-Stripe vendor either built a drop or did nothing at
+all. Nobody is "warming up". So the smallest useful model is:
+
+| State | Rule | Today |
 |---|---|---|
-| **High — needs attention** | not charge-ready **and** has a drop with products | California Vintage, Grandies, Elias test |
-| **Medium** | not charge-ready **and** has products or profile content but no drop | — |
-| **Low** | not charge-ready, little activity | DropQ Admin |
-| **Watch** | `restricted` — was selling, now cannot | none yet, and the most urgent if it ever appears |
-| **None** | `charge_ready` | Clovery, Paraiso, Casa Makulay, Britts Bunnies |
+| **Selling paused** | `stage === "paused"` — could sell, Stripe has stopped them | 0 (highest urgency when it appears) |
+| **Needs help** | not charge-ready **and** has a drop with products | **3** |
+| *(none)* | charge-ready, or no demonstrated intent | 3 + 1 idle |
 
-*"Created a drop but no Stripe"* is the headline signal, exactly as you framed
-it. Note it currently describes **three of nine vendors** — a third of the base
-is one Stripe conversation away from being able to sell.
+**No time threshold.** My earlier draft suggested waiting 24h before flagging.
+Real data says drop it: the trigger is *demonstrated intent*, not elapsed time,
+and Grandies built a drop within two minutes of signing up — which is the
+**best** moment to reach out, not a reason to wait. A vendor who signs up and
+does nothing simply never enters "Needs help", so there is no new-signup noise
+to suppress in the first place.
 
-**Do not alert on brand-new signups.** Grandies signed up and built a drop
-within two minutes; an immediate alert would be noise. Suggest a threshold —
-*reached the high-priority state and stayed there for 24h* — tuned once there is
-enough volume to know what "stuck" looks like.
+### 12.4 Excluding non-vendors
 
-### 12.4 The view
+- **`isDemoStore` → hard exclude**, everywhere, matching the existing convention.
+- **`isAdmin` → soft exclude.** Both internal accounts (DropQ Admin, and —
+  worth noting — **Britts Bunnies**) carry `isAdmin: true`. Including them
+  inflates the counts with people you would never email.
 
-Extend the existing `/admin` vendor list rather than building a parallel tool —
-it already lists vendors with counts and already excludes the demo store.
+  But `isAdmin` means *"has admin access"*, not *"is an internal account"* — a
+  real vendor granted admin would silently vanish from outreach. So: **excluded
+  from the summary counts and default list, behind a visible
+  "Show internal accounts" toggle**, never hidden outright.
 
-Columns: vendor · signup date · activation state · ever charge-ready ·
-milestones (`3/5`) · products / drops · has attempted to publish · priority ·
-link to the vendor detail page · mailto.
+### 12.5 Outreach tracking — **defer it**
 
-"Has attempted to publish" becomes genuinely knowable once V.3 emits
-`vendor_publish_blocked`; until then it can only be inferred from a draft drop
-on a non-charge-ready vendor.
+Recommendation: **do not add `lastActivationOutreachAt` in V.Admin.**
 
-**Manual outreach only.** No automated email or SMS campaigns, no "contacted"
-tracking, no CRM. Those are separate decisions.
+- **Not needed operationally.** Six outreachable vendors. An admin does not need
+  a database to remember who they emailed this week. At sixty they will.
+- **The column is useless without the button**, and the button is UI scope this
+  phase is meant to stay lean on. Shipping a column that is always NULL is the
+  anti-pattern we already rejected for `Order.paidAt`.
+- **Nothing is destroyed by waiting** — outreach happens by email today, which
+  leaves a record in the admin's own sent mail.
 
----
+**Could PostHog answer it instead? No — and this is the interesting part.**
+PostHog could *record* an `admin_vendor_contacted` event fine. But
+outreach→activation is a **business** metric, and the roadmap's settled Phase 8
+decision is that *"the application database stays the source of truth for
+business metrics"*. Joining an outreach event in PostHog to
+`stripeChargesEnabledAt` in Postgres is a fragile cross-system join for a
+question Postgres could answer with one column. So when it is needed, it belongs
+**in Postgres** (with a PostHog event alongside for funnel context), not in
+PostHog alone.
+
+**The one thing deferral costs:** outreach performed before the column exists is
+unrecoverable — the same trade-off accepted for `stripeChargesEnabledAt`. At six
+vendors that history is not worth a column.
+
+**When to revisit:** when outreachable vendors exceed roughly 25, or when the
+first "did contacting them actually help?" question is asked. It is then a
+single additive nullable column with no backfill — the same zero-risk shape as
+V.1.
+
+### 12.6 What the admin sees
+
+`/admin/activation`:
+
+```
+Vendor activation                                    [ ] Show internal accounts
+
+  Needs help  3        Selling paused  0        Ready to sell  3
+
+  ⚠ NEEDS HELP — built a drop but can't take payments
+  ┌──────────────────────────────────────────────────────────────────────┐
+  │ Grandies                    joined 15 Aug   Stripe: not started      │
+  │ 2/5 · 1 drop (1 draft) · never published · 0 paid                    │
+  │                                    [ View ]  [ Email vendor ]        │
+  ├──────────────────────────────────────────────────────────────────────┤
+  │ California Vintage Sales    joined 29 Jun   Stripe: not started      │
+  │ 3/5 · 1 drop · published · 0 paid                                    │
+  ├──────────────────────────────────────────────────────────────────────┤
+  │ Elias test                  joined 19 Jun   Stripe: not started      │
+  └──────────────────────────────────────────────────────────────────────┘
+
+  ✓ READY TO SELL — 3 vendors                              [ show ]
+```
+
+Per row: name · signup date · Stripe state · milestone progress · drops (and
+whether one is a draft) · ever published · paid orders · first charge-ready date
+where known · **View** (→ `/admin/[id]`) · **Email vendor** (`mailto:` — the
+detail page already exposes the address).
+
+"Has attempted to publish" is **not knowable today**. The honest proxy is
+*draft drop + not charge-ready*, labelled as such. It becomes real when V.3
+emits `vendor_publish_blocked`.
+
+Summary counts only for the three states that drive action. No charts.
+
+On `/admin/[id]`: a compact activation block — state, milestones, first
+charge-ready date — so the detail page agrees with the list.
+
+### 12.7 Implementation plan
+
+| File | Change |
+|---|---|
+| `lib/activation.ts` | add `attentionState(state, facts, seller)` → `"selling_paused" \| "needs_help" \| "none"`, plus `isOutreachable(seller)`. Pure, testable, **no new Stripe or activation vocabulary.** |
+| `app/admin/activation/page.tsx` | **new** — `requireAdmin()`, grouped list, counts, toggle |
+| `app/admin/layout.tsx` | one nav link |
+| `app/admin/[id]/page.tsx` | activation block |
+| `app/api/dev/activation-selftest/route.ts` | attention/exclusion cases |
+
+**Migration impact: none.** Everything derives from existing data.
+
+**Tests:** attention for each of the nine real vendors · demo hard-excluded ·
+internal soft-excluded and restored by the toggle · restricted → `selling_paused`
+outranks everything · charge-ready → none · Grandies → `needs_help` with no time
+delay · counts exclude demo and internal · `requireAdmin()` on the new route ·
+a vendor session and a customer session both get bounced · **`lib/activation.ts`
+milestone/stage/mode behaviour unchanged** (regression) · `test:phase-a` 77/77 ·
+tsc · build.
+
+**Deployment boundary:** one commit, no migration, admin-only surface. Zero
+customer- or vendor-facing change, so the blast radius is limited to `/admin`.
 
 ## 13. Analytics — approved event vocabulary (Phase 8, do not implement)
 
@@ -940,3 +1040,71 @@ modified — sessions were minted locally against read-only page renders.
 
 The `paused` variant is covered by tests but **not yet observed in production**:
 it needs Stripe to actually restrict a vendor, and none is restricted today.
+
+---
+
+## 16. V.Admin — as shipped
+
+`/admin/activation` + an Activation nav entry + an activation block on
+`/admin/[id]`. **No schema change.** 118/118 activation assertions,
+`test:phase-a` 77/77.
+
+### 16.1 What shipped
+
+| File | Change |
+|---|---|
+| `lib/activation.ts` | `attentionState()`, `isOutreachable()`, `attentionRank()`, `loadVendorActivationRows()` — batched with `groupBy`, not per-seller queries |
+| `app/admin/activation/page.tsx` | **new** — grouped work queue, counts, internal toggle |
+| `app/admin/layout.tsx` | nav entry |
+| `app/admin/[id]/page.tsx` | compact activation block, colour-coded by attention |
+
+No admin-only Stripe or readiness vocabulary. The page renders the vendor's own
+`nextAction.reason` verbatim — *"Vendor is being told: …"* — so an admin can see
+the exact words on the vendor's dashboard and never contradict them.
+
+### 16.2 Live production population
+
+| Group | Vendors |
+|---|---|
+| ⏸️ **Selling paused** | none |
+| ⚠️ **Needs help** | **Grandies** (1 drop, 1 draft) · **California Vintage Sales** (1 drop) · **Elias test** (1 drop) |
+| Everyone else | The Clovery · Paraiso Delicacies · Casa Makulay |
+| Hidden (internal, toggle) | Britts Bunnies · DropQ Admin |
+| Hidden (demo, always) | Marble & Crumb |
+
+Counts: **Needs help 3 · Selling paused 0 · Ready to sell 3.**
+
+### 16.3 Verified
+
+- **Authorization:** admin 200; **vendor session 307**, unauthenticated 307,
+  bogus cookie 307, customer cookie 307. Guarded by `requireAdmin()` in the page
+  *and* in `app/admin/layout.tsx`.
+- **Exclusions, checked by rendered `/admin/<id>` link, not by name match:**
+  Marble & Crumb hidden in both views; Britts Bunnies and DropQ Admin hidden by
+  default and shown under `?internal=1`; all six real vendors always shown.
+- **Detail block** renders correctly for Grandies (Needs help · 2 of 5 ·
+  outstanding milestones listed · vendor's own message quoted), The Clovery
+  (Ready to sell · all complete) and Casa Makulay (Ready to sell · 4 of 5 ·
+  publish next). `mailto:` links resolve to the real vendor addresses.
+- Production data unchanged; migrate status clean; drift empty.
+
+### 16.4 Two things worth knowing
+
+**"Never published" understates.** `hasPublished` is `liveDrops > 0 ||
+paidOrders > 0`, so a vendor whose only drop has since *closed* reads "never
+published" — California Vintage Sales is in exactly that position. This is the
+§3.4 trade-off (no `Drop.firstPublishedAt` column for a cosmetic label), and the
+page says so in a footnote. It does not affect attention: they are flagged on
+*drop built + no Stripe*, which is true regardless.
+
+**A name-match check would have lied.** Grepping the page HTML for
+"DropQ Admin" returns a hit even when that vendor is correctly excluded —
+because the page `<title>` is *"Vendor activation — DropQ Admin"*. Exclusion was
+therefore verified by the rendered `/admin/<id>` link instead. Worth remembering
+for any future admin-page assertion.
+
+### 16.5 Still deferred
+
+`lastActivationOutreachAt` is **not** added (§12.5). Revisit at roughly 25
+outreachable vendors, or the first time someone asks whether contacting a vendor
+actually helped. It stays a single additive nullable column with no backfill.

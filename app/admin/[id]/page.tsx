@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
+import { loadActivationState, attentionState, activationFacts } from "@/lib/activation";
 import { setAdminAction, setPlanAction, deleteVendorAction, setSellerDisabledAction } from "@/lib/actions/admin";
 import { setVendorSalesRepAction } from "@/lib/actions/sales-reps";
 import { formatMoney, formatDate, relativeTime, statusStyle } from "@/lib/format";
@@ -49,6 +50,12 @@ export default async function AdminClientPage({
     },
   });
   if (!seller) notFound();
+
+  // Same derivation the vendor's own dashboard uses, so admin and vendor can
+  // never disagree about whether they can sell.
+  const actFacts = await activationFacts(seller.id);
+  const activation = await loadActivationState(seller);
+  const attention = attentionState(activation, actFacts);
 
   const allReps = await prisma.salesRep.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } });
 
@@ -101,6 +108,68 @@ export default async function AdminClientPage({
           >
             View storefront ↗
           </Link>
+        </div>
+      </div>
+
+      {/* Activation (Phase V.Admin) — derived, never a second status model. */}
+      <div className={`rounded-card border p-4 sm:p-5 mb-8 ${
+        attention === "selling_paused"
+          ? "bg-brand-tint border-brand/40"
+          : attention === "needs_help"
+            ? "bg-quad/10 border-quad/30"
+            : "bg-paper border-line"
+      }`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted">
+                Activation
+              </span>
+              {attention === "selling_paused" && (
+                <Badge className="bg-brand text-white">Selling paused</Badge>
+              )}
+              {attention === "needs_help" && (
+                <Badge className="bg-quad/25 text-tertiary">Needs help</Badge>
+              )}
+              {activation.readyToSell && (
+                <Badge className="bg-sage-tint text-sage">Ready to sell</Badge>
+              )}
+              {!activation.applicable && (
+                <Badge className="bg-line text-ink-soft">demo store — excluded</Badge>
+              )}
+            </div>
+            <p className="mt-1.5 text-sm text-ink-soft">
+              {activation.completed} of {activation.total} milestones ·{" "}
+              {activation.milestones.filter((m) => !m.done).map((m) => m.label).join(", ") ||
+                "all complete"}
+            </p>
+            {seller.stripeChargesEnabledAt && (
+              <p className="text-xs text-muted mt-1">
+                First charge-ready {formatDate(seller.stripeChargesEnabledAt)}
+              </p>
+            )}
+            {activation.nextAction && (
+              <p className="text-xs text-ink-soft mt-1 italic">
+                Vendor is being told: &ldquo;{activation.nextAction.reason}&rdquo;
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href={`mailto:${seller.email}?subject=${encodeURIComponent(
+                "Getting your DropQ store ready to sell"
+              )}`}
+              className="text-sm font-medium px-3.5 py-2 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition"
+            >
+              Email vendor
+            </a>
+            <Link
+              href="/admin/activation"
+              className="text-sm font-medium px-3.5 py-2 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition whitespace-nowrap"
+            >
+              All activation →
+            </Link>
+          </div>
         </div>
       </div>
 

@@ -7,6 +7,10 @@ import {
   activationFacts,
   activationCardMode,
   showsGenericNextStep,
+  attentionState,
+  isOutreachable,
+  attentionRank,
+  loadVendorActivationRows,
   type ActivationSeller,
   type ActivationFacts,
 } from "@/lib/activation";
@@ -63,6 +67,7 @@ export async function GET() {
   }
 
   const results: Result[] = [];
+  const live: Record<string, string> = {};
   const check = (name: string, pass: boolean, detail?: string) =>
     results.push({ name, pass, ...(detail ? { detail } : {}) });
 
@@ -326,6 +331,74 @@ export async function GET() {
     activationState(READY, SOLD).readyToSell === true &&
     activationState(NOT_STARTED, SOLD).readyToSell === false);
 
+  /* ------------------- V.Admin attention + exclusions --------------------- */
+  const att = (sel: ActivationSeller, f: ActivationFacts) =>
+    attentionState(activationState(sel, f), f);
+
+  check("V.Admin restricted -> selling_paused (highest urgency)",
+    att(RESTRICTED, PUBLISHED) === "selling_paused");
+  check("V.Admin restricted outranks everything, even with sales",
+    att(RESTRICTED, SOLD) === "selling_paused");
+  check("V.Admin built a drop + no Stripe -> needs_help (the Grandies case)",
+    att(NOT_STARTED, HAS_DROP) === "needs_help");
+  check("V.Admin no drop + no Stripe -> not flagged (no intent demonstrated)",
+    att(NOT_STARTED, NOTHING) === "none");
+  check("V.Admin charge-ready is never flagged",
+    att(READY, NOTHING) === "none" && att(READY, HAS_DROP) === "none" &&
+    att(READY, SOLD) === "none");
+  check("V.Admin legacy/unknown Stripe with a drop -> needs_help",
+    att(INCOMPLETE, HAS_DROP) === "needs_help");
+  check("V.Admin needs_help has NO time threshold — a brand-new vendor qualifies",
+    att(NOT_STARTED, HAS_DROP) === "needs_help");
+  check("V.Admin ordering: paused before needs_help before the rest",
+    attentionRank("selling_paused") < attentionRank("needs_help") &&
+    attentionRank("needs_help") < attentionRank("none"));
+
+  const demoSeller = { ...NOT_STARTED, slug: "marble-crumb" };
+  check("V.Admin demo store is NOT outreachable",
+    isOutreachable({ isAdmin: false }, activationState(demoSeller, HAS_DROP)) === false);
+  check("V.Admin internal (isAdmin) account is NOT outreachable",
+    isOutreachable({ isAdmin: true }, activationState(NOT_STARTED, HAS_DROP)) === false);
+  check("V.Admin a normal vendor IS outreachable",
+    isOutreachable({ isAdmin: false }, activationState(NOT_STARTED, HAS_DROP)) === true);
+  check("V.Admin a demo store stays excluded even if it isn't internal",
+    isOutreachable({ isAdmin: false }, activationState(demoSeller, SOLD)) === false);
+
+  /* ------------- V.Admin against the real vendor population -------------- */
+  {
+    const rows = await loadVendorActivationRows();
+    const find = (n: string) => rows.find((r) => r.storeName === n);
+    const counted = rows.filter((r) => r.outreachable);
+
+    check("V.Admin loader returns every seller", rows.length >= 9, `${rows.length}`);
+    check("V.Admin Grandies is flagged needs_help",
+      find("Grandies")?.attention === "needs_help", find("Grandies")?.attention);
+    check("V.Admin The Clovery (selling) is not flagged",
+      find("The Clovery")?.attention === "none");
+    check("V.Admin Paraiso (selling) is not flagged",
+      find("Paraiso Delicacies")?.attention === "none");
+    check("V.Admin Casa Makulay (charge-ready) is not flagged",
+      find("Casa Makulay")?.attention === "none");
+    check("V.Admin Marble & Crumb is demo-excluded",
+      find("Marble & Crumb")?.state.applicable === false &&
+      find("Marble & Crumb")?.outreachable === false);
+    check("V.Admin DropQ Admin is internal, excluded from counts",
+      find("DropQ Admin")?.outreachable === false);
+    check("V.Admin Britts Bunnies is internal, excluded from counts",
+      find("Britts Bunnies")?.outreachable === false);
+    check("V.Admin no demo or internal account is counted",
+      counted.every((r) => r.state.applicable && !r.isAdmin));
+    check("V.Admin loader agrees with the pure derivation",
+      rows.every((r) => r.attention === attentionState(r.state, r.facts)));
+    check("V.Admin every row exposes what the page needs",
+      rows.every((r) => typeof r.totalDrops === "number" &&
+        typeof r.draftDrops === "number" && !!r.email && !!r.storeName));
+
+    live["__attention"] = rows
+      .map((r) => `${r.storeName}=${r.attention}${r.outreachable ? "" : "(excl)"}`)
+      .join(", ");
+  }
+
   /* ------------------------- Purity / no enforcement --------------------- */
   {
     const a = activationState(READY, HAS_DROP);
@@ -341,7 +414,6 @@ export async function GET() {
       disabledAt: true, stripeAccountId: true, stripeChargesEnabled: true,
     },
   });
-  const live: Record<string, string> = {};
   for (const s of sellers) {
     const state = activationState(s, await activationFacts(s.id));
     live[s.storeName] =

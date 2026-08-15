@@ -561,7 +561,7 @@ collide.
    review, not a payment-phase drive-by.
 3. **Vendor Stripe onboarding is its own phase** — PHASE V in the roadmap.
 
-### PHASE V — Vendor Activation · V.0 ✅ V.1 ✅ V.2 ✅ SHIPPED
+### PHASE V — Vendor Activation · V.0 ✅ V.1 ✅ V.2 ✅ V.Admin ✅ SHIPPED
 
 Full spec: **`docs/VENDOR-ACTIVATION.md`**.
 
@@ -672,7 +672,34 @@ compact; Marble & Crumb → excluded. **No vendor showed the contradiction.**
 The `paused` variant is tested but **not yet observed in production** — it needs
 Stripe to actually restrict someone.
 
-### V.3 / V.Admin / V.4 — recorded, not started
+### V.Admin ✅ SHIPPED — `/admin/activation`
+
+Admin work queue: **who can't sell, and who's worth contacting today.** New page
++ nav entry + an activation block on `/admin/[id]`. **No schema change.**
+
+Three attention states only — `selling_paused` (most urgent) · `needs_help`
+(built a drop, no Stripe) · `none`. **No time threshold**: the trigger is
+demonstrated intent, and a vendor who builds a drop minutes after signing up is
+the *best* person to contact. Real data killed the middle tiers — nobody is
+"warming up".
+
+Exclusions: demo stores **hard**; `isAdmin` accounts by default but behind a
+visible toggle, because `isAdmin` means "has admin access", not "is internal" —
+a real vendor granted admin must not silently vanish. ⚠️ **Britts Bunnies is
+`isAdmin: true`**, not just DropQ Admin.
+
+Today: **Needs help 3** (Grandies, California Vintage Sales, Elias test) ·
+Selling paused 0 · Ready to sell 3.
+
+The page quotes the vendor's own `nextAction.reason` back to the admin, so the
+two surfaces can never contradict each other.
+
+⚠️ **`lastActivationOutreachAt` deliberately NOT added.** Revisit at ~25
+outreachable vendors or the first "did outreach help?" question. See
+VENDOR-ACTIVATION.md §12.5 — and note it belongs in Postgres, not PostHog-only,
+because outreach→activation is a business metric.
+
+### V.3 / V.4 — recorded, not started
 
 **V.Admin** (recommended after V.2) is admin visibility into who can't sell:
 same `stripeActivationState()`, no second status model. Priority comes from

@@ -226,11 +226,12 @@ Full spec: **`docs/VENDOR-ACTIVATION.md`**.
 - [ ] **V.3 — Contextual nudges** after saving a product/draft drop, and
       disabling the "live" option in the drop editor for non-charge-ready
       vendors. **Presentation only — the Phase A server gate stays authoritative.**
-- [ ] **V.Admin — Vendor Activation Operations.** Admin visibility into who
-      can't sell and who is worth contacting. Recommended **after V.2**; it is
-      the highest-immediate-value sub-phase, because 5 of 9 vendors cannot sell
-      and nobody can currently see that without a database query. Manual
-      outreach only — no automated campaigns.
+- [x] **V.Admin — Vendor Activation Operations.** Shipped. `/admin/activation`
+      work queue + nav entry + activation block on the vendor detail page. Three
+      attention states (selling paused / needs help / none), no time threshold,
+      demo stores hard-excluded and internal `isAdmin` accounts behind a toggle.
+      Manual outreach only. Today: **3 vendors need help** (built a drop, no
+      Stripe). `lastActivationOutreachAt` deliberately deferred.
 - [ ] **V.4 — activation analytics.** Deferred to Phase 8.5.
 
 ### Stripe status granularity

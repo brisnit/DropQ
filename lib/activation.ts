@@ -334,6 +334,56 @@ export function showsGenericNextStep(state: ActivationState): boolean {
   return activationCardMode(state) === "hidden";
 }
 
+/* ------------------------- Admin outreach (V.Admin) ---------------------- */
+
+/**
+ * Who is worth an admin's attention right now.
+ *
+ * Deliberately three states, not a tiered scoring system. Run against the real
+ * vendor population, "medium priority" was empty: every vendor without Stripe
+ * had either built a drop or done nothing at all. Nobody is warming up.
+ *
+ * There is **no time threshold**. The trigger is demonstrated intent, not
+ * elapsed time — a vendor who builds a drop two minutes after signing up is the
+ * *best* person to contact, not someone to wait a day on. A vendor who signs up
+ * and does nothing never reaches `needs_help`, so there is no new-signup noise
+ * to suppress in the first place.
+ */
+export type ActivationAttention =
+  | "selling_paused" // was able to sell, Stripe has stopped them — most urgent
+  | "needs_help" // demonstrated intent (built a drop), can't take payment
+  | "none";
+
+export function attentionState(
+  state: ActivationState,
+  facts: ActivationFacts
+): ActivationAttention {
+  if (state.stage === "paused") return "selling_paused";
+  if (!state.readyToSell && facts.dropsWithProducts > 0) return "needs_help";
+  return "none";
+}
+
+/**
+ * Should this seller appear in outreach lists and counts?
+ *
+ * Demo stores are excluded outright (`state.applicable`). Internal accounts are
+ * excluded because you don't email yourself — but note `isAdmin` means "has
+ * admin access", NOT "is an internal account". A real vendor granted admin
+ * would silently vanish, which is why the admin page keeps a visible toggle
+ * rather than hiding them for good.
+ */
+export function isOutreachable(
+  seller: { isAdmin?: boolean },
+  state: ActivationState
+): boolean {
+  return state.applicable && !seller.isAdmin;
+}
+
+/** Sort key: paused first, then needs-help, then everyone else. */
+export function attentionRank(a: ActivationAttention): number {
+  return a === "selling_paused" ? 0 : a === "needs_help" ? 1 : 2;
+}
+
 /* --------------------------------- Loader -------------------------------- */
 
 /** The counts `activationState` needs, for one seller. */
@@ -349,4 +399,75 @@ export async function activationFacts(sellerId: string): Promise<ActivationFacts
 /** Convenience for a page that has the seller but not the counts. */
 export async function loadActivationState(seller: ActivationSeller & { id: string }) {
   return activationState(seller, await activationFacts(seller.id));
+}
+
+export type VendorActivationRow = {
+  id: string;
+  storeName: string;
+  slug: string;
+  email: string;
+  isAdmin: boolean;
+  createdAt: Date;
+  stripeChargesEnabledAt: Date | null;
+  state: ActivationState;
+  facts: ActivationFacts;
+  attention: ActivationAttention;
+  outreachable: boolean;
+  totalDrops: number;
+  draftDrops: number;
+};
+
+/**
+ * Every seller with their activation picture, for the admin operations view.
+ * Batched with groupBy rather than per-seller queries so it doesn't degrade
+ * into N+1 as the vendor list grows.
+ */
+export async function loadVendorActivationRows(): Promise<VendorActivationRow[]> {
+  const sellers = await prisma.seller.findMany({
+    select: {
+      id: true, storeName: true, slug: true, email: true, isAdmin: true,
+      createdAt: true, emailVerified: true, disabledAt: true,
+      stripeAccountId: true, stripeChargesEnabled: true, stripeChargesEnabledAt: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const [withProducts, byStatus, paid] = await Promise.all([
+    prisma.drop.groupBy({
+      by: ["sellerId"], where: { products: { some: {} } }, _count: true,
+    }),
+    prisma.drop.groupBy({ by: ["sellerId", "status"], _count: true }),
+    prisma.order.groupBy({
+      by: ["sellerId"], where: { paymentStatus: "paid" }, _count: true,
+    }),
+  ]);
+
+  const nWithProducts = new Map(withProducts.map((r) => [r.sellerId, r._count]));
+  const nPaid = new Map(paid.map((r) => [r.sellerId, r._count]));
+  const nLive = new Map<string, number>();
+  const nDraft = new Map<string, number>();
+  const nTotal = new Map<string, number>();
+  for (const r of byStatus) {
+    nTotal.set(r.sellerId, (nTotal.get(r.sellerId) ?? 0) + r._count);
+    if (r.status === "live") nLive.set(r.sellerId, r._count);
+    if (r.status === "draft") nDraft.set(r.sellerId, r._count);
+  }
+
+  return sellers.map((s) => {
+    const facts: ActivationFacts = {
+      dropsWithProducts: nWithProducts.get(s.id) ?? 0,
+      liveDrops: nLive.get(s.id) ?? 0,
+      paidOrders: nPaid.get(s.id) ?? 0,
+    };
+    const state = activationState(s, facts);
+    return {
+      ...s,
+      state,
+      facts,
+      attention: attentionState(state, facts),
+      outreachable: isOutreachable(s, state),
+      totalDrops: nTotal.get(s.id) ?? 0,
+      draftDrops: nDraft.get(s.id) ?? 0,
+    };
+  });
 }
