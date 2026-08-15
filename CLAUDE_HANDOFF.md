@@ -551,8 +551,15 @@ participates. No migration; `live` was never written.
 **`TouchSource` gained `in_person`, distinct from `qr`** — `qr` means they
 scanned a share link and self-ordered *online*. Phase 8's funnel needs both.
 
-⚠️ **Isabelle's bad data is NOT repaired.** The proposed 2-row fix is written up
-in `docs/IN-PERSON-PAYMENTS-ARCHITECTURE.md` §25, awaiting approval.
+**Isabelle's bad data is REPAIRED** (2026-08-15, `prisma/repair-abandoned-purchase.mjs`,
+1 `CustomerVendor` + 1 `Customer` row; idempotent; only those two tables changed).
+
+⚠️ **Two other drifted relationship rows exist and were deliberately NOT
+touched** — both `brisnit@gmail.com`, both different causes: the Casa Makulay
+`fulfilled/unpaid` order (a real sale settled outside DropQ — a product
+decision), and a Britts Bunnies row whose order was deleted with its drop
+(orphaned facts on a legitimate follow). The audit run reports them every time;
+the script never writes without an explicit `--only=<id>`. See §25.5.
 
 payments **159/159** (flag off and on) · activation 147/147 · phase-a 77/77.
 

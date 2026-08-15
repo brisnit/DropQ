@@ -2732,7 +2732,7 @@ nobody hand-rolls session params. And `Order.source` no longer derives from
 
 ---
 
-## 25. Isabelle production data — proposed repair (NOT APPLIED)
+## 25. Isabelle production data — repair APPLIED 2026-08-15
 
 The abandoned $6.50 checkout on 2026-08-15 recorded a purchase that never
 happened. **Nothing below has been changed.**
@@ -2791,4 +2791,40 @@ does buy, it becomes a no-op. Step 1 is a single row by primary key. Best run as
 a dry-run-by-default script in the `prisma/backfill-*.mjs` style, with a content
 hash of both rows before and after.
 
-**Awaiting your approval. Not applied.**
+### 25.4 Applied
+
+`prisma/repair-abandoned-purchase.mjs` — dry-run by default, and **writes are
+opt-in per row via `--only=<CustomerVendor id>`.**
+
+```
+node --env-file=.env prisma/repair-abandoned-purchase.mjs                       # audit
+node --env-file=.env prisma/repair-abandoned-purchase.mjs --only=<id> --commit  # write
+```
+
+Result: **1 `CustomerVendor` row, 1 `Customer` row.** `orderCount 1→0`,
+`totalSpentCents 650→0`, `firstPurchaseAt`/`lastPurchaseAt` → null, and
+`Customer.firstPurchaseAt` → null. The row itself, `relationshipSource`,
+`followedAt`, `signupSource`, `firstTouchAt`, `firstVendorId` and the Order are
+all untouched.
+
+Verified: re-running reports **0 changes** (idempotent, because it recomputes
+from paid orders). Content hashes show **only `Customer` and `CustomerVendor`
+changed** — `Order`, `OrderItem`, `OrderEvent`, `Drop`, `Product`, `Seller`,
+`PointsLedger` and `CommissionLedger` are byte-identical.
+
+### 25.5 ⚠️ Two other drifted rows found — NOT repaired, different causes
+
+The audit run surfaced two more, both `brisnit@gmail.com`. Neither is the
+abandoned-checkout bug, and neither was touched:
+
+| Row | Facts | Why it is not obviously wrong |
+|---|---|---|
+| × **Casa Makulay** | `orderCount 1`, `$25.00`, from the `fulfilled/unpaid` order | That order is a **real sale settled outside DropQ**. Whether it counts as a purchase relationship is a **product decision**, and the order itself is explicitly ring-fenced. |
+| × **Britts Bunnies** | `orderCount 1`, `$1.00`, **zero orders with that vendor** | The order was deleted with its drop (`Order.dropId` cascades — §16.3 finding 2). Orphaned purchase facts on a row that legitimately exists as a **follow** (`followedAt` set). A third distinct cause. |
+
+Consequence: `Customer.firstPurchaseAt` for `brisnit@gmail.com` is 2026-06-19
+(the Casa Makulay date) while their first *paid* order is 2026-07-04. Correcting
+it depends entirely on the Casa Makulay decision above.
+
+**Both need their own decision.** The script will report them on every audit run
+and will never write them without an explicit `--only`.
