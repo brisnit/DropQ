@@ -24,6 +24,7 @@ import { computeDropPhase } from "@/lib/drop-status";
 import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 import { BackLink } from "@/components/back-link";
 import { StripeRequiredBanner } from "@/components/stripe-required-banner";
+import { loadActivationState, publishGate } from "@/lib/activation";
 import { DropCommunicationSection } from "@/components/drop-communication";
 import { MessageCustomerButton } from "@/components/message-customer-button";
 import { dropCommunicationSummary } from "@/lib/messaging";
@@ -38,6 +39,10 @@ export default async function DropDetailPage({
   const { id } = await params;
   const { stripe_required: stripeRequired } = await searchParams;
   const seller = await requireSeller();
+
+  // Publish gate (V.3). UX only — updateDropStatusAction still routes every
+  // status change through resolveDropStatus, so a forged form is still refused.
+  const gate = publishGate(await loadActivationState(seller));
 
   const drop = await prisma.drop.findUnique({
     where: { id },
@@ -87,12 +92,34 @@ export default async function DropDetailPage({
 
   return (
     <Section>
-      <StripeRequiredBanner seller={seller} />
-      {stripeRequired && (
-        <div className="mb-6 rounded-card bg-brand-tint border border-brand/40 px-4 py-3 text-sm text-brand-dark">
-          <b>Saved as a draft.</b> A drop can only go live once Stripe can take
-          card payments for your store — everything you entered has been kept.
+      {/* Exactly one Stripe message on this page, at the point of action. The
+          transient post-blocked-publish notice wins; otherwise the inline
+          publish gate; otherwise the generic banner (which renders nothing for
+          a charge-ready vendor anyway). */}
+      {stripeRequired && gate ? (
+        <div className="mb-6 rounded-card bg-brand-tint border border-brand/40 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-brand-dark max-w-xl">
+            <b>Saved as a draft.</b> {gate.reason} Everything you entered has been kept.
+          </p>
+          <Link
+            href={gate.href}
+            className="shrink-0 text-sm font-medium px-3.5 py-2 rounded-lg bg-ink text-cream hover:bg-ink-soft transition"
+          >
+            {gate.cta} →
+          </Link>
         </div>
+      ) : gate ? (
+        <div className="mb-6 rounded-card bg-quad/10 border border-quad/30 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-ink-soft max-w-xl">{gate.reason}</p>
+          <Link
+            href={gate.href}
+            className="shrink-0 text-sm font-medium px-3.5 py-2 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition"
+          >
+            {gate.cta} →
+          </Link>
+        </div>
+      ) : (
+        <StripeRequiredBanner seller={seller} />
       )}
       <BackLink href="/dashboard/drops">Back to drops</BackLink>
 
@@ -112,13 +139,21 @@ export default async function DropDetailPage({
         </div>
 
         <div className="flex items-center gap-2">
-          {drop.status === "draft" && (
-            <form action={updateDropStatusAction}>
-              <input type="hidden" name="dropId" value={drop.id} />
-              <input type="hidden" name="status" value="live" />
-              <Button type="submit">Publish drop</Button>
-            </form>
-          )}
+          {drop.status === "draft" &&
+            (gate ? (
+              <Link
+                href={gate.href}
+                className="text-sm font-medium px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition whitespace-nowrap"
+              >
+                {gate.cta} to publish →
+              </Link>
+            ) : (
+              <form action={updateDropStatusAction}>
+                <input type="hidden" name="dropId" value={drop.id} />
+                <input type="hidden" name="status" value="live" />
+                <Button type="submit">Publish drop</Button>
+              </form>
+            ))}
           {drop.status === "live" && (
             <form action={updateDropStatusAction}>
               <input type="hidden" name="dropId" value={drop.id} />
@@ -126,13 +161,21 @@ export default async function DropDetailPage({
               <Button type="submit" variant="secondary">Close drop</Button>
             </form>
           )}
-          {drop.status === "closed" && (
-            <form action={updateDropStatusAction}>
-              <input type="hidden" name="dropId" value={drop.id} />
-              <input type="hidden" name="status" value="live" />
-              <Button type="submit" variant="secondary">Reopen</Button>
-            </form>
-          )}
+          {drop.status === "closed" &&
+            (gate ? (
+              <Link
+                href={gate.href}
+                className="text-sm font-medium px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition whitespace-nowrap"
+              >
+                {gate.cta} to reopen →
+              </Link>
+            ) : (
+              <form action={updateDropStatusAction}>
+                <input type="hidden" name="dropId" value={drop.id} />
+                <input type="hidden" name="status" value="live" />
+                <Button type="submit" variant="secondary">Reopen</Button>
+              </form>
+            ))}
           <Link
             href={`/dashboard/drops/${drop.id}/edit`}
             className="text-sm font-medium px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"

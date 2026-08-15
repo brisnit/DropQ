@@ -561,7 +561,7 @@ collide.
    review, not a payment-phase drive-by.
 3. **Vendor Stripe onboarding is its own phase** — PHASE V in the roadmap.
 
-### PHASE V — Vendor Activation · V.0 ✅ V.1 ✅ V.2 ✅ V.Admin ✅ SHIPPED
+### PHASE V — Vendor Activation · V.0 ✅ V.1 ✅ V.2 ✅ V.Admin ✅ V.3 ✅ COMPLETE
 
 Full spec: **`docs/VENDOR-ACTIVATION.md`**.
 
@@ -699,7 +699,44 @@ outreachable vendors or the first "did outreach help?" question. See
 VENDOR-ACTIVATION.md §12.5 — and note it belongs in Postgres, not PostHog-only,
 because outreach→activation is a business metric.
 
-### V.3 / V.4 — recorded, not started
+### V.3 ✅ SHIPPED — publish controls are activation-aware
+
+`publishGate(state)` in `lib/activation.ts`; consumed by the drop editor
+(create mode only), `/dashboard/drops/new`, and `/dashboard/drops/[id]`.
+**No schema change, no server change.**
+
+A non-charge-ready vendor no longer sees a Publish button the server will
+refuse. All four publish-equivalent paths are covered: create-preorder,
+create-live-mode, draft→Publish, and **closed→Reopen** (the easy one to miss —
+it sends `status: "live"` too). In create mode **Save as draft becomes the
+primary action**, so the obvious button is the one that works.
+
+⚠️ **`drops/[id]/edit` is deliberately untouched** — edit mode submits the
+drop's *existing* status via `value={status}` and can never publish. Don't
+"fix" it by adding a gate.
+
+⚠️ **`/dashboard/drops/[id]` now renders exactly ONE Stripe message**, in
+order: the transient "Saved as a draft" notice → the inline publish gate →
+`StripeRequiredBanner`. Don't re-add the banner unconditionally.
+
+**Close drop is never gated.** Taking a drop down must always work.
+
+**Enforcement is asserted, not assumed.** Tests read the server sources and fail
+if `resolveDropStatus` stops gating, if any status writer bypasses it, if
+`placeOrderAction` drops its check, or if `publishGate` ever appears inside a
+server action. 147/147 activation assertions; `test:phase-a` 77/77.
+
+⚠️ **Verification gotcha:** React inserts `<!-- -->` between a JSX expression and
+adjacent text, so `{gate.cta} to publish` renders as
+`Connect Stripe<!-- --> to publish`. Strip those before grepping rendered HTML —
+a naive match reports a false negative.
+
+### V.4 — recorded, not started
+
+Phase 8 needs **two** events, not one. V.3 changed what a server block means:
+`vendor_publish_gate_shown` is now the activation-friction / publish-intent
+metric, while `vendor_publish_blocked` becomes a rare bypass/race signal worth
+investigating. See VENDOR-ACTIVATION.md §18.7.
 
 **V.Admin** (recommended after V.2) is admin visibility into who can't sell:
 same `stripeActivationState()`, no second status model. Priority comes from

@@ -1,6 +1,6 @@
 # DropQ Phase V — Vendor Onboarding / Activation
 
-**Status: V.0, V.1, V.2 and V.Admin SHIPPED. V.3 / V.4 recorded, not started.**
+**Status: V.0, V.1, V.2, V.Admin and V.3 SHIPPED. Phase V complete except V.4 (analytics, deferred to Phase 8).**
 
 Goal: a vendor should always know **what they've done, what's next, and when
 they're ready to sell** — instead of discovering requirements when something
@@ -1108,3 +1108,254 @@ for any future admin-page assertion.
 `lastActivationOutreachAt` is **not** added (§12.5). Revisit at roughly 25
 outreachable vendors, or the first time someone asks whether contacting a vendor
 actually helped. It stays a single additive nullable column with no backfill.
+
+---
+
+## 17. V.3 — contextual nudges ✅ SHIPPED
+
+Verified against the code at `25ca407`. No code written.
+
+### 17.1 Every way a vendor can attempt to publish
+
+All four route to `resolveDropStatus` (Phase A) and are silently downgraded to
+draft today:
+
+| # | Surface | Control |
+|---|---|---|
+| 1 | `components/drop-editor.tsx:144` (create, preorder) | **Publish drop** |
+| 2 | `components/drop-editor.tsx:136` (create, live mode) | **Start live selling** |
+| 3 | `app/dashboard/drops/[id]/page.tsx:116` (draft) | **Publish drop** |
+| 4 | `app/dashboard/drops/[id]/page.tsx:130` (closed) | **Reopen** |
+
+**Not a publish path — leave alone:** `drop-editor.tsx:150` (edit mode) submits
+`value={status}`, preserving the drop's current status. Editing a draft can
+never publish it, and `resolveDropStatus` treats `live → live` as unblocked, so
+editing an already-live drop is unaffected. Worth stating because "the editor
+can publish" is only true in create mode.
+
+**#4 (Reopen) is the easiest to miss.** It sends `status: "live"` from a closed
+drop, so a restricted vendor reopening an old drop hits the gate exactly like a
+first publish.
+
+### 17.2 What already exists — the reason to add little
+
+A non-charge-ready vendor today already sees:
+
+| Surface | Stripe messaging |
+|---|---|
+| `/dashboard` | V.2 activation card (banner suppressed) |
+| `/dashboard/drops` | `StripeRequiredBanner` |
+| `/dashboard/drops/new` | `StripeRequiredBanner` |
+| `/dashboard/drops/[id]` | `StripeRequiredBanner` **+** the `?stripe_required=1` notice after a blocked publish |
+| `/dashboard/products` | none |
+| `/dashboard/payments` | the connect card |
+
+The drops surfaces are already covered. **The gap is not "more warnings" — it is
+that the publish button itself doesn't know.** A vendor clicks *Publish drop*,
+the server downgrades it, and they learn afterwards. That is the only remaining
+surprise, and it is where the whole phase should aim.
+
+### 17.3 Proposed: two changes, one of them a removal
+
+**A. The publish control states its own constraint** *(all four call sites)*
+
+Not a dead `disabled` button — a disabled control explains nothing and clicking
+it does nothing. Instead the publish action is **replaced by a link to
+`/dashboard/payments`** carrying the reason. The vendor's next step stays one
+click away, and their work is never at risk:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Publishing needs Stripe — you can keep this as a draft.    │
+│                        [ Save as draft ]  [ Connect Stripe ]│
+└─────────────────────────────────────────────────────────────┘
+```
+
+In create mode **Save as draft becomes the primary action**, so the obvious
+button is the one that works.
+
+**B. Suppress `StripeRequiredBanner` on `/dashboard/drops/[id]`** when the
+inline control is showing its own state.
+
+Without this, that page carries three Stripe messages at once (banner + inline
+control + the post-blocked-publish notice). Same principle V.2 applied on the
+dashboard: **one message per page, at the point of action.** The banner stays on
+`/dashboard/drops` and `/dashboard/drops/new`, where there is no inline control
+near the top.
+
+**Deliberately NOT adding a product-library nudge.** The brief's example
+(*"Your product is ready. Connect Stripe when you're ready to start selling"*)
+is the earliest, lowest-intent moment in the journey, `/dashboard/products` has
+no Stripe messaging today, and the dashboard card already covers it. Adding one
+there is the change most likely to read as nagging, and it would take a
+non-charge-ready vendor from five Stripe touchpoints to seven.
+
+### 17.4 Publish behaviour per Stripe state
+
+Copy comes from one pure helper so all four call sites stay identical.
+
+| Stripe state | Publish control | Inline line |
+|---|---|---|
+| `not_started` | → **Connect Stripe** | "Publishing needs Stripe — you can keep this as a draft." |
+| `incomplete` / `unknown` | → **Finish Stripe setup** | "Finish your Stripe setup to publish. Your draft is saved." |
+| `restricted` | → **Fix this in Stripe** | "Payments are paused on your account, so this can't go live yet." |
+| `charge_ready` | **normal Publish drop** | none |
+| `suspended` | n/a | **unreachable** — see below |
+
+⚠️ **`suspended` cannot occur in vendor UI.** `getCurrentSeller()` returns null
+when `disabledAt` is set (`lib/auth.ts`), so `requireSeller()` redirects a
+suspended vendor to `/login` before any dashboard page renders. The state exists
+in the model for `/admin/activation` only. Worth recording so nobody writes
+vendor-facing copy for a state that can never render.
+
+Tone throughout: a constraint with a next step, never an error. No red, no
+"cannot", no exclamation marks.
+
+### 17.5 Implementation plan
+
+| File | Change | Kind |
+|---|---|---|
+| `lib/activation.ts` | `publishGate(state)` → `null` when charge-ready, else `{ reason, cta, href }`. Pure, testable, reuses `state.stripe`. **No new Stripe vocabulary.** | +~25 lines |
+| `components/drop-editor.tsx` | new optional prop `publishGate`; `SaveBar` branches in **create mode only** | ~20 lines |
+| `app/dashboard/drops/new/page.tsx` | compute and pass it | 2 lines |
+| `app/dashboard/drops/[id]/page.tsx` | inline state on **Publish** and **Reopen**; suppress the banner when gated | ~25 lines |
+| `app/api/dev/activation-selftest/route.ts` | `publishGate` per state + regressions | tests |
+
+**Not touched:** `app/dashboard/drops/[id]/edit/page.tsx` (edit mode has no
+publish path — §17.1), `components/product-library.tsx`, and **every server
+action**.
+
+### 17.6 Blast radius
+
+- **Server enforcement: zero change.** `resolveDropStatus`, `placeOrderAction`
+  and `isVendorSellable` are untouched. Every V.3 control is UX; a vendor who
+  forges the form still gets downgraded to draft exactly as today, and a test
+  will assert that.
+- **Charge-ready vendors see no difference at all** — `publishGate` returns
+  `null` and every control renders as it does now.
+- **Customer-facing surfaces: untouched.** No storefront, checkout or order
+  change.
+- **Schema: none.** No migration.
+- **Reversible by revert** — pure UI, no data written.
+- Affects **3 of 6** outreachable vendors today (Grandies, California Vintage
+  Sales, Elias test), plus anyone later restricted.
+
+### 17.7 PostHog note — the meaning of `vendor_publish_blocked` changes
+
+Recorded for Phase 8, **not implemented.** Worth capturing now because V.3
+changes what the event means:
+
+- **Today** it would mean *"a vendor was surprised by the gate"* — the common
+  case.
+- **After V.3** the UI prevents the attempt, so a server-side block becomes
+  *"the UI was bypassed, raced, or a stale page was submitted"* — rare, and a
+  bug signal rather than a UX signal.
+
+So Phase 8 should record **two** events, not one:
+
+| Event | Meaning after V.3 |
+|---|---|
+| `vendor_publish_blocked` | server refused a live transition — rare; investigate |
+| `vendor_publish_gate_shown` | the vendor saw the gated control — the real activation-friction metric |
+
+Without the second, the funnel loses visibility into publish intent precisely
+because V.3 fixed the surprise.
+
+---
+
+## 18. V.3 — as shipped
+
+`publishGate()` in `lib/activation.ts` + three consuming surfaces. **No schema
+change. No server change.** 147/147 activation assertions, `test:phase-a`
+77/77.
+
+### 18.1 What changed
+
+| File | Change |
+|---|---|
+| `lib/activation.ts` | `publishGate(state)` → `null` when charge-ready, else `{ reason, cta, href }` |
+| `components/drop-editor.tsx` | optional `publishGate` prop; `SaveBar` gains a **create-mode-only** branch |
+| `app/dashboard/drops/new/page.tsx` | computes and passes it |
+| `app/dashboard/drops/[id]/page.tsx` | gates **Publish** and **Reopen**; collapses to exactly one Stripe message |
+
+**Untouched on purpose:** `drops/[id]/edit` (edit mode submits the drop's
+existing status and can never publish), `components/product-library.tsx`, and
+**every server action**.
+
+### 18.2 Copy per state
+
+| Stripe state | CTA | Reason |
+|---|---|---|
+| `not_started` | Connect Stripe | "Publishing needs Stripe. Connect your account to start taking orders." |
+| `incomplete` / `unknown` | Finish Stripe setup | "Finish your Stripe setup before this can go live." |
+| `restricted` | Fix this in Stripe | "Payments are paused on your account, so this can't go live yet." |
+| `charge_ready` | — | gate is `null`; publishing renders exactly as before |
+| `suspended` | Payment settings | Gated rather than `null` — returning `null` would mean "publishing is fine". **Unreachable in vendor UI** (`requireSeller()` bounces a disabled seller), so this is defence, not copy anyone will read. |
+
+A test asserts none of the copy contains error language (`error`, `fail`,
+`cannot`, `denied`, `!`). Tone is a constraint with a next step.
+
+### 18.3 One message per page
+
+`/dashboard/drops/[id]` previously risked three simultaneous Stripe messages.
+It now renders exactly one, in priority order:
+
+1. the transient **"Saved as a draft"** notice after a blocked publish
+   (now carrying the gate's CTA), else
+2. the **inline publish gate**, else
+3. `StripeRequiredBanner` — which renders nothing for a charge-ready vendor
+   anyway.
+
+`/dashboard/drops` and `/dashboard/drops/new` keep the banner: there is no
+inline control near the top of those pages.
+
+### 18.4 Verified against real vendors
+
+Rendered locally against the **production database** with real sessions
+(read-only; nothing written — drop statuses unchanged at draft=2, closed=8):
+
+| Surface | Gated vendor | Charge-ready vendor |
+|---|---|---|
+| `/dashboard/drops/new` | no Publish button · **Save as draft** · *"Publishing needs Stripe. Connect your account to start taking orders."* · **Connect Stripe →** | **Publish drop** + Save as draft, unchanged |
+| draft `/dashboard/drops/[id]` | no Publish button · **Connect Stripe to publish →** · one inline notice · no banner | **Publish drop**, unchanged |
+| closed `/dashboard/drops/[id]` | no Reopen button · **Connect Stripe to reopen →** | **Reopen**, unchanged |
+
+Grandies (draft, no Stripe) and California Vintage Sales (closed drop, no
+Stripe) exercised the two gated paths; Casa Makulay and The Clovery confirmed
+the ungated ones.
+
+**Close drop is never gated** — taking a drop down always works, asserted by
+test.
+
+### 18.5 Enforcement unchanged — asserted, not assumed
+
+Tests read the server sources directly and fail if any of this drifts:
+
+- all three `Drop.status` writers still route through `resolveDropStatus`
+- `resolveDropStatus` still blocks a non-sellable `live` transition and still
+  always permits leaving `live`
+- `placeOrderAction` still gates on `isVendorSellable`
+- **`publishGate` appears in no server action** — it cannot become enforcement
+  by accident
+
+A forged or stale form is still downgraded to a draft exactly as before.
+
+### 18.6 Verification note
+
+React inserts `<!-- -->` separators between a JSX expression and adjacent text,
+so `{gate.cta} to publish →` renders as `Connect Stripe<!-- --> to publish →`.
+A naive grep for the full phrase reports a false negative. Strip the separators
+before asserting on rendered copy.
+
+### 18.7 Phase 8 — two events, recorded not implemented
+
+V.3 changes what a server-side block *means*, so one event is no longer enough:
+
+| Event | Meaning after V.3 |
+|---|---|
+| `vendor_publish_gate_shown` | the vendor saw the gated control — **the activation-friction / publish-intent metric** |
+| `vendor_publish_blocked` | the server refused a live transition anyway — rare; a bypass, race or stale page, worth investigating |
+
+Before V.3, `vendor_publish_blocked` would have captured publish intent. Now the
+UI prevents the attempt, so without `vendor_publish_gate_shown` the funnel would
+lose sight of intent precisely because the surprise was fixed.

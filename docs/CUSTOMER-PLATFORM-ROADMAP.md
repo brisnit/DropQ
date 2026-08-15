@@ -223,9 +223,14 @@ Full spec: **`docs/VENDOR-ACTIVATION.md`**.
       selling, Stripe restricted — never re-runs onboarding) / compact
       *"✓ Ready to sell"* / hidden once selling. 95/95 tests; verified against
       all real vendors.
-- [ ] **V.3 — Contextual nudges** after saving a product/draft drop, and
-      disabling the "live" option in the drop editor for non-charge-ready
-      vendors. **Presentation only — the Phase A server gate stays authoritative.**
+- [x] **V.3 — Publish controls are activation-aware.** Shipped. All four
+      publish-equivalent paths (create-preorder, create-live, draft→Publish,
+      closed→Reopen) replace the doomed button with contextual guidance and a
+      CTA to `/dashboard/payments`; create mode makes **Save as draft** primary.
+      `/dashboard/drops/[id]` collapsed to exactly one Stripe message. No
+      product-library nudge — the dashboard card already covers that moment.
+      **Presentation only; the Phase A server gate stays authoritative and is
+      asserted by test.**
 - [x] **V.Admin — Vendor Activation Operations.** Shipped. `/admin/activation`
       work queue + nav entry + activation block on the vendor detail page. Three
       attention states (selling paused / needs help / none), no time threshold,

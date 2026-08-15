@@ -115,12 +115,41 @@ function SaveBar({
   mode,
   status,
   live,
+  publishGate,
 }: {
   mode: "create" | "edit";
   status: string;
   live: boolean;
+  /** Set when the vendor isn't Stripe charge-ready — see lib/activation.ts. */
+  publishGate?: { reason: string; cta: string; href: string } | null;
 }) {
   const { pending } = useFormStatus();
+
+  // Not charge-ready: don't offer a Publish button the server will refuse.
+  // "Save as draft" becomes the primary action so the obvious button is the one
+  // that works, and nothing the vendor typed is lost. Edit mode is untouched —
+  // it submits the drop's existing status and can never publish.
+  if (mode === "create" && publishGate) {
+    return (
+      <div className="sticky bottom-0 -mx-5 sm:-mx-8 px-5 sm:px-8 py-4 bg-cream/90 backdrop-blur border-t border-line flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-ink-soft max-w-md">
+          {publishGate.reason} Your work is saved as a draft in the meantime.
+        </p>
+        <div className="flex gap-2 ml-auto">
+          <a
+            href={publishGate.href}
+            className="inline-flex items-center text-sm font-medium px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition whitespace-nowrap"
+          >
+            {publishGate.cta} →
+          </a>
+          <Button type="submit" name="status" value="draft" disabled={pending}>
+            {pending ? "Saving…" : "Save as draft"}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="sticky bottom-0 -mx-5 sm:-mx-8 px-5 sm:px-8 py-4 bg-cream/90 backdrop-blur border-t border-line flex items-center justify-between gap-3">
       <p className="text-sm text-muted hidden sm:block">
@@ -163,6 +192,7 @@ export function DropEditor({
   dropId,
   category = "food",
   dropMode = "preorder",
+  publishGate = null,
   timeZone,
   savedProducts = [],
 }: {
@@ -172,6 +202,8 @@ export function DropEditor({
   dropId?: string;
   category?: string;
   dropMode?: "preorder" | "live";
+  /** Non-null when the vendor is not Stripe charge-ready (create mode only). */
+  publishGate?: { reason: string; cta: string; href: string } | null;
   timeZone?: string;
   savedProducts?: SavedProduct[];
 }) {
@@ -744,7 +776,7 @@ export function DropEditor({
         <p className="text-sm text-brand-dark bg-brand-tint rounded-lg px-4 py-3 -mt-2">{error}</p>
       )}
 
-      <SaveBar mode={mode} status={defaults.status ?? "draft"} live={live} />
+      <SaveBar mode={mode} status={defaults.status ?? "draft"} live={live} publishGate={publishGate} />
     </form>
   );
 }

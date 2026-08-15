@@ -1,5 +1,6 @@
 import { requireSeller } from "@/lib/auth";
 import { StripeRequiredBanner } from "@/components/stripe-required-banner";
+import { loadActivationState, publishGate } from "@/lib/activation";
 import { prisma } from "@/lib/db";
 import { createDropAction } from "@/lib/actions/dashboard";
 import { DropEditor } from "@/components/drop-editor";
@@ -36,6 +37,10 @@ export default async function NewDropPage({
     );
   }
 
+  // Publish gate (V.3). UX only — createDropAction still downgrades a forged
+  // live request to a draft via resolveDropStatus.
+  const gate = publishGate(await loadActivationState(seller));
+
   const library = await prisma.vendorProduct.findMany({
     where: { sellerId: seller.id, isActive: true },
     orderBy: { updatedAt: "desc" },
@@ -49,6 +54,7 @@ export default async function NewDropPage({
         {dropMode === "live" ? "Start a live selling drop" : "Create a drop"}
       </h1>
       <DropEditor
+        publishGate={gate}
         action={createDropAction}
         category={seller.category}
         dropMode={dropMode}

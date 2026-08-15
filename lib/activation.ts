@@ -334,6 +334,57 @@ export function showsGenericNextStep(state: ActivationState): boolean {
   return activationCardMode(state) === "hidden";
 }
 
+/* --------------------------- Publish gate (V.3) --------------------------- */
+
+/**
+ * What to show instead of a Publish control when the vendor can't go live.
+ * `null` means charge-ready — render publishing exactly as before.
+ *
+ * UX ONLY. `resolveDropStatus()` is the enforcement and is untouched: a forged
+ * or stale form still gets downgraded to a draft. This exists so the vendor
+ * finds out *before* clicking rather than after, which is the last remaining
+ * surprise in the activation journey.
+ *
+ * Copy states the constraint and the next step — never an error. The
+ * reassurance about drafts lives at the call site, because "your work is saved
+ * as a draft" is true when creating and meaningless when reopening a closed
+ * drop.
+ */
+export type PublishGate = { reason: string; cta: string; href: string };
+
+export function publishGate(state: ActivationState): PublishGate | null {
+  if (state.readyToSell) return null;
+  const href = "/dashboard/payments";
+  switch (state.stripe) {
+    case "restricted":
+      return {
+        reason: "Payments are paused on your account, so this can't go live yet.",
+        cta: "Fix this in Stripe",
+        href,
+      };
+    case "incomplete":
+    case "unknown":
+      return {
+        reason: "Finish your Stripe setup before this can go live.",
+        cta: "Finish Stripe setup",
+        href,
+      };
+    case "suspended":
+      // Unreachable in vendor UI: getCurrentSeller() returns null for a
+      // disabled seller, so requireSeller() redirects to /login before any
+      // dashboard page renders. Gated anyway rather than returning null —
+      // null would mean "publishing is fine", which it certainly isn't.
+      return { reason: "This store can't publish right now.", cta: "Payment settings", href };
+    case "not_started":
+    default:
+      return {
+        reason: "Publishing needs Stripe. Connect your account to start taking orders.",
+        cta: "Connect Stripe",
+        href,
+      };
+  }
+}
+
 /* ------------------------- Admin outreach (V.Admin) ---------------------- */
 
 /**

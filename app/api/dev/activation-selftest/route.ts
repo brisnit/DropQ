@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import {
@@ -9,6 +10,7 @@ import {
   showsGenericNextStep,
   attentionState,
   isOutreachable,
+  publishGate,
   attentionRank,
   loadVendorActivationRows,
   type ActivationSeller,
@@ -397,6 +399,84 @@ export async function GET() {
     live["__attention"] = rows
       .map((r) => `${r.storeName}=${r.attention}${r.outreachable ? "" : "(excl)"}`)
       .join(", ");
+  }
+
+  /* ---------------------- V.3 publish gate (UX only) --------------------- */
+  const gate = (sel: ActivationSeller, f: ActivationFacts = HAS_DROP) =>
+    publishGate(activationState(sel, f));
+
+  check("V.3 charge-ready vendor is NOT gated — publishing unchanged",
+    gate(READY) === null && gate(READY, PUBLISHED) === null && gate(READY, SOLD) === null);
+  check("V.3 not started -> Connect Stripe",
+    gate(NOT_STARTED)?.cta === "Connect Stripe");
+  check("V.3 not started copy names the constraint, not an error",
+    /Publishing needs Stripe/.test(gate(NOT_STARTED)!.reason));
+  check("V.3 incomplete/unknown -> Finish Stripe setup, never 'Connect'",
+    gate(INCOMPLETE)?.cta === "Finish Stripe setup");
+  check("V.3 restricted -> Fix this in Stripe",
+    gate(RESTRICTED)?.cta === "Fix this in Stripe");
+  check("V.3 restricted copy says payments are paused",
+    /paused/i.test(gate(RESTRICTED)!.reason));
+  check("V.3 suspended is gated too (never null)", gate(SUSPENDED) !== null);
+  check("V.3 every gate routes to the existing payments flow",
+    [NOT_STARTED, INCOMPLETE, RESTRICTED, SUSPENDED]
+      .every((v) => gate(v)!.href === "/dashboard/payments"));
+  check("V.3 gate never depends on drops or orders — only on Stripe",
+    JSON.stringify(gate(NOT_STARTED, NOTHING)) === JSON.stringify(gate(NOT_STARTED, SOLD)));
+  check("V.3 gate copy contains no error language",
+    [NOT_STARTED, INCOMPLETE, RESTRICTED].every((v) =>
+      !/error|fail|cannot|denied|!/i.test(gate(v)!.reason)));
+
+  /* -------- V.3 surfaces: gated markup present, ungated unchanged -------- */
+  {
+    const editor = readFileSync("components/drop-editor.tsx", "utf8");
+    check("V.3 editor gates create mode only",
+      /mode === "create" && publishGate/.test(editor));
+    check("V.3 editor keeps Save as draft as the submit when gated",
+      /publishGate[\s\S]{0,900}name="status" value="draft"/.test(editor));
+    check("V.3 editor gated branch offers no live submit",
+      !/mode === "create" && publishGate[\s\S]{0,700}value="live"/.test(editor));
+    check("V.3 edit mode is untouched — still submits the existing status",
+      /name="status" value=\{status\}/.test(editor));
+
+    const detail = readFileSync("app/dashboard/drops/[id]/page.tsx", "utf8");
+    check("V.3 drop detail computes the gate", /publishGate\(await loadActivationState/.test(detail));
+    check("V.3 draft publish is gated", /gate \? \([\s\S]{0,400}to publish/.test(detail));
+    check("V.3 closed reopen is gated", /gate \? \([\s\S]{0,400}to reopen/.test(detail));
+    check("V.3 'Close drop' is never gated — taking a drop down always works",
+      /status === "live"[\s\S]{0,300}value="closed"/.test(detail) &&
+      !/status === "live" &&\s*\(gate/.test(detail));
+    check("V.3 duplicate banner suppressed when the inline gate shows",
+      /\) : gate \? \([\s\S]{0,700}\) : \([\s\S]{0,120}StripeRequiredBanner/.test(detail));
+
+    const newDrop = readFileSync("app/dashboard/drops/new/page.tsx", "utf8");
+    check("V.3 new-drop page passes the gate", /publishGate=\{gate\}/.test(newDrop));
+
+    const editPage = readFileSync("app/dashboard/drops/[id]/edit/page.tsx", "utf8");
+    check("V.3 edit page deliberately untouched", !/publishGate/.test(editPage));
+
+    check("V.3 no Stripe messaging added to the product library",
+      !/Stripe/i.test(readFileSync("components/product-library.tsx", "utf8")));
+  }
+
+  /* ---- V.3 changes NO server enforcement (the forged-request guarantee) --- */
+  {
+    const dash = readFileSync("lib/actions/dashboard.ts", "utf8");
+    const pay = readFileSync("lib/payments.ts", "utf8");
+    const order = readFileSync("lib/actions/order.ts", "utf8");
+    for (const fn of ["createDropAction", "updateDropFullAction", "updateDropStatusAction"]) {
+      const body = dash.slice(dash.indexOf(`function ${fn}`), dash.indexOf(`function ${fn}`) + 2200);
+      check(`V.3 ${fn} still routes status through resolveDropStatus`,
+        body.includes("resolveDropStatus("));
+    }
+    check("V.3 resolveDropStatus still blocks a non-sellable live transition",
+      /status === "live" && current !== "live" && !isVendorSellable\(seller\)/.test(pay));
+    check("V.3 resolveDropStatus still always permits leaving live",
+      /current !== "live"/.test(pay));
+    check("V.3 placeOrderAction still gates on isVendorSellable",
+      /if \(!isVendorSellable\(drop\.seller\)\)/.test(order));
+    check("V.3 the publish gate never appears in a server action",
+      !dash.includes("publishGate") && !order.includes("publishGate"));
   }
 
   /* ------------------------- Purity / no enforcement --------------------- */
