@@ -1988,3 +1988,209 @@ worth recognising: **`indexOf` finds the import, not the call site**, and
 - one pinned the inline-object call form that C2 intentionally replaced; it now
   asserts the durable property instead — exactly one create call, still carrying
   the connected account
+
+---
+
+## 21. Phase D — walk-up sale creation (PROPOSED, awaiting approval)
+
+Verified against the repo at `ea969a6`. No code written.
+
+### 21.1 Assumptions — all confirmed
+
+| Assumption | Verified |
+|---|---|
+| `WalkUpSale` still empty | **0 rows** |
+| No app code creates it | zero references outside `api/dev/` |
+| `expiresAt` is NOT NULL | required in schema — D must always set it |
+| `canStartInPersonSale(seller, drop)` exists | `lib/payments.ts:102`, ownership checked first |
+| Ownership pattern | `requireSeller()` + `drop.sellerId !== seller.id` (`drops/[id]/page.tsx:58`) |
+| Token pattern | `randomBytes(32).toString("hex")` — `lib/tokens.ts:18`, `lib/customer-auth.ts:135` |
+| Product fields for a cart | `id · dropId · name · priceCents · inventory · sold` |
+| No inventory reservation needed | stock is claimed only in `finalizePaidOrder`; C1 pinned it |
+| Derived state without `status` | `orderId` / `canceledAt` / `expiresAt` suffice |
+| Live drops | **0** right now |
+
+### 21.2 🔴 The one real problem: Phase D would ship a dead end
+
+`/pay/{token}` belongs to **Phase E**. If D renders a scannable QR, a vendor at a
+market shows a customer a code that **404s** — a bad failure in front of a
+paying customer, and worse than not having the feature.
+
+**Recommendation: build D fully, but gate the vendor entry point behind a
+server-side `WALKUP_ENABLED` flag, default off.**
+
+This project already has the precedent: Phase 6's Google sign-in shipped
+complete but inert behind `NEXT_PUBLIC_GOOGLE_AUTH_ENABLED`, unset in
+production. Same shape here. Phase E flips the flag and the whole flow lights up
+at once.
+
+Consequences, all good:
+
+- **With the flag off, `/dashboard/drops/[id]` renders byte-identical to today**,
+  so D's blast radius on the live product is genuinely zero.
+- No vendor can reach a half-built flow.
+- D stays fully reviewable and testable in a real environment.
+
+Inside the flag, the panel *does* show the QR and link, labelled as not yet
+live — useful for verifying D, harmless because nobody else can see it.
+
+### 21.3 Vendor UX
+
+Entry point: `/dashboard/drops/[id]`, beside the existing Share/QR block
+(`:275`) and above the live-orders feed (`:380`). One page, as approved — not
+scattered.
+
+```
+In-person sale                          [ New in-person sale ]
+Ring up a customer standing with you. They pay by card on their phone.
+```
+
+Tapping it reveals an inline cart on the same page (no route change — a vendor
+at a booth should never lose their place):
+
+```
+New in-person sale
+  Sweet corn custard donut   $6.50    [ − ]  2  [ + ]     10 left
+  Sticker pack               $5.00    [ − ]  0  [ + ]     22 left
+  ───────────────────────────────────────────────────────────────
+  Total                     $13.00
+                              [ Cancel ]   [ Start sale → ]
+```
+
+After creation, the same block becomes the sale panel: total, item count, the
+`/pay/{token}` URL, a QR, an expiry countdown, **"Payment opens in the next
+release"**, and **Cancel sale**.
+
+Deliberately not a POS: no discounts, no notes, no custom line items, no
+split tender.
+
+### 21.4 `lines` JSON — the client never sends a price
+
+```jsonc
+[ { "productId": "cmsu…", "name": "Sweet corn custard donut",
+    "priceCents": 650, "quantity": 2 } ]
+```
+
+**The form submits only `productId` and `quantity`.** Price and name are read
+from `Product` server-side. This is stronger than validating a submitted
+price — there is no price field to forge in the first place.
+
+Why snapshot `name` and `priceCents` at all when both are re-derivable:
+
+- **Price** — at a market the vendor quotes a figure out loud. If the product
+  price is edited before the customer pays, the customer should pay what they
+  were told. Storing it preserves that option; **whether the snapshot or the
+  live price is authoritative at conversion stays a Phase E decision** (§3.3).
+- **Name** — matches `OrderItem`, which already snapshots name and price so
+  products can be edited or deleted without corrupting history.
+
+Server validation, all against authoritative rows:
+
+| Rule | Failure |
+|---|---|
+| `requireSeller()` | redirect to `/login` |
+| `drop.sellerId === seller.id` | `notFound()` |
+| `canStartInPersonSale(seller, drop)` | refuse with its reason |
+| every `productId` exists **and** `product.dropId === drop.id` | refuse |
+| `quantity` is an integer ≥ 1 | drop the line |
+| `quantity ≤ inventory − sold` **now** | refuse |
+| at least one line after filtering | refuse |
+| ≤ 50 distinct lines, ≤ 999 per line | refuse (sanity bound) |
+
+### 21.5 Expiry — 30 minutes
+
+As specified in §4. The vendor is standing right there, and it bounds how long a
+photographed QR stays chargeable. The Stripe session gets its own 60 minutes
+later, in Phase E, starting when the customer actually submits.
+
+No cleanup infrastructure in D: expiry is derived, and an expired row holds no
+inventory and no money. A sweeper only becomes worth writing if these ever
+accumulate.
+
+### 21.6 Server actions
+
+```ts
+// lib/actions/walkup.ts   ("use server")
+startWalkUpSaleAction(formData)   // requireSeller → ownership → eligibility
+                                  // → validate → create → revalidatePath
+cancelWalkUpSaleAction(formData)  // requireSeller → sale.sellerId === seller.id
+                                  // → canceledAt = now
+```
+
+`cancelWalkUpSaleAction` **sets `canceledAt`; it never deletes.** It refuses if
+the sale is already converted (`orderId != null`) or already canceled, so a
+stale form cannot resurrect or double-cancel one. It touches no inventory and
+creates no Order.
+
+Cancel is included in D rather than deferred because a mis-rung cart is the
+single most likely thing to happen at a booth, and it establishes the
+never-delete audit convention before Phase E depends on it.
+
+### 21.7 Idempotency — no schema, deliberately
+
+A double-clicked **Start sale** could create two carts. That is tolerable, and
+constraining it would be actively wrong:
+
+- a duplicate cart **reserves no inventory, creates no Order, charges nothing**,
+  and expires in 30 minutes
+- a unique "one open sale per drop" constraint would **break a real use case** —
+  a vendor at a busy market legitimately needs two open carts for two customers
+
+So: `useFormStatus` disables the button while pending (the existing `SubmitBtn` /
+`SaveBar` pattern), and a duplicate row is accepted as harmless.
+
+The idempotency that actually matters — two phones scanning the same QR — is
+already guaranteed by `orderId @unique` from Phase B, and is Phase E's concern.
+
+### 21.8 Files
+
+| File | Change |
+|---|---|
+| `lib/walkup.ts` | **new** — `WALKUP_TTL_MINUTES`, `newWalkUpToken()`, `validateWalkUpLines()` (pure), `walkUpSaleState()` (pure, derived), `payUrlFor(token)` |
+| `lib/actions/walkup.ts` | **new** — the two server actions |
+| `components/walkup-sale.tsx` | **new** — cart + created-sale panel |
+| `app/dashboard/drops/[id]/page.tsx` | entry point, behind `WALKUP_ENABLED` |
+| `app/api/dev/payments-selftest/route.ts` | Phase D tests |
+| `.env.example` | document `WALKUP_ENABLED` |
+
+**Not built in D:** `/pay/{token}` (E) · `GET /api/walkup/[id]/status` and the 3s
+poll — there is nothing to poll until a payment can happen, so it moves to E.
+
+### 21.9 Blast radius
+
+- **Flag off ⇒ zero.** `/dashboard/drops/[id]` renders exactly as today.
+- Flag on ⇒ one additive block on one vendor page. No customer-facing surface,
+  no storefront, no checkout, no Stripe.
+- Writes `WalkUpSale` only. No `Order`, no inventory, no DropPoints, no
+  `CustomerVendor`, no reporting change, no `Order.source` change.
+- No schema change, no migration.
+- Because the flag is off by default, **deploying during a live drop is safe** —
+  though the count should still be checked.
+
+### 21.10 Tests
+
+Pure `validateWalkUpLines()` — eligible vendor passes · non-charge-ready refused
+· wrong vendor refused · foreign-drop product refused · **client price ignored
+entirely** · quantity 0 / negative / non-integer / over-availability refused ·
+empty cart refused · sanity bounds enforced · price and name taken from
+`Product`.
+
+`walkUpSaleState()` — open / converted / canceled / expired derived correctly
+from `orderId`, `canceledAt`, `expiresAt`, with converted outranking canceled.
+
+`newWalkUpToken()` — 64 hex chars, unique across 1000 draws, never equal to the
+row id.
+
+Live-DB, **rolled back**: one create writes exactly one row with the right
+`expiresAt` and snapshot; cancel sets `canceledAt` and deletes nothing; the row
+count returns to 0.
+
+Non-effects asserted: no `Order`, no `sold` change, no `PointsLedger`, no
+`CustomerVendor`, no Stripe import anywhere in the walk-up code.
+
+Regression: `canStartInPersonSale` remains the only eligibility rule · online
+checkout untouched · phase-a 77/77 · activation 147/147 · payments suite green ·
+tsc · build.
+
+**No real Stripe transaction. No production `WalkUpSale` rows** without explicit
+approval — every DB test rolls back.

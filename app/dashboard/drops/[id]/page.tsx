@@ -25,6 +25,10 @@ import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 import { BackLink } from "@/components/back-link";
 import { StripeRequiredBanner } from "@/components/stripe-required-banner";
 import { loadActivationState, publishGate } from "@/lib/activation";
+import { canStartInPersonSale } from "@/lib/payments";
+import { isWalkUpEnabled, walkUpSaleState, walkUpTotalCents, payUrlFor, WALKUP_TTL_MINUTES, type WalkUpLine } from "@/lib/walkup";
+import { cancelWalkUpSaleAction } from "@/lib/actions/walkup";
+import { WalkUpSaleStarter } from "@/components/walkup-sale";
 import { DropCommunicationSection } from "@/components/drop-communication";
 import { MessageCustomerButton } from "@/components/message-customer-button";
 import { dropCommunicationSummary } from "@/lib/messaging";
@@ -34,10 +38,14 @@ export default async function DropDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ stripe_required?: string }>;
+  searchParams: Promise<{ stripe_required?: string; walkup?: string; walkup_error?: string }>;
 }) {
   const { id } = await params;
-  const { stripe_required: stripeRequired } = await searchParams;
+  const {
+    stripe_required: stripeRequired,
+    walkup: walkUpId,
+    walkup_error: walkUpError,
+  } = await searchParams;
   const seller = await requireSeller();
 
   // Publish gate (V.3). UX only — updateDropStatusAction still routes every
@@ -56,6 +64,18 @@ export default async function DropDetailPage({
     },
   });
   if (!drop || drop.sellerId !== seller.id) notFound();
+
+  // ---- Walk-up sales (Phase D) ----------------------------------------
+  // Server-side flag is authoritative; the entry point simply doesn't exist
+  // when it's off, so the page renders exactly as it did before Phase D.
+  const walkUpOn = isWalkUpEnabled();
+  const walkUpEligible = walkUpOn ? canStartInPersonSale(seller, drop) : null;
+  const walkUpSale =
+    walkUpOn && walkUpId
+      ? await prisma.walkUpSale.findFirst({
+          where: { id: walkUpId, sellerId: seller.id, dropId: drop.id },
+        })
+      : null;
 
   const h = await headers();
   const host = h.get("host") ?? "localhost:3001";
@@ -269,6 +289,99 @@ export default async function DropDetailPage({
               <Button type="submit">📍 I&apos;m at the pickup location</Button>
             </form>
           )}
+        </div>
+      )}
+
+      {/* In-person sale (Phase D). Absent entirely unless WALKUP_ENABLED. */}
+      {walkUpOn && (
+        <div className="bg-paper border border-line rounded-card p-5 mb-8">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="font-semibold">In-person sale</h2>
+              <p className="text-sm text-muted mt-0.5 max-w-xl">
+                Ring up a customer standing with you. They pay by card on their own phone.
+              </p>
+            </div>
+            {!walkUpSale && walkUpEligible?.ok && (
+              <WalkUpSaleStarter
+                dropId={drop.id}
+                products={drop.products.map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                  priceCents: p.priceCents,
+                  remaining: Math.max(0, p.inventory - p.sold),
+                }))}
+              />
+            )}
+          </div>
+
+          {walkUpError && (
+            <p className="mt-3 text-sm text-brand-dark bg-brand-tint rounded-lg px-3 py-2">
+              Couldn&apos;t start that sale ({walkUpError}). Nothing was created — try again.
+            </p>
+          )}
+
+          {!walkUpSale && walkUpEligible && !walkUpEligible.ok && (
+            <p className="mt-3 text-sm text-muted">
+              {walkUpEligible.reason === "vendor_not_sellable"
+                ? "Connect Stripe before taking in-person payments."
+                : walkUpEligible.reason === "no_stock"
+                  ? "Everything in this drop is sold out."
+                  : "This drop isn't available for in-person sales."}
+            </p>
+          )}
+
+          {walkUpSale && (() => {
+            const state = walkUpSaleState(walkUpSale);
+            const lines = walkUpSale.lines as unknown as WalkUpLine[];
+            const total = walkUpTotalCents(lines);
+            return (
+              <div className="mt-4 border-t border-line pt-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold">
+                      {formatMoney(total)}{" "}
+                      <span className="font-normal text-muted">
+                        · {lines.reduce((n, l) => n + l.quantity, 0)} item(s) ·{" "}
+                        {state === "open" ? "awaiting payment" : state}
+                      </span>
+                    </p>
+                    <ul className="text-sm text-ink-soft mt-1">
+                      {lines.map((l) => (
+                        <li key={l.productId}>
+                          <span className="text-muted">{l.quantity}×</span> {l.name} ·{" "}
+                          {formatMoney(l.priceCents)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  {state === "open" && (
+                    <form action={cancelWalkUpSaleAction} className="shrink-0">
+                      <input type="hidden" name="saleId" value={walkUpSale.id} />
+                      <Button type="submit" variant="secondary">Cancel sale</Button>
+                    </form>
+                  )}
+                </div>
+
+                {/* Deliberately NOT a scannable QR: /pay/{token} lands in
+                    Phase E, and a code that 404s in front of a paying customer
+                    is worse than no feature. The URL is shown as text so the
+                    flow can be verified without anyone scanning it. */}
+                <div className="mt-4 rounded-xl bg-cream/70 border border-line px-4 py-3">
+                  <p className="text-xs uppercase tracking-wider text-muted">
+                    Customer payment link — not live yet
+                  </p>
+                  <p className="font-mono text-xs break-all mt-1">
+                    {payUrlFor(walkUpSale.token, shareUrl.split("/s/")[0])}
+                  </p>
+                  <p className="text-xs text-muted mt-1.5">
+                    The payment page ships in the next release. This cart expires{" "}
+                    {WALKUP_TTL_MINUTES} minutes after it was created.
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
