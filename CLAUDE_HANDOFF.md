@@ -512,6 +512,39 @@ that reintroduces the spam.**
 vendor. Verified by test only. The first real firing logs
 `[stripe] charges disabled — vendor=…` in Vercel.
 
+### Phase D — ✅ SHIPPED, INERT behind `WALKUP_ENABLED`
+
+Vendor can ring up a walk-up cart on `/dashboard/drops/[id]`. Creates a
+`WalkUpSale` and nothing else — no Order, no Stripe, no inventory claim, no
+DropPoints, no `CustomerVendor`.
+
+⚠️ **`WALKUP_ENABLED` is server-side and default OFF. Do NOT enable it in
+production until Phase E ships `/pay/{token}`** — a vendor would otherwise ring
+up a cart no customer can pay. Deliberately not `NEXT_PUBLIC_`: the server
+action re-checks it before creating anything. With the flag off the drop page
+renders exactly as before, which is why D deployed inert during normal trading.
+
+⚠️ **No QR is rendered in D.** `/pay/{token}` 404s today; a scannable dead end
+in front of a paying customer is worse than no feature. D shows the URL as text
+labelled "not live yet". The QR ships with the route in E.
+
+**A forged price is inexpressible, not rejected** — the form submits
+`qty_<productId>` only, and name/price are read from `Product` and snapshotted
+into `lines`. Whether that snapshot or the live price wins at conversion is
+**still an open Phase E decision**.
+
+**Stock is checked, never reserved.** `finalizePaidOrder` remains the only
+authority (pinned by C1).
+
+Cancel sets `canceledAt` and never deletes; state stays derived from
+`orderId`/`canceledAt`/`expiresAt`. **No unique constraint on open sales per
+drop** — a market vendor legitimately needs two carts at once, and a duplicate
+reserves nothing and expires in 30 minutes.
+
+`npm run dev` + `curl localhost:3000/api/dev/payments-selftest` → **122
+assertions**, green with the flag off and on. Test with
+`WALKUP_ENABLED=true STRIPE_SECRET_KEY=sk_test_dummy npm run dev`.
+
 ### Phase C1 + C2 — ✅ BOTH SHIPPED
 
 **⚠️ PRODUCTION NOW HAS LIVE DROPS.** On 2026-08-15 The Clovery ran a live flash

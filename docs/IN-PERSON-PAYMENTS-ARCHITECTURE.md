@@ -1,6 +1,6 @@
 # DropQ In-Person Payments — Architecture
 
-**Status: APPROVED. Phases A, A.1, B, C1 and C2 SHIPPED. D–G not started.**
+**Status: APPROVED. Phases A, A.1, B, C1, C2 and D SHIPPED (D inert behind `WALKUP_ENABLED`). E–G not started.**
 
 The architecture, the two decisions in §10 and the seven-phase shape in §12 are
 signed off.
@@ -12,7 +12,8 @@ signed off.
 | **B** — schema foundation (`WalkUpSale`) | ✅ shipped, migrated, verified (§16) |
 | **C1** — walk-up eligibility + finalize regression pins | ✅ shipped (§19) |
 | **C2** — extract the Stripe session builder | ✅ shipped (§20) |
-| **D–G** | not started; each needs its own approval |
+| **D** — vendor walk-up cart | ✅ shipped **inert** behind `WALKUP_ENABLED`, default off (§22) |
+| **E–G** | not started; each needs its own approval |
 
 **⚠️ `Order.paidAt` was removed from the design** — see the callout in §3.3.
 Anything below written against `paidAt` has been corrected to `paymentStatus`.
@@ -1991,7 +1992,7 @@ worth recognising: **`indexOf` finds the import, not the call site**, and
 
 ---
 
-## 21. Phase D — walk-up sale creation (PROPOSED, awaiting approval)
+## 21. Phase D — walk-up sale creation (approved design; see §22 for what shipped)
 
 Verified against the repo at `ea969a6`. No code written.
 
@@ -2194,3 +2195,101 @@ tsc · build.
 
 **No real Stripe transaction. No production `WalkUpSale` rows** without explicit
 approval — every DB test rolls back.
+
+---
+
+## 22. Phase D — as shipped
+
+Vendor-side walk-up cart. **No schema change.** Deployed **inert**:
+`WALKUP_ENABLED` is unset in production, so `/dashboard/drops/[id]` renders
+exactly as it did before.
+
+### 22.1 Files
+
+| File | Role |
+|---|---|
+| `lib/walkup.ts` | **new** — TTL, token, `validateWalkUpLines()`, `walkUpSaleState()`, `payUrlFor()`, `isWalkUpEnabled()`. All pure except the flag. |
+| `lib/actions/walkup.ts` | **new** — `startWalkUpSaleAction` / `cancelWalkUpSaleAction` |
+| `components/walkup-sale.tsx` | **new** — the booth cart |
+| `app/dashboard/drops/[id]/page.tsx` | flagged entry point |
+| `.env.example` | documents the flag |
+
+### 22.2 The flag is the deployment strategy
+
+`WALKUP_ENABLED` is **server-side and deliberately not `NEXT_PUBLIC_`** —
+availability must stay authoritative even if the client bundle is modified. The
+server action re-checks it **before creating anything**, and a test asserts that
+check precedes the `create` call.
+
+Verified both ways against production data: **off** → no "In-person sale" text
+anywhere on the drop page, which otherwise renders normally; **on** → the
+heading and button appear for a charge-ready vendor, and a non-charge-ready
+vendor gets *"Connect Stripe before taking in-person payments"* and **no
+button**. The full suite is green in both states.
+
+### 22.3 No QR in Phase D — on purpose
+
+`/pay/{token}` ships in Phase E and **404s today** (verified in production). A
+scannable code that dead-ends in front of a paying customer is worse than no
+feature, so D renders the payment URL as **plain text labelled "not live yet"**
+and no QR at all. The QR lands with the working route.
+
+### 22.4 A forged price is not rejected — it is inexpressible
+
+The form submits **`qty_<productId>` only**. `validateWalkUpLines()` reads name
+and price from the `Product` rows; there is no price field in the request to
+forge. Those values are then snapshotted into `lines` so the cart the vendor
+quoted aloud survives a later product edit.
+
+**Whether the snapshot or the live price is authoritative at conversion remains
+an explicit Phase E decision** — D does not settle it.
+
+Stock is checked at creation as a courtesy against obviously unavailable
+quantities. It is **not a reservation**: `finalizePaidOrder`'s conditional
+increment stays the only authority, exactly as C1 pinned.
+
+### 22.5 Cancel, and why there is no unique constraint
+
+`cancelWalkUpSaleAction` sets `canceledAt` and **never deletes**. It refuses
+anything not currently `open`, so a stale form cannot resurrect a converted sale
+or double-cancel one. It touches no inventory and creates no Order.
+
+**No "one open sale per drop" constraint**, deliberately: a vendor at a busy
+market legitimately needs two carts at once. A duplicate reserves nothing,
+charges nobody and expires in 30 minutes; `useFormStatus` covers the accidental
+double-click. The idempotency that matters — two phones scanning one QR — is
+already `orderId @unique` from Phase B.
+
+### 22.6 Verification
+
+payments **122/122** (green with the flag off *and* on) · activation
+**147/147** · phase-a **77/77** · tsc · build · drift empty · no migration.
+
+Live-DB create and cancel run inside **rolled-back** transactions that exclude
+live drops, asserting the table is empty afterwards.
+
+Post-deploy: all public routes and **all 11 drop pages 200** · `/pay/testtoken`
+**404** · dev selftests 404 · **`WalkUpSale` 0** · orders 10, orderItems 19,
+orderEvents 29, `PointsLedger` 8, `CustomerVendor` 11, total `Product.sold` 166
+— all unchanged. `WALKUP_ENABLED` confirmed **absent from the Vercel production
+environment**.
+
+### 22.7 Two test corrections worth remembering
+
+Both were assertions, not product code, and both recur:
+
+- **A docblock naming what a file must never do trips its own regex.** The
+  actions file says "call Stripe · touch inventory" in its header comment, which
+  failed the "no Stripe / no inventory" checks. Strip block *and* line comments
+  before asserting on source.
+- **An assertion checked the environment, not behaviour.** `isWalkUpEnabled()
+  === false` would fail the moment anyone ran with the flag on — the same
+  mistake the Phase A suite made with `live === 0`. It now asserts the helper
+  agrees with `process.env.WALKUP_ENABLED`, which holds everywhere.
+
+### 22.8 What Phase E must do first
+
+`/pay/{token}`, and only then flip `WALKUP_ENABLED`. Also still deferred to E:
+the 3s status poll and `GET /api/walkup/[id]/status` (nothing to poll until a
+payment can happen), customer identity, DropPoints, `CustomerVendor`, and the
+snapshot-vs-live-price conversion policy.
