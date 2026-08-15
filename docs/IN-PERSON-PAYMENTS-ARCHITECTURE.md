@@ -1552,6 +1552,38 @@ Row counts before and after all testing: **orders 9, drops 9, orderItems 18,
 pointsLedger 8, customers 8, orderEvents 22 — unchanged.** The Casa Makulay
 order is byte-identical.
 
+### 15.3a Manual production verification — publish gate ✅
+
+Confirmed by the user in a browser on production, 2026-08-14, signed in as a
+vendor with **no Stripe account**. This is the check that could not be automated
+here: production's `SESSION_SECRET` differs from local, so an authenticated
+vendor session cannot be minted from a local session (§5c of the handoff).
+
+Attempting to publish a drop produced, as designed:
+
+| Expected | Result |
+|---|---|
+| Drop saved as a **draft**, not live | ✅ |
+| `?stripe_required=1` notice shown | ✅ |
+| Entered drop data preserved | ✅ |
+| **No live drop created** | ✅ |
+| Vendor sees "Connect Stripe to start selling" | ✅ |
+
+Two things this confirms beyond the gate itself:
+
+1. **`sellerBlockReason()` picks the right variant in production.** The vendor
+   saw the **`not_connected`** copy, not the `charges_disabled` copy — the
+   distinction §14.2(6) exists to make, verified live rather than only in unit
+   tests.
+2. **The "drafts stay editable" promise is not just theoretical** — the drop
+   survived the blocked publish with its contents intact, which is the whole
+   point of degrading to draft rather than refusing the save.
+
+**Still outstanding (user is verifying separately):** that the resulting draft
+remains fully editable while Stripe is disconnected. Covered by automated
+assertions (`draft -> draft` allowed and not flagged blocked) but not yet
+confirmed in a browser.
+
 ### 15.4 Two things deliberately not verified
 
 - **`app/api/dev/messaging-selftest` was NOT run.** Its own docstring and §5c of

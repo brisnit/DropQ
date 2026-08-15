@@ -473,6 +473,21 @@ orderEvents 22 — all unchanged. Casa Makulay order byte-identical. Zero live
 drops existed, so no customer or vendor was mid-sale. See §15.3 of the
 architecture doc.
 
+**Publish gate manually verified in a browser (2026-08-14)** as a vendor with no
+Stripe: the drop saved as a **draft**, the `stripe_required` notice appeared,
+the entered data was preserved, **no live drop was created**, and the vendor saw
+the **"Connect Stripe to start selling"** copy — i.e. `sellerBlockReason()`
+correctly chose `not_connected` over `charges_disabled` in production, not just
+in unit tests.
+
+This had to be done by a human: production's `SESSION_SECRET` differs from
+local, so **you cannot authenticate to production from a local session** (§5c).
+Any future vendor-authenticated check has the same constraint.
+
+⏳ Outstanding: confirming in a browser that the resulting draft stays fully
+editable while Stripe is disconnected. Automated assertions cover it
+(`draft -> draft` allowed, not flagged blocked); the user is verifying.
+
 ### 🔜 Approved follow-up, NOT implemented — do this before Phase B
 
 > **When `account.updated` flips a vendor from charge-ready to not charge-ready,
