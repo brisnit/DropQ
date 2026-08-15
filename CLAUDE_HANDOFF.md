@@ -394,7 +394,105 @@ the ledger honestly records when the points were granted.
 
 ---
 
-## 6b. ⚠️ NEXT SESSION STARTS HERE — approved brief
+## 5e. In-person payments — architecture approved, Phase A SHIPPED (2026-08-14)
+
+Full design: **`docs/IN-PERSON-PAYMENTS-ARCHITECTURE.md`**. Read it before
+touching payments — it supersedes §6b below, which is now historical.
+
+### The product model changed twice during design. The final one:
+
+**Cash is completely outside DropQ.** There is no "mark paid externally", no
+cash/Venmo/Zelle payment state, no external refund, no manual paid attestation.
+An earlier draft designed all of that; it was withdrawn. Two payment paths only,
+both Stripe:
+
+| Path | Who starts it | Payment |
+|---|---|---|
+| Online order | customer | Stripe via DropQ |
+| **Walk-up order** (Phases B–G, not built) | **vendor**, at the booth | Stripe via DropQ, on the customer's own phone |
+
+**And the governing platform rule:**
+
+> **A real DropQ vendor cannot sell unless Stripe is connected and currently
+> charge-ready.** Not a payment option — "vendor without Stripe" is an
+> incomplete-onboarding / selling-disabled state.
+
+### Phase A — shipped, deployed, verified
+
+Closed three ways to create a real order nobody paid for:
+
+1. **`payInPerson=1`** — a form field the server never validated. Any customer
+   could POST it against any drop and get a confirmed, inventory-consuming order
+   with a "Got your order! 🎉" email. Removed entirely, client and server.
+2. **Vendor without Stripe** — `useStripe` false fell into a branch commented
+   `// Demo mode (no Stripe configured)`, meaning the *platform*. In production
+   the key is always set, so it only ever fired for **vendors** who weren't
+   charge-ready. Now gated; that branch is local-dev-only and labelled so.
+3. **🔴 Charges revoked mid-drop** — `account.updated` writes
+   `stripeChargesEnabled: false` whenever Stripe disables charges (unverified
+   identity, expired document, risk review). A vendor with a **live drop and
+   real customers** silently started taking free orders. This is the dangerous
+   one: it isn't an onboarding case and can hit an established vendor mid-market.
+
+Plus: drops can no longer be **published live** without Stripe (all three
+`Drop.status` writers — `createDropAction`, `updateDropFullAction`,
+`updateDropStatusAction`, the last of which also wrote the raw form value with
+no whitelist).
+
+**Deliberately still allowed, and there are tests pinning this:** drafts stay
+fully editable, and `live → closed` / `live → draft` **always** work. A vendor
+whose Stripe breaks mid-drop must be able to take their drop down.
+
+### Where the rule lives
+
+**`lib/payments.ts`** — `isVendorSellable()`, `sellerBlockReason()`,
+`resolveDropStatus()`. **Do not re-inline this condition.** It was previously
+hand-written in two files that were free to drift. It is `server-only` because
+it reads `STRIPE_SECRET_KEY`, which is why `StripeRequiredBanner` is a server
+component.
+
+`sellerBlockReason()` distinguishes **`not_connected`** (never onboarded, low
+urgency) from **`charges_disabled`** (connected, Stripe turned charges off —
+urgent, possibly mid-drop). They previously shared one "finish setting up"
+message that badly understated the second.
+
+### Tests
+
+`npm run test:phase-a` → **58 assertions, writes nothing.** Run it after any
+change to payment eligibility or drop publishing.
+
+⚠️ **`app/api/dev/messaging-selftest` was NOT run** — it creates sellers, drops
+and orders, and `.env` points at production (§5c). Phase A doesn't touch
+messaging and that route bypasses `placeOrderAction` entirely. Run it on the
+next scratch database.
+
+### Verified in production after deploy
+
+Order count **9 → 9**. Drops 9, orderItems 18, pointsLedger 8, customers 8,
+orderEvents 22 — all unchanged. Casa Makulay order byte-identical. Zero live
+drops existed, so no customer or vendor was mid-sale. See §15.3 of the
+architecture doc.
+
+### 🔜 Approved follow-up, NOT implemented — do this before Phase B
+
+> **When `account.updated` flips a vendor from charge-ready to not charge-ready,
+> email them that selling is paused and action is required.**
+
+`app/api/stripe/webhook/route.ts:126-132` already writes the flag and is the
+natural trigger. Until this ships, a vendor whose Stripe breaks overnight finds
+out only from the dashboard banner.
+
+---
+
+## 6b. ⚠️ SUPERSEDED — historical pay-in-person brief
+
+**This section is out of date.** It proposed `Drop.allowPayInPerson`, a
+"Mark as paid in person" vendor action and pay-in-person DropPoints. All three
+were **rejected** during the design in §5e — cash is outside DropQ and
+`Drop.allowPayInPerson` was never built. Kept only for provenance; follow
+`docs/IN-PERSON-PAYMENTS-ARCHITECTURE.md` instead.
+
+### Original text — approved brief
 
 **Phase 7 is COMPLETE** (migrated, deployed, verified — see §5c). Phase 8 is
 explicitly **blocked** until the pay-in-person work below is done and verified.
@@ -525,8 +623,9 @@ See `docs/CUSTOMER-PLATFORM-ROADMAP.md` for the full ordered plan.
 - `vendorUpcomingAppearances()` exists but isn't wired into `/s/[slug]`
 - Saving individual **products** is still localStorage-only (`lib/saved-store.ts`)
 - **Checkout phone is now optional** — vendors lose SMS reach for those orders
-- **Pay-in-person orders currently earn 0 DropPoints** — points award on
-  `paymentStatus === "paid"`, which only Stripe sets. §6b item 2 fixes this.
+- ~~Pay-in-person orders earn 0 DropPoints~~ — **obsolete.** Customer-facing
+  pay-in-person was removed in Phase A (§5e); every DropQ order is paid by card
+  through Stripe, so there is no unpaid-order points case to fix.
 - ~~All 8 existing paid orders hold 0 DropPoints~~ — **fixed 2026-08-14**, all
   8 backfilled for 112 points (§5d).
 - Stale `* 2.ts` duplicates in `.next`/`app/generated` break `tsc`

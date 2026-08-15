@@ -1,4 +1,5 @@
 import { requireSeller } from "@/lib/auth";
+import { StripeRequiredBanner } from "@/components/stripe-required-banner";
 import { prisma } from "@/lib/db";
 import { createDropAction } from "@/lib/actions/dashboard";
 import { DropEditor } from "@/components/drop-editor";
@@ -42,6 +43,7 @@ export default async function NewDropPage({
 
   return (
     <Section>
+      <StripeRequiredBanner seller={seller} />
       <BackLink href="/dashboard/drops">Back to drops</BackLink>
       <h1 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight mt-3 mb-7">
         {dropMode === "live" ? "Start a live selling drop" : "Create a drop"}

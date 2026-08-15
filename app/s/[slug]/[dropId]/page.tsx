@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { isStripeEnabled, feePercent } from "@/lib/stripe";
+import { isVendorSellable } from "@/lib/payments";
 import { StorefrontOrder } from "@/components/storefront-order";
 import { SaveDropButton } from "@/components/my/save-drop-button";
 import { WaitlistForm } from "@/components/waitlist-form";
@@ -91,8 +92,12 @@ export default async function DropOrderPage({
   const isLiveDrop = drop.mode === "live";
   const phase = computeDropPhase(drop);
   const orderingOpen = isOrderingOpen(drop); // server-time gate for the order form
-  const paymentsEnabled =
-    isStripeEnabled() && drop.seller.stripeChargesEnabled && !!drop.seller.stripeAccountId;
+  // GOVERNING PLATFORM RULE: only a Stripe charge-ready vendor may sell. When
+  // they aren't, we must not render a checkout the customer can't complete —
+  // the server action rejects it anyway (lib/actions/order.ts), so showing the
+  // form would just be a dead end.
+  const sellable = isVendorSellable(drop.seller);
+  const paymentsEnabled = isStripeEnabled() && sellable;
   const fulfillmentLabel =
     drop.fulfillment === "pickup"
       ? "Pickup"
@@ -200,7 +205,34 @@ export default async function DropOrderPage({
           )}
         </div>
 
-        {orderingOpen ? (
+        {orderingOpen && !sellable ? (
+          /* Vendor isn't charge-ready, so checkout cannot complete. Neutral
+             copy on purpose — never expose a vendor's payment-account problems
+             to their customers. Pickup details and the waitlist stay so the
+             interest is still captured. */
+          <div>
+            <div className="bg-paper border border-line rounded-card p-10 text-center">
+              <div className="text-4xl">⏸️</div>
+              <h2 className="font-display text-xl font-semibold mt-3">
+                Not accepting orders right now
+              </h2>
+              <p className="text-muted mt-2">
+                {drop.seller.storeName} has paused ordering for this drop. Sign up below
+                and we&apos;ll let you know the moment it reopens.
+              </p>
+            </div>
+            {pickupBlock}
+            <div className="mt-6 max-w-md mx-auto text-left">
+              <WaitlistForm
+                sellerId={drop.sellerId}
+                dropId={drop.id}
+                storeName={drop.seller.storeName}
+                accent={accent}
+                geofence={drop.seller.geofenceEnabled}
+              />
+            </div>
+          </div>
+        ) : orderingOpen ? (
           <>
             <StorefrontOrder
               dropId={drop.id}

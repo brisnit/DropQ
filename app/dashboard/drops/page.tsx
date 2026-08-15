@@ -6,6 +6,7 @@ import { formatMoney, formatDate, statusStyle } from "@/lib/format";
 import { PageHeader, EmptyState, Section } from "@/components/dashboard-ui";
 import { LinkButton, Badge } from "@/components/ui";
 import { ConfirmSubmit } from "@/components/confirm-submit";
+import { StripeRequiredBanner } from "@/components/stripe-required-banner";
 import { effectivePlan, canCreateDrop, dropsRemaining, STARTER_DROP_LIMIT } from "@/lib/plans";
 
 export const metadata = { title: "Drops — DropQ" };
@@ -43,6 +44,7 @@ export default async function DropsPage() {
 
   return (
     <Section>
+      <StripeRequiredBanner seller={seller} />
       <PageHeader
         title="Drops"
         subtitle="A regular drop is a preorder window. A live drop takes on-site orders via QR in real time."

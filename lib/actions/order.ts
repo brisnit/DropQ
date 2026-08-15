@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getStripe, calcFeeCents } from "@/lib/stripe";
+import { isVendorSellable } from "@/lib/payments";
 import { sendEmail, orderReceivedEmail } from "@/lib/email";
 import { orderMailPickup, pickupSummary } from "@/lib/pickup";
 import { dropMapsUrl } from "@/lib/maps";
@@ -63,6 +64,15 @@ export async function placeOrderAction(
   // The marketing showcase is a visual demo only — never takes real orders.
   if (isDemoStore(drop.seller))
     return { error: "This is a demo storefront. Sign up free to open your own store and take real orders!" };
+  // GOVERNING PLATFORM RULE: DropQ vendors sell through Stripe or not at all.
+  // Without this, a vendor who isn't charge-ready falls through to the local-dev
+  // branch below and takes a real, free, inventory-consuming order. That happens
+  // both to vendors who never onboarded AND — via the account.updated webhook —
+  // to established vendors whose charges Stripe disables mid-drop.
+  // Deliberately vendor-neutral copy: never expose a vendor's account problems
+  // to their customers.
+  if (!isVendorSellable(drop.seller))
+    return { error: "This store isn't accepting orders right now." };
 
   // Build line items from server-trusted prices + inventory
   const lines: { product: (typeof drop.products)[number]; qty: number }[] = [];
@@ -85,15 +95,13 @@ export async function placeOrderAction(
 
   // Order source: a live-selling drop produces "live" (on-site QR) orders.
   const source = drop.mode === "live" ? "live" : "online";
-  // Live customers can choose to pay in person (cash/card at the booth).
-  const payInPerson = String(formData.get("payInPerson") ?? "") === "1";
 
+  // There is no customer-facing way to opt out of paying. The isVendorSellable
+  // guard above means this is false ONLY when the platform has no Stripe key,
+  // i.e. local dev.
   const stripe = getStripe();
   const useStripe =
-    !!stripe &&
-    drop.seller.stripeChargesEnabled &&
-    !!drop.seller.stripeAccountId &&
-    !payInPerson;
+    !!stripe && drop.seller.stripeChargesEnabled && !!drop.seller.stripeAccountId;
 
   // Give the buyer a durable Customer identity at checkout so messaging works
   // from their very first order. Never blocks the sale — if this fails the
@@ -219,7 +227,14 @@ export async function placeOrderAction(
     redirect(session.url!);
   }
 
-  // ----- Demo mode (no Stripe configured): finalize immediately -----
+  // ----- LOCAL DEV ONLY: no platform Stripe key. Finalize immediately. -----
+  //
+  // UNREACHABLE IN PRODUCTION. STRIPE_SECRET_KEY is always set there, so
+  // isVendorSellable() above has already rejected any vendor who isn't
+  // charge-ready. This branch exists so seeding and manual testing work on a
+  // machine with no Stripe key — it must never become a fallback for a real
+  // vendor, because it creates a confirmed, fulfillable, inventory-consuming
+  // order for which no money was requested.
   const order = await prisma
     .$transaction(async (tx) => {
       // Atomic conditional claim per item — no read-then-write race. If any

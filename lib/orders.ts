@@ -42,9 +42,21 @@ export function orderStatusStyle(s: string): string {
   return ORDER_STATUS_STYLE[s] ?? "bg-line text-ink-soft";
 }
 
+// Payment states. "unpaid" used to render as "Pay in person", which was
+// misleading: it describes an order nobody has paid for, not an agreed payment
+// arrangement. DropQ takes card payment through Stripe — there is no
+// pay-in-person option. refunded / refund_pending / expired are all written by
+// lib/checkout.ts and previously fell through to the raw string.
 export function paymentLabel(p: string): string {
   return (
-    { paid: "Paid", unpaid: "Pay in person", pending: "Awaiting payment" }[p] ?? p
+    {
+      paid: "Paid",
+      unpaid: "Unpaid",
+      pending: "Awaiting payment",
+      refund_pending: "Refund pending",
+      refunded: "Refunded",
+      expired: "Expired",
+    }[p] ?? p
   );
 }
 
@@ -54,6 +66,9 @@ export function paymentStyle(p: string): string {
       paid: "bg-sage-tint text-sage",
       unpaid: "bg-quad/15 text-tertiary",
       pending: "bg-line text-muted",
+      refund_pending: "bg-line text-muted",
+      refunded: "bg-brand-tint text-brand-dark",
+      expired: "bg-line text-muted",
     }[p] ?? "bg-line text-muted"
   );
 }

@@ -23,16 +23,20 @@ import { Countdown } from "@/components/countdown";
 import { computeDropPhase } from "@/lib/drop-status";
 import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 import { BackLink } from "@/components/back-link";
+import { StripeRequiredBanner } from "@/components/stripe-required-banner";
 import { DropCommunicationSection } from "@/components/drop-communication";
 import { MessageCustomerButton } from "@/components/message-customer-button";
 import { dropCommunicationSummary } from "@/lib/messaging";
 
 export default async function DropDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ stripe_required?: string }>;
 }) {
   const { id } = await params;
+  const { stripe_required: stripeRequired } = await searchParams;
   const seller = await requireSeller();
 
   const drop = await prisma.drop.findUnique({
@@ -83,6 +87,13 @@ export default async function DropDetailPage({
 
   return (
     <Section>
+      <StripeRequiredBanner seller={seller} />
+      {stripeRequired && (
+        <div className="mb-6 rounded-card bg-brand-tint border border-brand/40 px-4 py-3 text-sm text-brand-dark">
+          <b>Saved as a draft.</b> A drop can only go live once Stripe can take
+          card payments for your store — everything you entered has been kept.
+        </div>
+      )}
       <BackLink href="/dashboard/drops">Back to drops</BackLink>
 
       {/* Header */}

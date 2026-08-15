@@ -79,7 +79,10 @@ export default async function OrderConfirmationPage({
   const cta = vendorPalette(accent).vendor_cta_color;
   const pending = order.status === "pending";
   const paidWithStripe = !!order.stripeSessionId && !pending;
-  const payInPerson = order.paymentStatus === "unpaid" && order.source === "live";
+  // Legacy/local-dev orders that were never paid. DropQ no longer offers a
+  // pay-in-person option, so this must not imply one was agreed — historical
+  // unpaid orders (see the Casa Makulay order) are simply unpaid.
+  const unpaid = order.paymentStatus === "unpaid";
   const itemsSum = order.items.reduce((s, it) => s + it.priceCents * it.quantity, 0);
   const serviceFee = Math.max(0, order.totalCents - itemsSum);
 
@@ -287,8 +290,8 @@ export default async function OrderConfirmationPage({
         <p className="text-center text-xs text-muted mt-5">
           {paidWithStripe
             ? "Paid securely with Stripe."
-            : payInPerson
-              ? "Pay the seller in person."
+            : unpaid
+              ? `Contact ${order.seller.storeName} about payment for this order.`
               : "Demo order — no payment taken."}
         </p>
 

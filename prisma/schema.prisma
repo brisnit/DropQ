@@ -391,7 +391,10 @@ model Order {
   feeCents   Int      @default(0) // DropQ platform fee taken from this order
   status     String   @default("new") // pending | new | in_progress | ready | completed | canceled (legacy: fulfilled)
   source     String   @default("online") // online (preorder/regular drop) | live (live QR / on-site POS)
-  paymentStatus String @default("unpaid") // unpaid (pay in person) | pending (awaiting Stripe) | paid
+  // unpaid | pending (Stripe session open) | paid | refund_pending | refunded | expired
+  // DropQ takes card payment through Stripe only — there is no pay-in-person
+  // option. "unpaid" means nobody has paid, not an agreed arrangement.
+  paymentStatus String @default("unpaid")
   // Stripe
   stripeSessionId       String? @unique
   stripePaymentIntentId String?

@@ -27,7 +27,6 @@ function SubmitBtn({
   total,
   accent,
   outline = false,
-  payInPerson = false,
 }: {
   label: string;
   busy: string;
@@ -35,19 +34,16 @@ function SubmitBtn({
   total: number;
   accent: string;
   outline?: boolean;
-  payInPerson?: boolean;
 }) {
   const { pending } = useFormStatus();
   const [hover, setHover] = useState(false);
   const disabled = pending || count === 0;
-  const extra = payInPerson ? { name: "payInPerson", value: "1" } : {};
   // `accent` here is already the accessible CTA color; darken a touch on hover.
   const hoverBg = darkenColor(accent, 0.08);
   if (outline) {
     return (
       <button
         type="submit"
-        {...extra}
         disabled={disabled}
         style={{ borderColor: accent, color: accent }}
         className="w-full font-semibold rounded-xl py-3 border-2 bg-paper disabled:opacity-50 transition active:scale-[0.99] hover:bg-cream"
@@ -59,7 +55,6 @@ function SubmitBtn({
   return (
     <button
       type="submit"
-      {...extra}
       disabled={disabled}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
@@ -405,28 +400,21 @@ export function StorefrontOrder({
           <p className="text-sm text-brand-dark bg-brand-tint rounded-lg px-3 py-2">{state.error}</p>
         )}
 
-        {live && paymentsEnabled ? (
-          <div className="space-y-2">
-            <SubmitBtn label="Pay now" busy="Redirecting…" count={count} total={total} accent={cta} />
-            <SubmitBtn label="Pay in person" busy="Placing order…" count={count} total={total} accent={cta} outline payInPerson />
-          </div>
-        ) : (
-          <SubmitBtn
-            label={paymentsEnabled ? "Continue to payment" : live ? "Place order — pay in person" : "Place order"}
-            busy={paymentsEnabled ? "Redirecting…" : "Placing order…"}
-            count={count}
-            total={total}
-            accent={cta}
-          />
-        )}
+        {/* One path only. Every DropQ order is paid by card through Stripe —
+            there is no pay-in-person / pay-later option, and this form is only
+            ever rendered for a charge-ready vendor (the page checks
+            isVendorSellable before mounting it). */}
+        <SubmitBtn
+          label={paymentsEnabled ? "Continue to payment" : "Place order"}
+          busy={paymentsEnabled ? "Redirecting…" : "Placing order…"}
+          count={count}
+          total={total}
+          accent={cta}
+        />
         <p className="text-xs text-muted text-center">
           {paymentsEnabled
-            ? live
-              ? "🔒 Pay now with Stripe, or pay in person at checkout."
-              : "🔒 Secure checkout powered by Stripe."
-            : live
-              ? "Order now, pay the seller in person."
-              : "Demo checkout — no real payment is taken."}
+            ? "🔒 Secure checkout powered by Stripe."
+            : "Demo checkout — no real payment is taken."}
         </p>
       </div>
     </form>

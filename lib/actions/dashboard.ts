@@ -24,6 +24,7 @@ import { dropMapsUrl } from "@/lib/maps";
 import { geocode } from "@/lib/geofence";
 import { canCreateDrop } from "@/lib/plans";
 import { ORDER_STATUSES } from "@/lib/orders";
+import { resolveDropStatus } from "@/lib/payments";
 import { SOCIALS, normalizeSocialUrl } from "@/lib/social";
 
 async function baseUrl(): Promise<string> {
@@ -338,7 +339,10 @@ export async function createDropAction(formData: FormData) {
   const liveMode = String(formData.get("mode") ?? "preorder") === "live";
   const statusRaw = String(formData.get("status") ?? "draft");
   // Live drops open immediately; regular drops honor the chosen status.
-  const status = liveMode || statusRaw === "live" ? "live" : "draft";
+  const requested = liveMode || statusRaw === "live" ? "live" : "draft";
+  // Stripe gate: a vendor who can't take payment can still build the drop, but
+  // it is saved as a draft rather than published. Nothing they entered is lost.
+  const { status, blocked: stripeBlocked } = resolveDropStatus(requested, "draft", seller);
 
   const now = new Date();
   const opensAt = formData.get("opensAt")
@@ -413,7 +417,7 @@ export async function createDropAction(formData: FormData) {
   });
 
   revalidatePath("/dashboard/drops");
-  redirect(`/dashboard/drops/${drop.id}`);
+  redirect(`/dashboard/drops/${drop.id}${stripeBlocked ? "?stripe_required=1" : ""}`);
 }
 
 // Full edit: updates the drop in place (never duplicates) and syncs its items.
@@ -425,7 +429,9 @@ export async function updateDropFullAction(formData: FormData) {
 
   const title = String(formData.get("title") ?? "").trim();
   const statusRaw = String(formData.get("status") ?? drop.status);
-  const status = ["draft", "live", "closed"].includes(statusRaw) ? statusRaw : drop.status;
+  // Stripe gate: publishing needs a charge-ready vendor. Taking a drop down
+  // (live -> closed/draft) is always allowed — see resolveDropStatus.
+  const { status, blocked: stripeBlocked } = resolveDropStatus(statusRaw, drop.status, seller);
   const opensAt = formData.get("opensAt") ? new Date(String(formData.get("opensAt"))) : drop.opensAt;
   const closesAt = formData.get("closesAt") ? new Date(String(formData.get("closesAt"))) : drop.closesAt;
   const pickup = parsePickup(formData);
@@ -515,15 +521,22 @@ export async function updateDropFullAction(formData: FormData) {
   revalidatePath("/dashboard/drops");
   revalidatePath(`/s/${seller.slug}`);
   revalidatePath(`/s/${seller.slug}/${dropId}`);
-  redirect(`/dashboard/drops/${dropId}`);
+  redirect(`/dashboard/drops/${dropId}${stripeBlocked ? "?stripe_required=1" : ""}`);
 }
 
 export async function updateDropStatusAction(formData: FormData) {
   const seller = await requireSeller();
   const dropId = String(formData.get("dropId"));
-  const status = String(formData.get("status"));
+  const statusRaw = String(formData.get("status"));
   const drop = await prisma.drop.findUnique({ where: { id: dropId } });
   if (!drop || drop.sellerId !== seller.id) return;
+  // Whitelist + Stripe gate. This action used to write the raw form value, so
+  // any string at all could land in Drop.status.
+  const { status, blocked: stripeBlocked } = resolveDropStatus(statusRaw, drop.status, seller);
+  if (stripeBlocked) {
+    redirect(`/dashboard/drops/${dropId}?stripe_required=1`);
+  }
+  if (status === drop.status) return;
   await prisma.drop.update({ where: { id: dropId }, data: { status } });
   revalidatePath(`/dashboard/drops/${dropId}`);
   revalidatePath("/dashboard/drops");
