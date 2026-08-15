@@ -6,6 +6,7 @@ import { sendEmail, orderReceivedEmail } from "@/lib/email";
 import { sendSms } from "@/lib/notifications";
 import { sendGatedSms } from "@/lib/sms-gate";
 import { createCommissionForOrder } from "@/lib/commission";
+import { recordRelationship } from "@/lib/attribution";
 import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 
 // Header-free base URL — finalizePaidOrder runs from webhooks and cron sweeps
@@ -101,6 +102,24 @@ export async function finalizePaidOrder(
     await awardPointsForOrder(orderId).catch((e) =>
       console.error("awardPointsForOrder failed:", e)
     );
+  }
+
+  // Customer↔vendor purchase relationship. This lives HERE, not at checkout,
+  // because reaching checkout is not buying: an abandoned Stripe session used
+  // to increment CustomerVendor.orderCount and set firstPurchaseAt for someone
+  // who never paid (it happened in production on 2026-08-15). The atomic
+  // pending-claim above guarantees this block runs exactly once per order, so a
+  // webhook retry cannot double-count. Same rule for online and walk-up — there
+  // is one definition of a purchase. Never throws: a relationship-bookkeeping
+  // failure must not cost the buyer their confirmation email.
+  if (result.state === "ok" && result.order?.customerId) {
+    await recordRelationship({
+      customerId: result.order.customerId,
+      sellerId: result.order.sellerId,
+      source: "purchase",
+      // Buying is not consent to be marketed to — no implicit follow.
+      purchase: { at: new Date(), amountCents: result.order.totalCents },
+    }).catch((e) => console.error("recordRelationship failed:", e));
   }
 
   // Sales-rep commission — created exactly once (the atomic paid-claim above

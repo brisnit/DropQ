@@ -4,6 +4,8 @@ import { prisma } from "@/lib/db";
 import { canStartInPersonSale, isVendorSellable } from "@/lib/payments";
 import {
   isWalkUpEnabled,
+  linesFromJson,
+  snapshotToOrderItems,
   newWalkUpToken,
   validateWalkUpLines,
   walkUpExpiry,
@@ -402,7 +404,10 @@ export async function GET() {
     check("C2 the builder has no second create path", !/sessions\.create/.test(builderCode));
     check("C2 the builder imports Stripe types only",
       /import type Stripe from "stripe"/.test(readFileSync("lib/checkout-session.ts", "utf8")));
-    check("C2 nothing else consumes the builder yet", (() => {
+    // Superseded by Phase E: pay.ts is the second consumer, which is exactly
+    // what C2 existed to make possible. The invariant now is that BOTH flows go
+    // through the one builder and nobody hand-rolls session params.
+    check("C2 the builder is shared by online checkout and walk-up, and only those", (() => {
       const hits: string[] = [];
       const walk = (dir: string) => {
         for (const e of require("node:fs").readdirSync(dir, { withFileTypes: true })) {
@@ -414,8 +419,11 @@ export async function GET() {
         }
       };
       ["lib", "app", "components"].forEach(walk);
-      return hits.filter((h) => !h.endsWith("lib/checkout-session.ts")).length === 1 &&
-        hits.some((h) => h.endsWith("lib/actions/order.ts"));
+      const consumers = hits.filter((h) => !h.endsWith("lib/checkout-session.ts")).sort();
+      return JSON.stringify(consumers) === JSON.stringify([
+        "lib/actions/order.ts",
+        "lib/actions/pay.ts",
+      ]);
     })());
   }
 
@@ -620,6 +628,113 @@ export async function GET() {
     check("D no inventory was touched", typeof prod!.sold === "number");
   }
 
+  /* ------------------------ Phase E: conversion -------------------------- */
+  {
+    const SNAP = [
+      { productId: "p1", name: "Donut", priceCents: 650, quantity: 2 },
+      { productId: "p2", name: "Sticker", priceCents: 500, quantity: 1 },
+    ];
+    check("E snapshot maps straight to OrderItem shape",
+      JSON.stringify(snapshotToOrderItems(SNAP)) === JSON.stringify(SNAP));
+    check("E quoted price survives a later Product price change", (() => {
+      // Product is now $9.99; the snapshot still bills the quoted $6.50.
+      const items = snapshotToOrderItems(SNAP);
+      return items[0].priceCents === 650;
+    })());
+    check("E total is computed from the snapshot, not from Product",
+      walkUpTotalCents(SNAP) === 1800);
+    check("E linesFromJson tolerates a malformed column",
+      linesFromJson(null).length === 0 && linesFromJson({}).length === 0);
+
+    const pay = readFileSync("lib/actions/pay.ts", "utf8");
+    check("E conversion reuses the C2 builder — no second Stripe config",
+      /buildCheckoutSessionParams\(\{/.test(pay) &&
+      !/mode: "payment"/.test(pay) && !/application_fee_amount/.test(pay));
+    check("E creates the order pending/pending — what finalizePaidOrder expects",
+      /status: "pending",\s*\n\s*paymentStatus: "pending"/.test(pay));
+    check("E stamps source in_person", /source: "in_person"/.test(pay));
+    check("E claims the sale INSIDE the order transaction",
+      pay.indexOf("prisma.$transaction") < pay.indexOf("walkUpSale.updateMany") &&
+      pay.indexOf("walkUpSale.updateMany") < pay.indexOf("ALREADY_CONVERTED"));
+    check("E the claim predicate requires an unconverted, uncanceled sale",
+      /orderId: null, canceledAt: null/.test(pay));
+    check("E the losing racer creates no order (throws inside the txn)",
+      /throw new Error\("ALREADY_CONVERTED"\)/.test(pay));
+    check("E refuses a non-open sale before doing anything",
+      pay.indexOf('walkUpSaleState(existing) !== "open"') < pay.indexOf("$transaction"));
+    check("E requires first name and email, not phone",
+      /if \(!firstName\) return/.test(pay) && /Please add a valid email/.test(pay) &&
+      !/if \(!phone\) return/.test(pay));
+    check("E never reads a price from the request",
+      !/formData\.get\("price/.test(pay) && !/priceCents.*formData/.test(pay));
+    check("E never reads customerId from the request",
+      !/formData\.get\("customerId/.test(pay));
+    check("E checks the feature flag on the public path",
+      /if \(!isWalkUpEnabled\(\)\)/.test(pay));
+    check("E uses the existing upsertCustomer, not a parallel identity path",
+      /upsertCustomer\(\{ email, name: firstName, phone \}\)/.test(pay));
+    check("E attributes acquisition as in_person, never qr",
+      /source: "in_person"/.test(pay) && !/source: "qr"/.test(pay));
+    check("E cancelUrl returns to the pay page, not a storefront",
+      /cancelUrl: `\$\{base\}\/pay\/\$\{token\}\?canceled=1`/.test(pay));
+
+    const page = readFileSync("app/pay/[token]/page.tsx", "utf8");
+    check("E /pay 404s when the flag is off",
+      /if \(!isWalkUpEnabled\(\)\) notFound\(\)/.test(page));
+    check("E expired and canceled tokens create nothing",
+      /state === "expired"/.test(page) && /state === "canceled"/.test(page) &&
+      !/order\.create/.test(page));
+    check("E an already-converted token resumes rather than erroring",
+      /Finish your payment/.test(page) && /sessions\.retrieve/.test(page));
+    check("E a paid token says so instead of charging again",
+      /already paid/i.test(page));
+
+    const status = readFileSync("app/api/walkup/[id]/status/route.ts", "utf8");
+    check("E vendor status is seller-owned",
+      /getCurrentSeller\(\)/.test(status) && /sale\.sellerId !== seller\.id/.test(status));
+    check("E 'paid' derives from Order.paymentStatus, never a Stripe redirect",
+      /ps === "paid" \? "paid"/.test(status));
+    check("E refunded/oversold is a distinct vendor state",
+      /"refunded"/.test(status));
+    check("E status endpoint honours the flag", /isWalkUpEnabled\(\)/.test(status));
+  }
+
+  /* ------- Phase E: relationship timing (the Isabelle defect) ------------ */
+  {
+    const co = readFileSync("lib/checkout.ts", "utf8");
+    const ord = readFileSync("lib/actions/order.ts", "utf8");
+    check("E purchase relationship now lives in finalizePaidOrder",
+      /recordRelationship\(\{/.test(co));
+    check("E it is gated on the winning claim (state ok)",
+      co.lastIndexOf('result.state === "ok"', co.indexOf("recordRelationship({")) > -1);
+    check("E a webhook retry cannot double-count it",
+      co.indexOf('if (claimed.count === 0) return { state: "done"') <
+        co.indexOf("recordRelationship({"));
+    check("E checkout no longer records a purchase before payment",
+      !/recordRelationship\(\{/.test(ord));
+    check("E applyFirstTouch STAYS at checkout — arriving is not buying",
+      /applyFirstTouch\(customerId/.test(ord));
+    check("E relationship failure cannot break the receipt",
+      /recordRelationship[\s\S]{0,320}\.catch\(/.test(co));
+    check("E one definition of a purchase — walk-up does not duplicate it",
+      !/recordRelationship/.test(readFileSync("lib/actions/pay.ts", "utf8")));
+  }
+
+  /* ------------------ Phase E: Order.source normalization ---------------- */
+  {
+    const ord = readFileSync("lib/actions/order.ts", "utf8");
+    check("E online checkout is always source online",
+      /const source = "online";/.test(ord));
+    check("E drop.mode no longer determines the channel",
+      !/drop\.mode === "live" \? "live"/.test(ord));
+    const orders = readFileSync("app/dashboard/orders/page.tsx", "utf8");
+    check("E the vendor badge shows in_person, not the retired live value",
+      /source === "in_person"/.test(orders) && !/source === "live"/.test(orders));
+    const attr = readFileSync("lib/attribution.ts", "utf8");
+    check("E TouchSource gained in_person and kept qr distinct",
+      /"in_person"/.test(attr) && /"qr"/.test(attr));
+  }
+
   /* --------------------- C1 is inert: prove it stays so ------------------ */
   {
     const app = ["lib", "app", "components"];
@@ -662,8 +777,11 @@ export async function GET() {
       (orderSrc.match(/sessions\.create\(/g) ?? []).length === 1);
     check("C1 did not move recordRelationship (still a Phase E concern)",
       orderSrc.indexOf("recordRelationship") < orderSrc.indexOf("useStripe && stripe"));
-    check("C1 did not change Order.source derivation",
-      /const source = drop\.mode === "live" \? "live" : "online";/.test(orderSrc));
+    // Superseded by Phase E, which deliberately normalized this: channel is no
+    // longer derived from drop.mode. See the Phase E source assertions above.
+    check("Order.source is the purchase channel, not the drop type",
+      /const source = "online";/.test(orderSrc) &&
+      !/drop\.mode === "live" \? "live"/.test(orderSrc));
     check("C1 created no lib/reporting.ts (that belongs to Phase G)", (() => {
       try { readFileSync("lib/reporting.ts", "utf8"); return false; } catch { return true; }
     })());

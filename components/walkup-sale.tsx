@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { formatMoney } from "@/lib/format";
 import { startWalkUpSaleAction } from "@/lib/actions/walkup";
@@ -143,4 +143,83 @@ export function WalkUpSaleStarter({
     );
   }
   return <WalkUpCart dropId={dropId} products={products} onCancel={() => setOpen(false)} />;
+}
+
+/* --------------------------- Live status (Phase E) ------------------------- */
+
+type StatusPayload = {
+  state: "waiting" | "customer_paying" | "paid" | "refunded" | "expired" | "canceled";
+  orderId: string | null;
+  totalCents: number | null;
+  done: boolean;
+};
+
+const LABEL: Record<StatusPayload["state"], { text: string; cls: string }> = {
+  waiting: { text: "Waiting for the customer…", cls: "bg-line text-ink-soft" },
+  customer_paying: { text: "Customer is paying…", cls: "bg-quad/15 text-tertiary" },
+  paid: { text: "✓ Paid", cls: "bg-sage-tint text-sage" },
+  refunded: { text: "Sold out — refunded", cls: "bg-brand-tint text-brand-dark" },
+  expired: { text: "Expired", cls: "bg-line text-muted" },
+  canceled: { text: "Canceled", cls: "bg-line text-muted" },
+};
+
+/**
+ * Polls the seller-owned status endpoint every 3s, the same pattern
+ * `components/live-orders.tsx` already uses.
+ *
+ * ⚠️ "Paid" comes from `Order.paymentStatus`, which only `finalizePaidOrder`
+ * sets — never from the customer returning from Stripe. In the oversell case
+ * the charge succeeds and the order is then canceled and refunded, so a
+ * redirect-based "Paid" would tell the vendor to hand over goods they no
+ * longer have.
+ */
+export function WalkUpStatus({
+  saleId,
+  initialState,
+}: {
+  saleId: string;
+  initialState: StatusPayload["state"];
+}) {
+  const [status, setStatus] = useState<StatusPayload["state"]>(initialState);
+  const [orderId, setOrderId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/walkup/${saleId}/status`, { cache: "no-store" });
+        if (!res.ok || !active) return;
+        const d = (await res.json()) as StatusPayload;
+        setStatus(d.state);
+        setOrderId(d.orderId);
+        if (d.done && timer) clearInterval(timer);
+      } catch {
+        /* transient — keep polling */
+      }
+    };
+    timer = setInterval(poll, 3000);
+    void poll();
+    return () => {
+      active = false;
+      if (timer) clearInterval(timer);
+    };
+  }, [saleId]);
+
+  const l = LABEL[status];
+  return (
+    <div className="flex flex-wrap items-center gap-2 mt-3">
+      <span className={`inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-pill ${l.cls}`}>
+        {status === "waiting" || status === "customer_paying" ? (
+          <span className="w-1.5 h-1.5 rounded-full bg-current live-dot" />
+        ) : null}
+        {l.text}
+      </span>
+      {status === "paid" && orderId && (
+        <a href={`/dashboard/orders`} className="text-sm font-medium underline">
+          See the order
+        </a>
+      )}
+    </div>
+  );
 }

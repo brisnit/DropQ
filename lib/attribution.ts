@@ -22,7 +22,19 @@ import { prisma } from "@/lib/db";
 const TOUCH_COOKIE = "dq_touch";
 const TOUCH_MAX_AGE = 60 * 60 * 24 * 30; // 30 days to convert
 
-export type TouchSource = "storefront" | "drop" | "qr" | "dropmeet" | "checkout" | "direct" | "admin";
+/**
+ * How a customer first reached DropQ.
+ *
+ * ⚠️ `qr` and `in_person` are NOT the same thing and must never be merged:
+ *   qr        — they scanned a drop/share QR and self-ordered ONLINE
+ *               (set by middleware.ts from ?ref=qr / utm_source=qr)
+ *   in_person — they were physically with the vendor and entered DropQ through
+ *               a vendor-initiated walk-up sale
+ * Phase 8's acquisition funnel depends on telling those apart.
+ */
+export type TouchSource =
+  | "storefront" | "drop" | "qr" | "dropmeet" | "checkout" | "direct" | "admin"
+  | "in_person";
 
 export type FirstTouch = {
   /// Middleware writes the slug (edge runtime, no Prisma). Server callers may

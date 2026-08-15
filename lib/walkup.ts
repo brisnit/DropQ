@@ -172,3 +172,27 @@ export function validateWalkUpLines(
 export function walkUpTotalCents(lines: WalkUpLine[]): number {
   return lines.reduce((s, l) => s + l.priceCents * l.quantity, 0);
 }
+
+/* --------------------------- Snapshot → Order ----------------------------- */
+
+/**
+ * The quoted cart becomes the order's line items.
+ *
+ * ⚠️ SETTLED RULE: the price in `lines` is authoritative for this transaction.
+ * If the vendor said "thirteen dollars", editing the Product price afterwards
+ * must not change that customer's bill. Product identity and *inventory* stay
+ * live — only the price is frozen.
+ */
+export function snapshotToOrderItems(lines: WalkUpLine[]) {
+  return lines.map((l) => ({
+    productId: l.productId,
+    name: l.name,
+    priceCents: l.priceCents,
+    quantity: l.quantity,
+  }));
+}
+
+/** Parse the Json column back into typed lines. */
+export function linesFromJson(value: unknown): WalkUpLine[] {
+  return (Array.isArray(value) ? value : []) as WalkUpLine[];
+}

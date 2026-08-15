@@ -2293,3 +2293,305 @@ Both were assertions, not product code, and both recur:
 the 3s status poll and `GET /api/walkup/[id]/status` (nothing to poll until a
 payment can happen), customer identity, DropPoints, `CustomerVendor`, and the
 snapshot-vs-live-price conversion policy.
+
+---
+
+## 23. Phase E — customer pay page (PROPOSED, awaiting approval)
+
+Verified against the repo at `7992f4b`. No code written.
+
+### 23.1 Customer journey
+
+```
+QR (vendor screen) → /pay/{token}
+  → sale state checked: open | expired | canceled | converted
+  → OPEN: vendor brand, items, quoted prices, total, ONE required field (email)
+  → submit → single transaction: create pending Order + atomically claim the sale
+  → buildCheckoutSessionParams() → stripe.checkout.sessions.create({ stripeAccount })
+  → redirect to Stripe (vendor is merchant of record, direct charge)
+  → customer pays
+  → webhook / success page → finalizePaidOrder()   ← UNCHANGED
+      claims stock · OrderEvent · DropPoints · commission · confirmation email
+  → /order/{id} success page, with the existing ClaimOrderPanel
+  → vendor's panel flips to Paid (poll)
+```
+
+Everything after `sessions.create` is the existing online pipeline, untouched.
+
+### 23.2 `/pay/{token}` — exactly one required field
+
+**Required: `email`.** Nothing else is genuinely required by the architecture:
+
+| Field | Actually required? |
+|---|---|
+| `Order.buyerEmail` | **yes** — NOT NULL, and the receipt goes there |
+| `Order.buyerName` | **NOT NULL in schema**, consumed as `buyerName.split(" ")[0]` in every email/SMS — see §23.3 |
+| `Order.buyerPhone` | nullable; SMS is consent-gated and 0 customers hold consent |
+| `Customer` | `upsertCustomer` needs only email; name/phone are optional patches |
+| Stripe | `customer_email` only |
+
+Mobile-first, terminal-like: vendor logo and store name, the line items with
+**quoted** prices, the total, one email field, a full-width **Pay $13.00**
+button, and "Secure payment through DropQ · powered by Stripe". Name and phone
+are optional and collapsed behind "Add contact details (optional)". No address,
+no account, no password.
+
+If a customer session already exists (`getCurrentCustomer()`), prefill the email
+and skip straight to Pay.
+
+### 23.3 ⚠️ `Order.buyerName` is NOT NULL — a decision is needed
+
+An empty string renders "Hi ," in the confirmation email
+(`lib/checkout.ts:117`, `:177`, `lib/drop-close.ts:65`).
+
+Options:
+
+| | Cost |
+|---|---|
+| **A. Email only; `buyerName` = email local-part** *(recommended)* | one field at the booth; receipts read "Hi isabelle"; `Customer.name` stays **null** rather than inventing one |
+| B. Require name too | two fields; slower at a booth |
+| C. Make `buyerName` nullable | schema change + ~8 call sites |
+
+**Recommend A** — fastest for the real situation, no schema change, and the
+durable `Customer.name` is left honestly empty. **Your call.**
+
+### 23.4 `WalkUpSale → Order` — the exact transaction
+
+```ts
+const order = await prisma.$transaction(async (tx) => {
+  const sale = await tx.walkUpSale.findUnique({ where: { token } });
+  if (!sale || walkUpSaleState(sale) !== "open") throw new NotOpen(state);
+
+  const order = await tx.order.create({ data: {
+    dropId: sale.dropId, sellerId: sale.sellerId,
+    buyerName, buyerEmail, buyerPhone, customerId,
+    totalCents,            // from the SNAPSHOT
+    feeCents,              // calcFeeCents(snapshot items)
+    status: "pending", paymentStatus: "pending",
+    source: "in_person",
+    events: { create: { type: "created", detail: "in_person" } },
+    items: { create: snapshotLines },   // name + price from lines, NOT Product
+  }});
+
+  // Atomic claim. Only one scanner can win; the loser's Order is rolled back
+  // with the transaction, so no orphan is left behind.
+  const claimed = await tx.walkUpSale.updateMany({
+    where: { id: sale.id, orderId: null }, data: { orderId: order.id },
+  });
+  if (claimed.count === 0) throw new AlreadyConverted();
+  return order;
+});
+```
+
+Then **outside** the transaction: `buildCheckoutSessionParams()` →
+`sessions.create` → persist `stripeSessionId` → redirect. Identical to online.
+
+The order enters the pipeline as `status: "pending"`, stock unclaimed — exactly
+what `finalizePaidOrder` expects, which C1 pinned and C2 left untouched.
+
+### 23.5 Concurrency
+
+| Race | Guard |
+|---|---|
+| two phones scan simultaneously | the conditional `updateMany` — one wins, the loser's Order rolls back with the transaction |
+| DB backstop | `WalkUpSale.orderId @unique` (Phase B) |
+| double-submit on the form | `useFormStatus` + the claim above |
+| replay of a used token | state is `converted`, handled below |
+
+### 23.6 Already-converted token — recoverable, not an error
+
+Look up the linked Order:
+
+- **paid** → redirect to `/order/{id}` (the normal success page)
+- **pending, Stripe session still `open`** → retrieve the session on the
+  connected account and redirect to `session.url` — the customer resumes
+- **pending, session expired/canceled** → "This payment link expired. Ask the
+  vendor to start a new sale."
+
+**Expired** / **canceled** → a plain message naming the vendor, no Order.
+
+### 23.7 Identity and acquisition — existing architecture only
+
+```ts
+upsertCustomer({ email, name, phone })              // email-keyed, unchanged
+applyFirstTouch(customerId, { vendorId, dropId, source: "in_person", detail: slug })
+```
+
+⚠️ **`TouchSource` is a closed union** (`lib/attribution.ts:25`) —
+`"storefront" | "drop" | "qr" | "dropmeet" | "checkout" | "direct" | "admin"`.
+Adding `"in_person"` is a one-line type change, no schema.
+
+⚠️ **Do not reuse the existing `"qr"` value.** It already means *a customer
+scanned a vendor's drop-share QR and self-ordered online* (set by
+`middleware.ts` from `?ref=qr`). Conflating the two would destroy the very
+distinction this feature exists to measure.
+
+`applyFirstTouch` never overwrites an existing attribution, so a returning
+customer keeps their original source. No touch cookie is involved — the
+fallback argument is passed explicitly, which already works.
+
+Account creation stays **after** payment via the existing `ClaimOrderPanel` on
+`/order/{id}`. No password before paying.
+
+### 23.8 🔴 `recordRelationship` — and a real production instance of the bug
+
+`lib/actions/order.ts:139` records `{ purchase }` **at checkout**, before Stripe.
+Today's flash sale produced the first real casualty:
+
+```
+Isabelle · order canceled/expired · 0 paid orders
+CustomerVendor: orderCount 1 · totalSpentCents 650 · firstPurchaseAt set
+Customer.firstPurchaseAt: set
+```
+
+**A customer who never paid is recorded as having purchased £6.50.** Walk-up
+will make this common — abandonment at a booth is routine.
+
+**Fix: move the `{ purchase }` call into `finalizePaidOrder`'s `state === "ok"`
+block**, which already has `customerId`, `sellerId` and `totalCents`, and which
+runs exactly once per paid order. One definition of a purchase, both flows.
+
+- **Leave `applyFirstTouch` where it is.** First touch is acquisition, not
+  purchase — someone who arrived and abandoned genuinely did arrive.
+- **Existing data:** one wrong `CustomerVendor` row and one wrong
+  `Customer.firstPurchaseAt`. Correctable by a small idempotent script, or left
+  as-is. **Flagging, not fixing, in E** — your call.
+- **Regression risk:** `CustomerVendor` counts change meaning (paid-only). The
+  9 historical paid orders are unaffected; only Isabelle's row is currently
+  wrong.
+
+### 23.9 `Order.source` normalization — blast radius is one badge
+
+Production: **`source` is `online` for all 10 orders**; every drop is
+`preorder`; `"live"` has **never been written**.
+
+Consumers, verified: `app/dashboard/orders/page.tsx:85` (a `live` badge) ·
+`drops/[id]/page.tsx:107` and `api/drops/[id]/orders/route.ts:38` pass it into
+`LiveOrders`, whose type declares it but **never renders it**.
+
+Change: `placeOrderAction` writes `"online"` unconditionally (dropping the
+`drop.mode === "live"` derivation); walk-up writes `"in_person"`; the badge
+renders `in_person` instead of `live`. **No migration** — no row holds `live`.
+
+### 23.10 Stripe — reuse, with two deliberate differences
+
+`buildCheckoutSessionParams()` unchanged. Same direct charge, same
+`application_fee_amount`, same `feeMode` behaviour, same metadata on session and
+PaymentIntent, same 60-minute expiry.
+
+| Field | Online | Walk-up | Why |
+|---|---|---|---|
+| `successUrl` | `/order/{id}?session_id=…` | **same** | same success page |
+| `cancelUrl` | back to the drop page | **`/pay/{token}`** | the customer's context is the pay page, not a storefront they never visited |
+
+Prices come from the **snapshot**, per the settled rule: `feeCents =
+calcFeeCents(snapshot items subtotal)`, `passFee` from the seller's current
+`feeMode`.
+
+### 23.11 Inventory and oversell — unchanged, with one real-world risk
+
+Nothing is claimed at QR generation, at `/pay` load, or at Order creation. Stock
+is claimed only by `finalizePaidOrder`'s conditional increment.
+
+**If the last unit sells online while the walk-up customer is in Stripe:** the
+increment matches 0 rows → order auto-cancels → `refundOversoldOrder` refunds
+with `refund_application_fee: true` → apology email. Exactly today's behaviour.
+
+⚠️ **Worth naming: at a booth the vendor may have already handed over the item**
+when they saw "Paid", and the auto-refund then costs them the goods. E does not
+change this (it is the existing, correct oversell policy), but the vendor UI
+should show **Paid** only after `finalizePaidOrder` succeeds — never on the
+Stripe redirect alone.
+
+### 23.12 Vendor status — poll, and every state is genuinely derivable
+
+`GET /api/walkup/[id]/status`, seller-owned, polled every 3s — the same pattern
+`components/live-orders.tsx` already uses.
+
+| Shown | Derived from |
+|---|---|
+| Waiting for customer | sale open, `orderId` null |
+| **Customer is paying** | `orderId` set, order `pending` — genuinely known: the customer submitted the form |
+| Paid | order `paymentStatus === "paid"` |
+| Expired / Canceled | `expiresAt` / `canceledAt` |
+| Sold out — refunded | order `canceled` + `refund_pending`/`refunded` |
+
+No invented states. Polling stops on any terminal state.
+
+### 23.13 QR
+
+`qrcode@1.5.4` is already a dependency and already used server-side at
+`app/dashboard/drops/[id]/page.tsx:64`. **No new library.** Encode
+`payUrlFor(token, base)`, render large (≈320px) for across-a-table scanning,
+with the URL as text plus the existing `ShareButton` for copy/share.
+
+### 23.14 Files
+
+| File | Change |
+|---|---|
+| `app/pay/[token]/page.tsx` | **new** — public pay page |
+| `app/pay/[token]/pay-form.tsx` | **new** — client form |
+| `lib/actions/pay.ts` | **new** — the conversion action |
+| `lib/walkup.ts` | `snapshotToOrderItems()`, `snapshotTotalCents()` |
+| `lib/attribution.ts` | add `"in_person"` to `TouchSource` |
+| `lib/checkout.ts` | **move** `recordRelationship({purchase})` into the `ok` block |
+| `lib/actions/order.ts` | remove the purchase call; `source` → always `"online"` |
+| `app/api/walkup/[id]/status/route.ts` | **new** — seller-owned poll |
+| `components/walkup-sale.tsx` + `drops/[id]/page.tsx` | QR panel + poll |
+| `app/dashboard/orders/page.tsx` | badge `in_person` |
+| tests | Phase E cases |
+
+### 23.15 Schema
+
+**None.** `TouchSource` is a TypeScript union; `Order.source` is a free String;
+`WalkUpSale` already has everything.
+
+### 23.16 Blast radius
+
+- **Flag off ⇒ customers cannot reach any of it.** `/pay/{token}` would resolve,
+  but no vendor can create a sale, so no token exists. **Recommend `/pay` also
+  check `isWalkUpEnabled()`** and 404 when off, so the route is dead until
+  activation.
+- **Touches live online checkout twice**: `Order.source` derivation and the
+  `recordRelationship` move. Both need the zero-live-drops window.
+- `finalizePaidOrder` gains one call inside the existing `ok` block. C1's pins
+  must stay green.
+
+### 23.17 Rollback
+
+Revert. No schema, no data written while the flag is off. If the relationship
+move needs reverting independently it is a self-contained commit.
+
+### 23.18 Test plan
+
+Pure: snapshot→OrderItem mapping keeps quoted price even when `Product` changes
+· fee from snapshot · state gating.
+
+Rolled-back DB: conversion creates exactly one Order `pending`/`pending`,
+`source: "in_person"`, snapshot prices; second concurrent claim gets 0 and its
+Order is rolled back; converted/expired/canceled tokens create nothing;
+`Product.sold` unchanged.
+
+Security: token entropy · unknown token 404 · one vendor cannot read another's
+status endpoint · client price ignored · `customerId` never taken from the
+request · pay token grants no account access.
+
+Regression: `finalizePaidOrder` claim + stock pins (C1) · golden snapshots (C2)
+· phase-a 77/77 · activation 147/147 · online checkout unchanged · abandoned
+checkout no longer increments `CustomerVendor`.
+
+**No real Stripe charge.** Deploy with the flag **off**, verify, then stop for a
+separate activation decision.
+
+### 23.19 Assumptions in the architecture that are wrong
+
+1. **§5.2 said "email required, name optional"** without noticing
+   `Order.buyerName` is NOT NULL. §23.3 resolves it.
+2. **§7 scenario 1 assumed `orderId @unique` alone prevents double conversion.**
+   It prevents two *sales* pointing at one order; the actual race needs the
+   conditional `updateMany` **inside a transaction** so the loser's Order is
+   rolled back (§23.4).
+3. **§5.3 implied `signupSource` just accepts a new value.** `TouchSource` is a
+   closed union, and `"qr"` already exists with a different meaning (§23.7).
+4. **§1.7 called the relationship-timing bug theoretical.** It has now happened
+   in production (§23.8).

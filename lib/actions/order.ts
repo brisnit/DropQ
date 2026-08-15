@@ -14,7 +14,7 @@ import { dropMapsUrl } from "@/lib/maps";
 import { sendSms } from "@/lib/notifications";
 import { isDemoStore } from "@/lib/demo";
 import { upsertCustomer } from "@/lib/customer-auth";
-import { applyFirstTouch, recordRelationship } from "@/lib/attribution";
+import { applyFirstTouch } from "@/lib/attribution";
 import { recordSmsConsent, sendGatedSms } from "@/lib/sms-gate";
 import { DISCLOSURE_VERSION } from "@/lib/sms-consent";
 
@@ -94,8 +94,11 @@ export async function placeOrderAction(
   // What the customer pays. In "pass" mode the DropQ fee is added on top.
   const totalCents = passFee ? itemsCents + feeCents : itemsCents;
 
-  // Order source: a live-selling drop produces "live" (on-site QR) orders.
-  const source = drop.mode === "live" ? "live" : "online";
+  // Purchase CHANNEL, not drop type. A customer self-ordering from a storefront
+  // is "online" whatever mode the drop is in; only a vendor-initiated walk-up
+  // sale is "in_person" (Phase E). Previously this derived from `drop.mode`,
+  // which conflated the two — no production row ever held the old "live" value.
+  const source = "online";
 
   // There is no customer-facing way to opt out of paying. The isVendorSellable
   // guard above means this is false ONLY when the platform has no Stripe key,
@@ -137,13 +140,12 @@ export async function placeOrderAction(
       source: "checkout",
       detail: drop.seller.slug,
     }).catch(() => {});
-    await recordRelationship({
-      customerId,
-      sellerId: drop.sellerId,
-      source: "purchase",
-      // Buying is not consent to be marketed to — no implicit follow.
-      purchase: { at: new Date(), amountCents: totalCents },
-    }).catch(() => {});
+    // NOTE: the purchase relationship is deliberately NOT recorded here.
+    // Reaching checkout is not buying — an abandoned Stripe session used to
+    // increment CustomerVendor.orderCount and set firstPurchaseAt for someone
+    // who never paid. It now happens once, in finalizePaidOrder, for both the
+    // online and walk-up flows. applyFirstTouch stays here: arriving IS
+    // arriving, whether or not they go on to pay.
   }
 
   // ----- Real payments via Stripe Connect (destination charge + platform fee) -----

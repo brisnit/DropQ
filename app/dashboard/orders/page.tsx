@@ -82,7 +82,7 @@ export default async function OrdersPage({
                     <p className="font-medium">{o.buyerName}</p>
                     <Badge className={statusStyle(o.status)}>{orderStatusLabel(o.status)}</Badge>
                     <Badge className={paymentStyle(o.paymentStatus)}>{paymentLabel(o.paymentStatus)}</Badge>
-                    {o.source === "live" && <Badge className="bg-quad/15 text-tertiary">live</Badge>}
+                    {o.source === "in_person" && <Badge className="bg-quad/15 text-tertiary">in person</Badge>}
                   </div>
                   <p className="text-xs text-muted mt-0.5">
                     {o.buyerEmail}

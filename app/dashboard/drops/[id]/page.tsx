@@ -28,7 +28,7 @@ import { loadActivationState, publishGate } from "@/lib/activation";
 import { canStartInPersonSale } from "@/lib/payments";
 import { isWalkUpEnabled, walkUpSaleState, walkUpTotalCents, payUrlFor, WALKUP_TTL_MINUTES, type WalkUpLine } from "@/lib/walkup";
 import { cancelWalkUpSaleAction } from "@/lib/actions/walkup";
-import { WalkUpSaleStarter } from "@/components/walkup-sale";
+import { WalkUpSaleStarter, WalkUpStatus } from "@/components/walkup-sale";
 import { DropCommunicationSection } from "@/components/drop-communication";
 import { MessageCustomerButton } from "@/components/message-customer-button";
 import { dropCommunicationSummary } from "@/lib/messaging";
@@ -81,6 +81,11 @@ export default async function DropDetailPage({
   const host = h.get("host") ?? "localhost:3001";
   const proto = h.get("x-forwarded-proto") ?? "http";
   const shareUrl = `${proto}://${host}/s/${seller.slug}/${drop.id}`;
+  const walkUpQr = walkUpSale
+    ? await QRCode.toDataURL(payUrlFor(walkUpSale.token, `${proto}://${host}`), {
+        width: 440, margin: 1, color: { dark: "#1b1726", light: "#ffffff" },
+      })
+    : null;
   const qrDataUrl = await QRCode.toDataURL(shareUrl, {
     width: 360,
     margin: 1,
@@ -363,22 +368,44 @@ export default async function DropDetailPage({
                   )}
                 </div>
 
-                {/* Deliberately NOT a scannable QR: /pay/{token} lands in
-                    Phase E, and a code that 404s in front of a paying customer
-                    is worse than no feature. The URL is shown as text so the
-                    flow can be verified without anyone scanning it. */}
-                <div className="mt-4 rounded-xl bg-cream/70 border border-line px-4 py-3">
-                  <p className="text-xs uppercase tracking-wider text-muted">
-                    Customer payment link — not live yet
-                  </p>
-                  <p className="font-mono text-xs break-all mt-1">
-                    {payUrlFor(walkUpSale.token, shareUrl.split("/s/")[0])}
-                  </p>
-                  <p className="text-xs text-muted mt-1.5">
-                    The payment page ships in the next release. This cart expires{" "}
-                    {WALKUP_TTL_MINUTES} minutes after it was created.
-                  </p>
-                </div>
+                {/* Phase E: /pay/{token} is live, so the QR is real. Large on
+                    purpose — it gets scanned across a table. */}
+                {state === "open" && (
+                  <div className="mt-4 flex flex-wrap items-center gap-5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={walkUpQr!}
+                      alt="Scan to pay"
+                      width={220}
+                      height={220}
+                      className="w-[220px] h-[220px] rounded-xl border border-line bg-white p-2"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold">Customer scans this to pay</p>
+                      <p className="font-mono text-xs break-all mt-1 text-muted">
+                        {payUrlFor(walkUpSale.token, shareUrl.split("/s/")[0])}
+                      </p>
+                      <div className="mt-2">
+                        <ShareButton
+                          url={payUrlFor(walkUpSale.token, shareUrl.split("/s/")[0])}
+                          title={`Pay ${seller.storeName}`}
+                        />
+                      </div>
+                      <p className="text-xs text-muted mt-2">
+                        Expires {WALKUP_TTL_MINUTES} minutes after it was created.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <WalkUpStatus
+                  saleId={walkUpSale.id}
+                  initialState={
+                    state === "open" ? "waiting"
+                    : state === "canceled" ? "canceled"
+                    : state === "expired" ? "expired"
+                    : "customer_paying"
+                  }
+                />
               </div>
             );
           })()}
