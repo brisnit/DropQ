@@ -20,8 +20,17 @@ resolves but serves someone else's page. Three stale references were fixed.)
   bites this session: `cookies().set()` is Server-Function/Route-Handler only
   (silently no-ops in a page), and `NEXT_PUBLIC_*` is inlined at build time.
 - **Prisma client is generated to `app/generated/prisma`** (not node_modules).
-  Finder/iCloud sometimes leaves `* 2.ts` duplicates there that break `tsc` —
-  delete with `find app/generated -name "* [0-9].*" -delete`.
+  Finder/iCloud sometimes leaves `* 2.ts` duplicates that break `tsc`. They
+  appear in **both `.next` and `app/generated`** — clean both:
+
+  ```
+  find .next app/generated -name "* [0-9].*" -delete
+  ```
+
+  Scanning only `app/generated` is not enough: a real `tsc` failure came from
+  `.next/types/routes.d 2.ts` and `.next/types/cache-life.d 2.ts` (duplicate
+  `PageProps`/`LayoutProps` identifiers), with 19 stale files present in
+  `.next` alone.
 
 ### Authentication — two hand-rolled HMAC cookie systems
 
@@ -520,7 +529,9 @@ See `docs/CUSTOMER-PLATFORM-ROADMAP.md` for the full ordered plan.
   `paymentStatus === "paid"`, which only Stripe sets. §6b item 2 fixes this.
 - ~~All 8 existing paid orders hold 0 DropPoints~~ — **fixed 2026-08-14**, all
   8 backfilled for 112 points (§5d).
-- Stale `* 2.ts` duplicates in `.next`/`app/generated` break `tsc` intermittently
+- Stale `* 2.ts` duplicates in `.next`/`app/generated` break `tsc`
+  intermittently — clear with `find .next app/generated -name "* [0-9].*"
+  -delete` (both directories; see §1)
 
 ---
 
