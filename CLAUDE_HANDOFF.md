@@ -115,6 +115,7 @@ All additive; no data was deleted.
 | `CustomerToken.followSellerId` | follow intent on magic link |
 | **SMS consent columns on `Customer`** | see §4 |
 | **`PointsLedger`** (session 3) | applied via `migrate deploy`, not `db push` |
+| **`WalkUpSale`** (in-person Phase B, 2026-08-15) | `20260815033104_add_walk_up_sale` via `migrate deploy`. One new table, **zero alterations to existing tables**, zero backfill. Inert — nothing writes to it yet. |
 
 ### Backfills run (all idempotent)
 
@@ -510,6 +511,68 @@ that reintroduces the spam.**
 ⚠️ **Not yet observed in production** — it needs Stripe to genuinely disable a
 vendor. Verified by test only. The first real firing logs
 `[stripe] charges disabled — vendor=…` in Vercel.
+
+### Phase B — ✅ SHIPPED: `WalkUpSale` schema foundation (inert)
+
+`20260815033104_add_walk_up_sale`. **One new table. Zero alterations to any
+existing table. Zero backfill. Zero existing rows read or written.**
+
+The walk-up cart is deliberately **not** an Order: when a vendor rings items up
+nobody has identified themselves yet, and `Order.buyerName`/`buyerEmail` are NOT
+NULL. Market abandonment is routine, so throwaway carts stay out of `Order`
+entirely. The Order is created later at `/pay/{token}` once the customer gives
+an email — in the same request as the Stripe session, so a walk-up order enters
+the pipeline in the identical `pending`/stock-unclaimed shape as an online one
+and **`finalizePaidOrder` needs no changes.** That is the point of the design;
+don't undo it.
+
+`orderId @unique` is the conversion boundary — two phones scanning the same QR
+cannot both produce an order. **State is derived, never stored** (`open` /
+`converted` / `canceled` / `expired` fall out of `orderId`, `canceledAt`,
+`expiresAt`), so it cannot contradict itself. There is deliberately no `status`,
+no `totalCents`, no `createdBy`.
+
+⚠️ **`Order.paidAt` was removed from the design.** An earlier draft added it
+while cash was in scope. Evidence against it: all 8 paid orders already carry
+exactly one `OrderEvent(payment, "paid")`, written inside the atomic claim, and
+the created→paid gap is 16–40s so `createdAt` is a fine revenue-date axis. The
+reporting defect is fixed by keying on `paymentStatus`, not by a new column.
+**Don't reintroduce it without new evidence.**
+
+⚠️ **`Drop.allowPayInPerson` never existed.** Several documents discuss removing
+it. There is nothing to remove.
+
+**Verified:** migrate status clean, drift empty, live table/indexes/FKs match the
+reviewed SQL, row count 0, `tsc` + build clean, `test:phase-a` 77/77, no code
+references `WalkUpSale`. **Ten business tables verified unchanged by SHA-256
+content hash.** Constraints proven against the real table inside rolled-back
+transactions — including that **many NULL `orderId`s coexist** (Postgres allows
+multiple NULLs in a unique index), without which concurrent open sales would
+collide.
+
+### ⚠️ Deferred findings recorded during Phase B — do not fix as a side effect
+
+1. **`Order.source` mixes channel with `drop.mode`** (`lib/actions/order.ts:97`).
+   Phase E normalizes: customer self-order = `online`, vendor walk-up =
+   `in_person`. `live` has zero production rows, so retiring it is free.
+2. **🔴 `Order.dropId` cascades on Drop deletion** — `deleteDropAction` destroys
+   that drop's historical **paid** Orders. `PointsLedger` survives only because
+   it deliberately has no FK. **Pre-existing**, needs its own data-retention
+   review, not a payment-phase drive-by.
+3. **Vendor Stripe onboarding is its own phase** — PHASE V in the roadmap.
+
+### 🔜 PHASE V — Vendor Onboarding / Activation (recorded, not started)
+
+**Recommended next, before in-person Phase C.** Reason: **5 of 9 production
+vendors are not charge-ready**, and walk-up sales need Stripe exactly as online
+sales do — so shipping C–G first delivers the feature to 44% of vendors.
+
+Full spec in `docs/CUSTOMER-PLATFORM-ROADMAP.md` → PHASE V: activation
+checklist, Stripe status granularity, and the Phase 8 activation funnel.
+**Derive readiness from existing state — do not add a `readyToSell` flag**; it
+would go stale the moment Stripe revokes charges, which is exactly what the A.1
+alert exists to catch. `lib/payments.ts` and `components/stripe-required-banner.tsx`
+already do most of the derivation — extend them, don't duplicate.
 
 ### Live production note (2026-08-15)
 

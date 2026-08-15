@@ -1,11 +1,23 @@
 # DropQ In-Person Payments — Architecture
 
-**Status: APPROVED 2026-08-14. Phase A SHIPPED. Phases B–G not started.**
+**Status: APPROVED. Phases A, A.1 and B SHIPPED. Phases C–G not started.**
 
 The architecture, the two decisions in §10 and the seven-phase shape in §12 are
-signed off. **Phase A is implemented, tested and deployed** — see §14 and §15.
-No schema change, no migration and no production data change has occurred.
-Phases B and later each require their own approval.
+signed off.
+
+| Phase | State |
+|---|---|
+| **A** — enforce Stripe-required-to-sell | ✅ shipped, deployed, verified (§14, §15) |
+| **A.1** — vendor alert when Stripe pauses selling | ✅ shipped (§15.5) |
+| **B** — schema foundation (`WalkUpSale`) | ✅ shipped, migrated, verified (§16) |
+| **C–G** | not started; each needs its own approval |
+
+**⚠️ `Order.paidAt` was removed from the design** — see the callout in §3.3.
+Anything below written against `paidAt` has been corrected to `paymentStatus`.
+
+A separate **Vendor Onboarding / Activation** phase is now recorded in
+`docs/CUSTOMER-PLATFORM-ROADMAP.md` and is recommended to run **before Phase C**
+— see §16.5.
 
 Governing principles:
 
@@ -430,24 +442,38 @@ model WalkUpSale {
 model Order {
   // ...
   /// online | in_person   (legacy: "live", never used in production)
-  source String @default("online")     // ← no schema change, already a free String
-  /// When money was actually received. Null = never paid.
-  paidAt DateTime?                     // ← the one new column
+  source String @default("online")     // ← NO schema change; already a free String
 }
 ```
 
-**Total: one new model, one nullable column.** No enum changes, no NOT NULL
-changes, no renames, no `--accept-data-loss`.
+**Total: one new model. No column added to any existing table.**
 
-`paidAt` earns its place three times over: it is the honest revenue-by-date
-axis (`createdAt` is wrong for anything paid later than it was placed), the
-clean reporting boundary that replaces the `status`-based filters in §1.10, and
-the natural home for the payment timestamp. It is **not** needed as a
-concurrency primitive — the existing `status: "pending"` claim already provides
-that under this model.
+> ### ⚠️ `Order.paidAt` was proposed here and then REMOVED from the design
+>
+> An earlier draft added `paidAt` while cash payments were still in scope. Under
+> the Stripe-only model it does not earn its place, and the evidence is in
+> production:
+>
+> ```
+> paid orders: 8 | with an OrderEvent(payment,"paid"): 8 | with >1: 0 | none: 0
+> created → paid gap: 39.7s, 16.2s, 30.3s
+> ```
+>
+> `finalizePaidOrder` writes that event **inside the atomic claim**, so an
+> application-level payment timestamp already exists, exactly once, for every
+> paid order. And the created→paid gap is 16–40 seconds, so `Order.createdAt` is
+> a perfectly adequate revenue-date axis.
+>
+> The §1.10 reporting defect is caused by keying on `status`; `paymentStatus =
+> 'paid'` fixes it with **no new column**. Adding `paidAt` now would create a
+> column that is NULL for every existing order and tempting to query wrongly for
+> several phases. If Phase G proves the `OrderEvent` join awkward, add it there
+> **with its backfill in the same migration**.
+>
+> Decided and approved 2026-08-15. Do not reintroduce it without new evidence.
 
-`Drop.allowPayInPerson` is **not** added. It only existed to gate a
-customer-facing pay-later option that is now being removed.
+`Drop.allowPayInPerson` is **not** added — and note it never existed in the
+first place. It was proposed in the superseded handoff §6b and never built.
 
 ### 3.4 Why not reuse `source: "live"`
 
@@ -695,8 +721,8 @@ Payment and fulfillment stay orthogonal. A paid in-person order enters the
 normal `new → in_progress → ready → completed` flow — often completed
 immediately, since the customer is holding the item.
 
-`updateOrderStatusAction` must continue not to touch `paymentStatus`, `paidAt`
-or `source`. It doesn't today; that must stay true.
+`updateOrderStatusAction` must continue not to touch `paymentStatus` or
+`source`. It doesn't today; that must stay true.
 
 Under the new model **unpaid orders stop being created**, so the
 "fulfilled + unpaid" combination becomes historical only. The legacy `fulfilled`
@@ -709,11 +735,15 @@ Add `lib/reporting.ts` with canonical predicates and point every surface at it:
 
 | Metric | Definition |
 |---|---|
-| Vendor gross sales / DropQ GMV | `SUM(totalCents) WHERE paidAt IS NOT NULL AND refunded = false` |
+| Vendor gross sales / DropQ GMV | `SUM(totalCents) WHERE paymentStatus = 'paid'` |
 | **Online sales** | `... AND source = 'online'` |
 | **In-person sales** | `... AND source = 'in_person'` |
 | Stripe processed volume | equals GMV — every order is Stripe |
-| DropQ fee revenue | `SUM(feeCents) WHERE paidAt IS NOT NULL AND refunded = false` |
+| DropQ fee revenue | `SUM(feeCents) WHERE paymentStatus = 'paid'` |
+
+The boundary is **`paymentStatus`, not `paidAt`** (which was removed — see §3.3)
+and **not `status`** (which is the §1.10 defect). A payment date axis, if one is
+ever needed, comes from `OrderEvent(payment, "paid").createdAt`.
 
 Refunds subtract from gross, GMV and fee revenue alike (`refund_application_fee`
 genuinely returns the fee, so the reduction is real money, not an adjustment).
@@ -721,8 +751,9 @@ genuinely returns the fee, so the reduction is real money, not an adjustment).
 There is no "external" category and no $0-fee carve-out — every DropQ order
 earns the normal fee, which is the entire point of routing cards through DropQ.
 
-**Switching from `status` to `paidAt` also fixes the live over-reporting in
-§1.10**: Casa Makulay drops out of GMV and out of DropQ revenue, correctly.
+**Switching from `status` to `paymentStatus` also fixes the live over-reporting
+in §1.10**: Casa Makulay (`paymentStatus: "unpaid"`) drops out of GMV and out of
+DropQ revenue, correctly, with no data rewrite.
 
 ---
 
@@ -759,26 +790,19 @@ hole affects no real data.
 **has** Stripe (`acct_1TldlAJYe7OtAQDX`, charges enabled), so the order predates
 their connection.
 
-Under this model it needs **no migration and no action**. `paidAt` stays NULL,
-so it correctly leaves GMV and fee revenue (fixing today's over-report) while
-remaining intact and fulfillable. It is not modified. See §10 for the one small
-decision it raises.
+Under this model it needs **no migration and no action**. It is
+`paymentStatus: "unpaid"`, so once reporting keys on payment (Phase G) it
+correctly leaves GMV and fee revenue — fixing today's over-report — while
+remaining intact and fulfillable. It is not modified. See §10.
 
-### Data migration required: exactly one
+### Data migration required: NONE
 
-Adding `paidAt` without backfilling it would zero every report, since all 8
-genuinely-paid orders would look unpaid. Derivable and idempotent:
+An earlier draft needed an 8-row backfill to populate `Order.paidAt`. **That
+column was removed from the design (§3.3), so the backfill is gone with it.**
 
-```sql
--- 8 rows. Idempotent; re-running updates 0. Casa Makulay excluded by the predicate.
-UPDATE "Order" o SET "paidAt" = COALESCE(
-    (SELECT MIN(e."createdAt") FROM "OrderEvent" e
-      WHERE e."orderId" = o.id AND e.type = 'payment' AND e.detail = 'paid'),
-    o."createdAt")
-WHERE o."paymentStatus" = 'paid' AND o."paidAt" IS NULL;
-```
-
-No other cleanup required.
+No phase of this project currently requires a data migration. Phase B added a
+table and touched no existing row; Phase G reads `paymentStatus`, which is
+already correct on all 9 orders.
 
 ---
 
@@ -788,15 +812,13 @@ Both open questions were decided on 2026-08-14. Nothing in this document is
 awaiting input.
 
 1. **The Casa Makulay order is left untouched — no migration, no modification.**
-   Once reporting uses `paidAt` as the payment boundary (Phase G), it naturally
-   stops counting as paid revenue: `paidAt` stays NULL, so it leaves GMV, vendor
-   gross sales and DropQ fee revenue on its own, with no data rewrite. It
-   remains in the vendor's order list as a genuine historical record of a sale
-   settled outside DropQ before DropQ could take payment. **Do not cancel it,
-   do not backfill it, do not fabricate a payment for it.**
-
-   The §9 `paidAt` backfill excludes it by predicate
-   (`WHERE paymentStatus = 'paid'`), which must stay true.
+   Once reporting uses `paymentStatus` as the payment boundary (Phase G), it
+   naturally stops counting as paid revenue: it is `paymentStatus: "unpaid"`, so
+   it leaves GMV, vendor gross sales and DropQ fee revenue on its own, with no
+   data rewrite at all. It remains in the vendor's order list as a genuine
+   historical record of a sale settled outside DropQ before DropQ could take
+   payment. **Do not cancel it, do not backfill it, do not fabricate a payment
+   for it.**
 
 2. **In-person card sales earn sales-rep commission exactly as online Stripe
    sales do.** No special case, no separate rate, no exclusion. Both are DropQ
@@ -820,7 +842,7 @@ awaiting input.
 |---|---|---|---|
 | — | vendor starts sale | *(no Order yet — `WalkUpSale.open`)* | ✅ |
 | — | customer submits pay form | `pending` (`status: pending`) | ✅ Order created here |
-| `pending` | Stripe confirms | `paid` + `paidAt` | ✅ |
+| `pending` | Stripe confirms | `paid` (+ `OrderEvent(payment,"paid")`) | ✅ |
 | `pending` | session expires | `expired` + `status: canceled` | ✅ existing sweep |
 | `pending` | vendor cancels sale | `status: canceled` | ✅ only while unpaid |
 | `paid` | second payment claim | — | ❌ `status` no longer `pending` |
@@ -853,12 +875,12 @@ payment fields.
 
 **Cross-axis invariants** *(each should have a test)*
 
-- `paidAt IS NOT NULL` ⟺ `paymentStatus ∈ {paid, refund_pending, refunded}`
-- `paidAt IS NOT NULL` ⟹ `stripePaymentIntentId IS NOT NULL` *(for all new orders)*
+- `paymentStatus = 'paid'` ⟹ `stripePaymentIntentId IS NOT NULL` *(new orders)*
+- `paymentStatus = 'paid'` ⟹ exactly one `OrderEvent(payment, "paid")`
 - `source = 'in_person'` ⟹ the order was created by a customer request at `/pay/{token}`
 - every `Order` has a real, non-empty `buyerEmail`
 - `WalkUpSale.orderId` is written exactly once and never cleared
-- `status` transitions never write `paymentStatus`, `paidAt` or `source`
+- `status` transitions never write `paymentStatus` or `source`
 - **no code path creates an `Order` with `paymentStatus: "unpaid"`**
 
 ---
@@ -906,15 +928,14 @@ Full detail: **§14**.
 
 ### Phase B — Schema *(plan items 2, 10)*
 
-**Changes** `WalkUpSale` model + `Order.paidAt`, plus the §9 backfill in the
-same migration.
+**Changes** `WalkUpSale` model only. (`Order.paidAt` and its backfill were
+removed from the design — §3.3.) **As shipped: see §16.**
 **DB** One new table, one nullable column, an 8-row idempotent backfill. No
 `--accept-data-loss`.
 **Risk** Very low — no code reads either yet.
-**Tests** `migrate diff` empty after apply. All 8 paid orders have `paidAt`;
-Casa Makulay does not. Re-running the backfill updates 0 rows. `Order`,
-`OrderItem`, `Customer` and `Seller` verified untouched **by content hash**, per
-the §5d backfill practice.
+**Tests** `migrate diff` empty after apply. Ten business tables verified
+untouched **by content hash**, per the §5d backfill practice. Database
+constraints proven against the real table.
 **Prod** `migrate status` clean, drift check empty, site unchanged.
 
 ---
@@ -969,7 +990,7 @@ claim the sale (`updateMany where { token, status: "open" }`) → `upsertCustome
 → create `Order` (`source: "in_person"`, `status: "pending"`,
 `paymentStatus: "pending"`, real `buyerEmail`) → `applyFirstTouch(..., source:
 "in_person")` → `createCheckoutSessionForOrder()` → redirect.
-Set `paidAt` inside the existing finalize claim.
+(No `paidAt` to set — §3.3.)
 
 **Also in this phase — move `recordRelationship({ purchase })` from order
 creation to `finalizePaidOrder`** (§1.7), for **both** flows. Abandoned
@@ -978,7 +999,7 @@ urgent rather than cosmetic.
 
 **DB** writes `Order`, `OrderItem`, `Customer`, `CustomerVendor`, `WalkUpSale`.
 **Risk** **Highest in the project** — real charges, and it touches
-`finalizePaidOrder` for `paidAt` and the relationship move. Mitigated by the
+`finalizePaidOrder` for the relationship move. Mitigated by the
 Phase C regression test and by online checkout being unchanged in shape.
 **Tests**
 - End-to-end walk-up payment: order `paid`, exactly one points row, one
@@ -1008,7 +1029,7 @@ received, order visible in `/my/orders`, claim panel present.
 — with `refund_application_fee: true` and an idempotency key. Refund prompt when
 canceling a paid order. Method-aware copy.
 
-**DB** writes `paymentStatus`, and `paidAt` is never cleared.
+**DB** writes `paymentStatus`; payment history is never rewritten.
 **Risk** Medium-high — moves real money, and it is greenfield.
 **Tests** Double-submit refunds once. Points reversed exactly once. Commission
 voided. Partial-refund behaviour explicitly decided (recommend full-only for
@@ -1656,3 +1677,100 @@ regain, no-op, mid-onboarding) plus 11 source assertions, inside
 actually disable a live vendor's charges. The trigger is verified by test, not
 by a real event. Watch for the `[stripe] charges disabled — vendor=…` log line
 the first time it fires.
+
+---
+
+## 16. Phase B — as shipped
+
+Migrated and verified 2026-08-15, `20260815033104_add_walk_up_sale`.
+**One new table. Zero alterations to any existing table. Zero backfill. Zero
+destructive operations. Zero existing rows read or written.**
+
+Phase B is deliberately **inert**: no vendor UI, no QR, no pay page, no Stripe
+change, no code anywhere constructs a `WalkUpSale`.
+
+### 16.1 What landed
+
+`WalkUpSale` exactly as approved — `id`, `token @unique`, `sellerId`, `dropId`,
+`lines Json`, `orderId @unique`, `expiresAt`, `canceledAt`, `createdAt`, plus
+`@@index([sellerId])` and `@@index([expiresAt])`, and Cascade FKs to `Seller`,
+`Drop` and `Order`. Back-relations added to those three models (virtual, no SQL).
+
+Deliberately **not** included, each for a reason worth not relitigating:
+
+| Rejected | Why |
+|---|---|
+| `Order.paidAt` | §3.3 callout — `OrderEvent(payment,"paid")` already is the timestamp, exactly-once, on all 8 paid orders |
+| a channel column | `Order.source` already exists and already defaults `"online"` |
+| `status` | all four states derive from `orderId` / `canceledAt` / `expiresAt`; a stored status can contradict them |
+| `totalCents` | derivable from `lines`; a denormalized total that disagrees with its own items is a latent bug |
+| `createdBy` | `Seller` is a single-user account — `sellerId` *is* the vendor identity |
+| removing `Drop.allowPayInPerson` | **it never existed**; only ever prose in the superseded handoff §6b |
+
+### 16.2 Verification
+
+`migrate status` clean (3 migrations) · drift check `-- This is an empty
+migration.` · live table, 5 indexes and 3 FKs match the reviewed SQL exactly ·
+`WalkUpSale` row count **0** · `tsc` clean · `next build` clean ·
+`npm run test:phase-a` **77/77** · no reference to `WalkUpSale` anywhere in
+`app/`, `lib/` or `components/`.
+
+**Ten business tables verified unchanged by SHA-256 content hash**, not row
+count — `Order`, `OrderItem`, `OrderEvent`, `Drop`, `Product`, `Seller`,
+`Customer`, `CustomerVendor`, `PointsLedger`, `CommissionLedger`. Snapshot taken
+before the migration, re-taken after, byte-identical.
+
+**Constraints proven against the real production table**, every insert inside a
+transaction that always rolls back (table still empty afterwards):
+
+- duplicate `token` → rejected (P2002)
+- duplicate non-null `orderId` → rejected (P2002) — the single-conversion guarantee
+- **many rows with `orderId` NULL coexist** — critical: Postgres allows multiple
+  NULLs in a unique index, so concurrent open sales don't collide
+- bogus `sellerId` / `orderId` → rejected (P2003)
+- the Phase E claim `updateMany where { token, orderId: null }` returns **1 then
+  0** — single-winner, as designed
+
+No real-money checkout was performed; Phase B changes no checkout code.
+
+### 16.3 Deferred findings — recorded, deliberately not fixed
+
+1. **`Order.source` mixes purchase channel with `drop.mode`.**
+   `lib/actions/order.ts:97` writes `drop.mode === "live" ? "live" : "online"`,
+   so the field currently encodes *drop type*, not *channel*. **Phase E must
+   normalize it**: a customer self-ordering is `online` whatever the drop's mode;
+   only a vendor-initiated walk-up is `in_person`. `live` has **zero production
+   rows**, so retiring it is free. One badge reads it
+   (`app/dashboard/orders/page.tsx:85`).
+
+2. **🔴 `Order.dropId` cascades on Drop deletion — deleting a Drop deletes its
+   historical paid Orders.** `deleteDropAction` therefore destroys financial
+   records. `PointsLedger` survives only because it deliberately has no FK.
+   **Pre-existing, not introduced by Phase B, and out of scope** — flagged for
+   separate data-retention review. Do not change it as a side effect of payment
+   work.
+
+3. **Vendor Stripe onboarding is its own product phase** — see §16.5 and
+   `docs/CUSTOMER-PLATFORM-ROADMAP.md`. It must not expand the walk-up phases.
+
+### 16.4 Rollback
+
+`DROP TABLE "WalkUpSale";` plus deleting the migration directory. Safe
+unconditionally while the table is empty and nothing writes to it, which Phase B
+guarantees. All three FKs point *outward* from the new table, so no existing
+table gained a constraint that could fail.
+
+### 16.5 Where Vendor Onboarding / Activation should sit
+
+**Recommendation: immediately after Phase B, before Phase C.**
+
+The evidence is in production: **5 of 9 vendors are not charge-ready** and
+therefore cannot sell at all. Since walk-up sales require a charge-ready Stripe
+account exactly as online sales do, shipping Phases C–G to that base delivers
+the feature to **44% of vendors**. Onboarding is not a parallel nicety — it is
+what makes the walk-up work worth building.
+
+It is also cleanly separable: onboarding touches the vendor dashboard and
+`Seller` state, while C–G touch checkout and `WalkUpSale`. They can run in
+parallel if there is capacity, but if they run in sequence, onboarding first is
+the higher-value order.

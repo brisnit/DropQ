@@ -135,6 +135,7 @@ model Seller {
   acquiredCustomers   Customer[]       @relation("CustomerFirstVendor")
   customerRelationships CustomerVendor[]
   pointsAwarded         PointsLedger[]
+  walkUpSales           WalkUpSale[]
 
   @@index([salesRepId])
 }
@@ -312,6 +313,7 @@ model Drop {
   // Customers whose very first DropQ touch was this drop
   acquiredCustomers Customer[] @relation("CustomerFirstDrop")
   savedBy           SavedDrop[]
+  walkUpSales       WalkUpSale[]
 
   @@index([status])
 }
@@ -406,6 +408,7 @@ model Order {
 
   conversations Conversation[] @relation("ConversationLastOrder")
   messages      Message[]      @relation("MessageOrder")
+  walkUpSale    WalkUpSale?
 
   @@index([customerId])
 }
@@ -1329,4 +1332,63 @@ model PointsLedger {
   @@unique([orderId, reason])
   @@index([customerId, createdAt])
   @@index([sellerId, customerId])
+}
+
+/// A vendor-initiated in-person sale, waiting for a customer to pay on their
+/// own phone. Deliberately NOT an Order: when the vendor rings items up nobody
+/// has identified themselves yet, and Order.buyerName/buyerEmail are NOT NULL.
+/// Abandonment at a market is routine, so this keeps throwaway carts out of the
+/// Order table entirely.
+///
+/// The Order is created at /pay/{token} once the customer gives an email, in
+/// the same request as the Stripe Checkout Session — so a walk-up order enters
+/// the pipeline in exactly the same `pending`/stock-unclaimed shape as an
+/// online one, and finalizePaidOrder needs no changes.
+///
+/// State is DERIVED, never stored, so it cannot contradict itself:
+///   open      orderId IS NULL AND canceledAt IS NULL AND expiresAt > now()
+///   converted orderId IS NOT NULL
+///   canceled  canceledAt IS NOT NULL
+///   expired   otherwise
+model WalkUpSale {
+  id String @id @default(cuid())
+
+  /// Public secret in the QR / payment link. Separate from `id` and generated
+  /// from crypto.randomBytes: the QR is displayed on a screen in public, and a
+  /// guessable id would let a stranger convert someone else's sale.
+  token String @unique
+
+  sellerId String
+  seller   Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  /// Required: OrderItem -> Product -> Drop, and Order.dropId is NOT NULL, so a
+  /// walk-up sale is always scoped to one of the vendor's drops.
+  dropId String
+  drop   Drop   @relation(fields: [dropId], references: [id], onDelete: Cascade)
+
+  /// The rung-up cart: [{ productId, name, priceCents, quantity }].
+  /// Json rather than a child table because this is a throwaway cart that is
+  /// never reported on or joined — OrderItem is the durable record. Json also
+  /// means the snapshot's shape can change in later phases with no migration.
+  /// Whether the snapshotted price or the live Product price is authoritative
+  /// at conversion is a Phase E policy decision, not a schema one.
+  lines Json
+
+  /// Set exactly once, when a customer converts the sale. @unique is the
+  /// idempotency guarantee: two phones scanning the same QR cannot both produce
+  /// an order.
+  orderId String? @unique
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// Bounds how long a photographed QR stays chargeable.
+  expiresAt  DateTime
+  /// Vendor tapped "start over". Nullable timestamp rather than a status
+  /// string so it can never disagree with orderId.
+  canceledAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  /// The vendor's open sales.
+  @@index([sellerId])
+  /// The expiry sweep.
+  @@index([expiresAt])
 }

@@ -151,6 +151,101 @@ page says so plainly rather than implying one is coming imminently.
 3. A bare `catch {}` treated every error as "already awarded". Narrowed to
    Prisma `P2002`
 
+## PHASE V — Vendor Onboarding / Activation  **[NEW — not started]**
+
+> **Recommended position: immediately after in-person Phase B, before Phase C.**
+> Not because it is urgent in the abstract — because **5 of 9 production vendors
+> are not Stripe charge-ready** and therefore cannot sell at all. Walk-up sales
+> need a charge-ready account exactly as online sales do, so shipping the
+> in-person feature first delivers it to 44% of the vendor base. Onboarding is
+> what makes that work worth building.
+>
+> It is cleanly separable — this phase touches the vendor dashboard and `Seller`
+> state; in-person Phases C–G touch checkout and `WalkUpSale` — so the two can
+> run in parallel given capacity.
+
+### Product principle
+
+**Stripe is mandatory for every DropQ vendor who wants to sell.** Connecting it
+should feel like a normal, required step in becoming **Ready to Sell** — not an
+error a vendor discovers when they try to publish.
+
+Phase A made the rule real (a non-charge-ready vendor cannot publish or sell).
+This phase makes the rule *kind*: it should be obvious from signup onward what
+remains before selling can start.
+
+A vendor without Stripe must still be able to:
+
+- create and edit their business/store profile
+- add products
+- create and edit **draft** drops
+- explore the whole dashboard
+
+They cannot publish or sell until Stripe is charge-ready. That boundary is
+already enforced and tested — see `docs/IN-PERSON-PAYMENTS-ARCHITECTURE.md` §14.
+
+### The activation journey
+
+A **Get Ready to Sell** checklist, conceptually:
+
+```
+✓ Create account
+✓ Complete business/store information
+○ Connect Stripe
+○ Add first product
+○ Create first drop
+○ Publish first drop
+```
+
+**Do not treat those as the final steps.** Derive the real activation milestones
+from the product when the phase begins — `Seller` already carries
+`emailVerified`, `termsAcceptedAt`, `stripeAccountId`, `stripeChargesEnabled`,
+`dropsCreated`, plus profile fields, and `VendorProduct` / `Drop` / `Order`
+answer the rest.
+
+- [ ] V.1 Activation checklist with progress state
+- [ ] V.2 Persistent but non-annoying **Finish Stripe Setup** CTA
+      *(`components/stripe-required-banner.tsx` already exists and already
+      distinguishes the failure modes — extend it, don't duplicate it)*
+- [ ] V.3 Contextual nudges while adding products and building drops, getting
+      stronger as the vendor approaches publishing
+- [ ] V.4 A clear **Ready to Sell** state
+- [ ] V.5 Richer Stripe status than the current boolean
+
+### Stripe status granularity
+
+Today `Seller` has `stripeAccountId` + `stripeChargesEnabled`, from which
+`lib/payments.ts` already derives `not_connected` / `charges_disabled` /
+`suspended`. The states worth distinguishing:
+
+| State | Derivable today? |
+|---|---|
+| not started | ✅ `stripeAccountId IS NULL` |
+| setup started / incomplete | ⚠️ needs `account.details_submitted` (fetched on `/dashboard/payments`, not stored) |
+| connected but not charge-ready | ✅ `sellerBlockReason() === "charges_disabled"` |
+| charge-ready | ✅ `isVendorSellable()` |
+| previously charge-ready, now restricted | ⚠️ needs history — the `account.updated` webhook is the natural place to record it |
+
+**Derive readiness from authoritative state; do not add a hand-maintained
+`readyToSell` flag** unless inspection proves one is necessary. A cached flag
+would go stale the moment Stripe revokes charges — the exact failure the A.1
+alert exists to catch.
+
+### Analytics — for Phase 8, not now
+
+Record vendor activation as a measurable funnel:
+
+```
+signup → business setup → Stripe setup started → Stripe charge-ready
+       → first product → first draft drop → first live drop → first paid order
+```
+
+The goal is knowing exactly where vendors abandon activation. **Do not implement
+these events now** — they belong to Phase 8 and go through `lib/analytics.ts`
+like everything else.
+
+---
+
 ## PHASE 8 — Analytics and admin visibility
 
 > ⛔ **Blocked.** Do not start Phase 8 until Phase 7 *and* the pay-in-person work
@@ -185,6 +280,11 @@ page says so plainly rather than implying one is coming imminently.
       top acquiring vendors, cross-vendor purchases
 - [ ] 8.4 Vendor analytics: their followers, customers they brought in,
       repeat rate — scoped so a vendor never sees platform-wide data
+- [ ] 8.5 **Vendor activation funnel** — signup → business setup → Stripe
+      started → charge-ready → first product → first draft drop → first live
+      drop → first paid order. See PHASE V. This is how we learn where vendor
+      activation actually breaks; today we only know the outcome (5 of 9
+      vendors not charge-ready), not the step they gave up on.
 
 ---
 
