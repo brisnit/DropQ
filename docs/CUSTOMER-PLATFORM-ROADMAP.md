@@ -151,6 +151,20 @@ page says so plainly rather than implying one is coming imminently.
 3. A bare `catch {}` treated every error as "already awarded". Narrowed to
    Prisma `P2002`
 
+## In-person / walk-up payments — A, A.1, B, C1, C2 shipped
+
+Full architecture: **`docs/IN-PERSON-PAYMENTS-ARCHITECTURE.md`**. Cash is
+outside DropQ; every DropQ order is a Stripe card payment. Shipped so far:
+Stripe-required enforcement (A), the revoked-Stripe vendor alert (A.1), the
+inert `WalkUpSale` table (B), walk-up eligibility + `finalizePaidOrder`
+regression pins (C1), and the pure Stripe-params builder (C2).
+
+**Next: Phase D** — vendor walk-up sale creation + UI. D–G each need their own
+approval. ⚠️ Anything touching checkout deploys only when
+`SELECT count(*) FROM "Drop" WHERE status='live'` is 0.
+
+---
+
 ## PHASE V — Vendor Onboarding / Activation  **[NEW — not started]**
 
 > **Recommended position: immediately after in-person Phase B, before Phase C.**

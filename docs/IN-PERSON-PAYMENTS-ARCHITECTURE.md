@@ -1,6 +1,6 @@
 # DropQ In-Person Payments — Architecture
 
-**Status: APPROVED. Phases A, A.1, B and C1 SHIPPED. C2 held; D–G not started.**
+**Status: APPROVED. Phases A, A.1, B, C1 and C2 SHIPPED. D–G not started.**
 
 The architecture, the two decisions in §10 and the seven-phase shape in §12 are
 signed off.
@@ -11,7 +11,7 @@ signed off.
 | **A.1** — vendor alert when Stripe pauses selling | ✅ shipped (§15.5) |
 | **B** — schema foundation (`WalkUpSale`) | ✅ shipped, migrated, verified (§16) |
 | **C1** — walk-up eligibility + finalize regression pins | ✅ shipped (§19) |
-| **C2** — extract the Stripe session builder | **not started** — deliberately held, see §19.1 |
+| **C2** — extract the Stripe session builder | ✅ shipped (§20) |
 | **D–G** | not started; each needs its own approval |
 
 **⚠️ `Order.paidAt` was removed from the design** — see the callout in §3.3.
@@ -1891,3 +1891,100 @@ no such proof.
 ```sql
 SELECT count(*) FROM "Drop" WHERE status = 'live';
 ```
+
+---
+
+## 20. Phase C2 — as shipped
+
+**A behaviour-preserving extraction. Online checkout does exactly what it did
+before.** `lib/checkout-session.ts` now owns the Stripe Checkout Session
+parameters, so Phase E's walk-up flow can reuse them instead of duplicating
+payment logic. No schema change.
+
+### 20.1 The shape, and why the network call stayed behind
+
+```ts
+buildCheckoutSessionParams(input): Stripe.Checkout.SessionCreateParams   // pure
+defaultExpiresAt(nowMs?): number                                        // now + TTL
+SESSION_TTL_SECONDS = 3600
+```
+
+`placeOrderAction` still runs
+`stripe.checkout.sessions.create(params, { stripeAccount })` itself. Two reasons
+the call did **not** move:
+
+1. The connected-account context belongs to the caller — that is the DropQ
+   direct-charge model, and burying it in a builder would obscure it.
+2. Keeping Stripe out of the builder is what makes the whole thing testable.
+   A pure params object can be deep-equalled offline; a function that calls
+   Stripe cannot.
+
+`expires_at` is **injected**, not computed inside, so the builder is pure and
+its output deterministic in tests.
+
+### 20.2 Proof of equivalence — golden snapshots
+
+Two hand-written literals transcribed from the inline object **as it stood at
+`9beccc1`, before the extraction**, one per fee mode. They are deliberately
+*not* generated from the builder — that would make the test tautological. Deep
+equality against them is what makes "unchanged behaviour" a fact.
+
+Alongside them: absorb adds no fee line · pass appends the "Service fee" line
+**last** · `application_fee_amount === feeCents` in both modes · `orderId`
+metadata on the session **and** the PaymentIntent · a null description is
+**omitted**, never sent as `"description": null` · every line is USD · and the
+key set is exactly the original eight (`cancel_url`, `customer_email`,
+`expires_at`, `line_items`, `metadata`, `mode`, `payment_intent_data`,
+`success_url`) — so no field was silently added.
+
+Source assertions pin the call site: exactly **one** `sessions.create` call, the
+connected account still passed, the session id still persisted, the redirect
+unchanged, the order still created `pending` before the params are built, and
+**nothing but `placeOrderAction` consumes the builder yet**.
+
+**No Stripe call in any test. No real charge.**
+
+### 20.3 Deployment discipline
+
+Deployed **only after the live flash sale closed**. Zero live drops was verified
+twice — at the start of the session and again in the same command as the commit.
+That gate is the rule for anything touching checkout:
+
+```sql
+SELECT count(*) FROM "Drop" WHERE status = 'live';
+```
+
+### 20.4 Verification
+
+phase-a **77/77** · payments **72/72** · activation **147/147** · tsc clean ·
+build clean · `migrate status` up to date · drift empty · **no migration**.
+
+Post-deploy: all public routes 200, **all 11 drop pages 200**, `/dashboard` and
+`/admin/activation` 307, all three dev selftests 404. Production data unchanged
+— orders 10, orderItems 19, orderEvents 29, drops 11, sellers 9,
+**`WalkUpSale` 0**, `PointsLedger` 8.
+
+### 20.5 What the flash sale proved about the pipeline
+
+While C2 waited, the live drop took **one real order**: a customer reached
+Stripe Checkout (`cs_live_…`), abandoned it, and `reconcilePendingOrders` swept
+the order to `canceled`/`expired`. **Stock was never claimed** (10/10 remained),
+no PaymentIntent, no DropPoints, no commission.
+
+That is the abandoned-checkout path working end to end in production for the
+first time — and it exercised the very invariants C1 pinned. It also means
+`Order.paymentStatus` now has a real `expired` row, which the Phase G reporting
+predicates must treat as unpaid.
+
+### 20.6 Four test bugs found and fixed
+
+All were assertions, never product code, and each is the same class of mistake
+worth recognising: **`indexOf` finds the import, not the call site**, and
+**regexes match text inside comments and type-only imports**.
+
+- three matched their own explanatory prose or `Stripe.Checkout.SessionCreateParams`
+  (the type-only import) — fixed by stripping comments and making the check
+  case-sensitive, since the client variable is lowercase `stripe`
+- one pinned the inline-object call form that C2 intentionally replaced; it now
+  asserts the durable property instead — exactly one create call, still carrying
+  the connected account

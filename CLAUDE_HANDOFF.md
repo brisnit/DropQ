@@ -512,7 +512,7 @@ that reintroduces the spam.**
 vendor. Verified by test only. The first real firing logs
 `[stripe] charges disabled — vendor=…` in Vercel.
 
-### Phase C1 — ✅ SHIPPED. C2 deliberately HELD.
+### Phase C1 + C2 — ✅ BOTH SHIPPED
 
 **⚠️ PRODUCTION NOW HAS LIVE DROPS.** On 2026-08-15 The Clovery ran a live flash
 sale (charge-ready, real Stripe checkout). Every phase before this shipped into
@@ -530,8 +530,22 @@ So it was split:
 
 - **C1 ✅** — `canStartInPersonSale()` in `lib/payments.ts` (nothing calls it)
   + `finalizePaidOrder` regression pins. Genuinely inert; shipped mid-sale.
-- **C2 ⏸ HELD** — the extraction. **Deploy only when no drop is live.**
+- **C2 ✅** — `lib/checkout-session.ts` → `buildCheckoutSessionParams()`, a pure
+  builder returning the Stripe Checkout params. `placeOrderAction` is still the
+  **only** caller; Phase E adds the second. Deployed only after the flash sale
+  closed, with zero live drops verified twice.
 - `lib/reporting.ts` was dropped from C entirely — it belongs to Phase G.
+
+⚠️ **The Stripe `sessions.create` call deliberately stays at the call site** —
+the connected-account context belongs to the caller, and keeping Stripe out of
+the builder is what makes it testable. Don't "finish the job" by moving it.
+
+⚠️ **`expires_at` is injected, not computed inside the builder.** That purity is
+what allows the golden-snapshot test. Don't move `Date.now()` into it.
+
+**Equivalence is proven by golden snapshots** transcribed from the inline object
+before extraction (absorb + pass), deliberately hand-written rather than
+generated from the builder — generating them would make the test tautological.
 
 `canStartInPersonSale` is built on `isVendorSellable` (no second Stripe model),
 checks **ownership before sellability** so probing another vendor's drop leaks
