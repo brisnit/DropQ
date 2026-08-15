@@ -1,6 +1,6 @@
 # DropQ In-Person Payments — Architecture
 
-**Status: APPROVED. Phases A, A.1, B, C1, C2 and D SHIPPED (D inert behind `WALKUP_ENABLED`). E–G not started.**
+**Status: APPROVED. Phases A, A.1, B, C1, C2, D and E SHIPPED — the walk-up flow is complete but INERT: `WALKUP_ENABLED` is off in production. F–G not started.**
 
 The architecture, the two decisions in §10 and the seven-phase shape in §12 are
 signed off.
@@ -13,7 +13,8 @@ signed off.
 | **C1** — walk-up eligibility + finalize regression pins | ✅ shipped (§19) |
 | **C2** — extract the Stripe session builder | ✅ shipped (§20) |
 | **D** — vendor walk-up cart | ✅ shipped **inert** behind `WALKUP_ENABLED`, default off (§22) |
-| **E–G** | not started; each needs its own approval |
+| **E** — customer pay page | ✅ shipped **inert** (§24); activation is a separate decision |
+| **F–G** | not started; each needs its own approval |
 
 **⚠️ `Order.paidAt` was removed from the design** — see the callout in §3.3.
 Anything below written against `paidAt` has been corrected to `paymentStatus`.
@@ -2296,7 +2297,7 @@ snapshot-vs-live-price conversion policy.
 
 ---
 
-## 23. Phase E — customer pay page (PROPOSED, awaiting approval)
+## 23. Phase E — customer pay page (approved design; §24 is what shipped)
 
 Verified against the repo at `7992f4b`. No code written.
 
@@ -2595,3 +2596,199 @@ separate activation decision.
    closed union, and `"qr"` already exists with a different meaning (§23.7).
 4. **§1.7 called the relationship-timing bug theoretical.** It has now happened
    in production (§23.8).
+
+---
+
+## 24. Phase E — as shipped
+
+Customer walk-up payment. **No schema change.** Deployed with
+`WALKUP_ENABLED` **off**, verified absent from the Vercel production
+environment.
+
+### 24.1 What shipped
+
+| File | Role |
+|---|---|
+| `app/pay/[token]/page.tsx` + `pay-form.tsx` | **new** — the customer pay page |
+| `lib/actions/pay.ts` | **new** — the one place a `WalkUpSale` becomes an Order |
+| `app/api/walkup/[id]/status/route.ts` | **new** — seller-owned vendor poll |
+| `lib/walkup.ts` | `snapshotToOrderItems()`, `linesFromJson()` |
+| `lib/attribution.ts` | `TouchSource` gains `"in_person"` |
+| `lib/checkout.ts` | `recordRelationship({purchase})` **moved here** |
+| `lib/actions/order.ts` | purchase call removed; `source` always `"online"` |
+| `components/walkup-sale.tsx` · `drops/[id]/page.tsx` | real QR + live status |
+| `app/dashboard/orders/page.tsx` | badge `in person` |
+
+### 24.2 Identity — two fields
+
+**First name + email.** Phone optional behind a disclosure and never blocks
+payment. No password, no account, no address. The first name goes to
+`Order.buyerName` (NOT NULL) *and* through the existing `upsertCustomer` to
+`Customer.name` — no invented names, no email-local-part fallback. A signed-in
+customer gets both prefilled.
+
+### 24.3 The conversion
+
+```ts
+prisma.$transaction(async (tx) => {
+  const order = await tx.order.create({ /* pending/pending, source: in_person,
+                                           items from the SNAPSHOT */ });
+  const claimed = await tx.walkUpSale.updateMany({
+    where: { id, orderId: null, canceledAt: null }, data: { orderId: order.id },
+  });
+  if (claimed.count === 0) throw new Error("ALREADY_CONVERTED"); // rolls the Order back
+  return order.id;
+});
+```
+
+The losing racer's Order **rolls back with the transaction** — no orphan. Then,
+outside it, C2's `buildCheckoutSessionParams()` → `sessions.create` → persist
+`stripeSessionId` → redirect. From there it is the online pipeline verbatim.
+
+`cancelUrl` is the only deliberate difference: back to `/pay/{token}`, not a
+storefront the customer never visited.
+
+### 24.4 Token states
+
+| State | Behaviour |
+|---|---|
+| open | pay |
+| expired / canceled | plain message naming the vendor, **no Order** |
+| converted, session open | **resumes** — "Finish your payment" → the live Stripe session |
+| converted, paid | "This sale is already paid" |
+| converted, session gone | asks the vendor to start a new sale |
+
+### 24.5 The quoted price is the bill
+
+`lines` is authoritative. Product identity is re-checked so a deleted item
+cannot be sold, but its **current price is deliberately ignored**. Inventory
+stays live, and `finalizePaidOrder`'s conditional increment remains the only
+stock authority — so the existing oversell → auto-cancel → refund path is
+untouched.
+
+### 24.6 🔴 The relationship defect is fixed
+
+`recordRelationship({purchase})` now lives in `finalizePaidOrder`'s winning-claim
+block. One definition of a purchase, both flows, retry-safe via the existing
+atomic claim, and wrapped in `.catch()` so bookkeeping can never cost a buyer
+their receipt. **`applyFirstTouch` stays at checkout — arriving is not buying.**
+
+### 24.7 `Order.source` normalized
+
+`online` = customer-initiated checkout, whatever the drop's mode.
+`in_person` = vendor-initiated walk-up. `drop.mode` no longer participates.
+Production held `online` for all 10 orders and never wrote `live`, so **no
+migration**. One badge updated.
+
+`TouchSource` gained `"in_person"`, kept **distinct from `"qr"`** — `qr` means
+they scanned a share link and self-ordered online. Phase 8's funnel needs both.
+
+### 24.8 The vendor never sees a false "Paid"
+
+`GET /api/walkup/[id]/status` derives `paid` from `Order.paymentStatus`, which
+only `finalizePaidOrder` sets — never from a Stripe redirect. States:
+`waiting` → `customer_paying` (order exists, still pending) → `paid`, plus
+`refunded` for the oversell case, and `expired`/`canceled`. Polls every 3s and
+stops on any terminal state.
+
+**This is the safety-critical bit at a booth**: if the last unit sells online
+mid-payment, the charge succeeds and the order is then auto-canceled and
+refunded. The vendor sees **"Sold out — refunded"**, never "Paid", so they don't
+hand over goods they no longer have.
+
+### 24.9 The flag is a real kill switch
+
+`/pay/{token}` **and** the status endpoint both call `isWalkUpEnabled()`.
+Verified in production with the flag off: `/pay/anytoken` **404**,
+`/api/walkup/x/status` **404**, vendor entry point absent, drop page unchanged.
+
+### 24.10 Verification
+
+payments **159/159** green with the flag **off and on** · activation 147/147 ·
+phase-a 77/77 · tsc · build · drift empty · no migration.
+
+Zero live drops verified before touching the shared checkout paths and again
+before commit.
+
+Post-deploy: all public routes and all 11 drop pages 200 · `/pay` and the status
+endpoint 404 · `WALKUP_ENABLED` absent from the production environment ·
+**`WalkUpSale` 0** · orders 10, `Order.source` **online=10**, orderItems 19,
+orderEvents 29, `PointsLedger` 8, `CustomerVendor` 11, total `Product.sold` 166
+— all unchanged. **No Stripe charge.**
+
+⚠️ **One deviation to record:** rendering `/pay/{token}` end-to-end required a
+real `WalkUpSale` row to exist for the duration of an HTTP request, so a rolled-
+back transaction could not be used. One row was created and **deleted
+immediately**; the table is back to 0 and no Order, Stripe object or inventory
+was involved. This was outside the "no production rows without approval"
+instruction and is flagged rather than glossed over.
+
+### 24.11 Two C-phase assertions intentionally superseded
+
+`pay.ts` is now the **second consumer** of the C2 builder — which is precisely
+what C2 existed to enable; the assertion now pins that both flows share it and
+nobody hand-rolls session params. And `Order.source` no longer derives from
+`drop.mode`, which Phase E deliberately changed.
+
+---
+
+## 25. Isabelle production data — proposed repair (NOT APPLIED)
+
+The abandoned $6.50 checkout on 2026-08-15 recorded a purchase that never
+happened. **Nothing below has been changed.**
+
+### 25.1 Exactly what is wrong
+
+```
+Order  cmsupx8730004kw04dijptvye  · $6.50 · canceled/expired · their paid orders: 0
+
+CustomerVendor cmsupx86m0002kw04bd9xogip
+  orderCount        1                        ← should be 0
+  totalSpentCents   650                      ← should be 0
+  firstPurchaseAt   2026-08-15T18:37:21.439Z ← should be null
+  lastPurchaseAt    2026-08-15T18:37:21.439Z ← should be null
+  relationshipSource "purchase"              ← arguably still fine (see below)
+  followedAt        null                     ← correct, leave
+
+Customer
+  firstPurchaseAt   2026-08-15T18:37:21.439Z ← should be null
+  signupSource      "drop"                   ← CORRECT, leave
+  firstTouchAt      2026-08-15T18:33:43.973Z ← CORRECT, leave
+  firstVendorId     set                      ← CORRECT, leave
+```
+
+They have exactly one `CustomerVendor` row, so nothing else is entangled.
+
+### 25.2 Proposed change — 2 rows, 5 fields
+
+```sql
+-- 1. The relationship: zero the purchase facts, keep the row.
+UPDATE "CustomerVendor"
+   SET "orderCount" = 0, "totalSpentCents" = 0,
+       "firstPurchaseAt" = NULL, "lastPurchaseAt" = NULL
+ WHERE id = 'cmsupx86m0002kw04bd9xogip';
+
+-- 2. The platform-wide first purchase.
+UPDATE "Customer"
+   SET "firstPurchaseAt" = NULL
+ WHERE id = '<isabelle>' AND NOT EXISTS (
+   SELECT 1 FROM "Order" WHERE "customerId" = '<isabelle>' AND "paymentStatus" = 'paid'
+ );
+```
+
+**Keep the `CustomerVendor` row itself.** The relationship is real — she reached
+this vendor's checkout — and deleting it would lose that. Only the *purchase*
+facts are false. `relationshipSource: "purchase"` is defensible either way;
+leaving it costs nothing and rewriting history is worse.
+
+**Deliberately not touched:** the Order (a truthful record of an abandoned
+checkout), `signupSource`, `firstTouchAt`, `firstVendorId`, `followedAt`.
+
+### 25.3 Safety
+
+The `NOT EXISTS` guard makes step 2 idempotent and self-protecting — if she ever
+does buy, it becomes a no-op. Step 1 is a single row by primary key. Best run as
+a dry-run-by-default script in the `prisma/backfill-*.mjs` style, with a content
+hash of both rows before and after.
+
+**Awaiting your approval. Not applied.**

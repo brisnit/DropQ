@@ -512,6 +512,62 @@ that reintroduces the spam.**
 vendor. Verified by test only. The first real firing logs
 `[stripe] charges disabled — vendor=…` in Vercel.
 
+### Phase E — ✅ SHIPPED, still INERT. Walk-up is feature-complete.
+
+`/pay/{token}` converts a quoted cart into a real pending Order and hands it to
+the **existing** Stripe pipeline. No second payment engine — everything after
+`sessions.create` is unchanged.
+
+⚠️ **`WALKUP_ENABLED` is still OFF in production and enabling it is a separate
+decision.** `/pay/{token}` and `/api/walkup/[id]/status` both check the flag, so
+it is a real kill switch: with it off both 404.
+
+**Identity: first name + email.** Phone optional, no password, no account. The
+first name goes to `Order.buyerName` (NOT NULL) and via `upsertCustomer` to
+`Customer.name`. **Never invent a name** — no email-local-part fallback.
+
+**Conversion** creates the Order and claims the sale in ONE transaction
+(`where: { orderId: null, canceledAt: null }`). A losing racer throws inside the
+transaction so its Order rolls back — no orphan. Don't split these.
+
+**The quoted snapshot is the bill.** Product identity is re-checked; its current
+price is deliberately ignored. Inventory stays live.
+
+⚠️ **The vendor must never see "Paid" from a Stripe redirect.** The status
+endpoint derives it from `Order.paymentStatus`, which only `finalizePaidOrder`
+sets. In the oversell case the charge succeeds and the order is then canceled
+and refunded — the vendor sees "Sold out — refunded". Getting this wrong makes a
+vendor hand over goods they no longer have.
+
+**🔴 The relationship defect is FIXED.** `recordRelationship({purchase})` moved
+from checkout into `finalizePaidOrder`'s winning-claim block — one definition of
+a purchase, both flows, retry-safe. `applyFirstTouch` stays at checkout:
+arriving is not buying.
+
+**`Order.source` normalized** — `online` = customer-initiated (whatever the drop
+mode), `in_person` = vendor-initiated walk-up. `drop.mode` no longer
+participates. No migration; `live` was never written.
+
+**`TouchSource` gained `in_person`, distinct from `qr`** — `qr` means they
+scanned a share link and self-ordered *online*. Phase 8's funnel needs both.
+
+⚠️ **Isabelle's bad data is NOT repaired.** The proposed 2-row fix is written up
+in `docs/IN-PERSON-PAYMENTS-ARCHITECTURE.md` §25, awaiting approval.
+
+payments **159/159** (flag off and on) · activation 147/147 · phase-a 77/77.
+
+### PostHog — configured in Vercel, NOT implemented in code
+
+`NEXT_PUBLIC_POSTHOG_KEY` and `NEXT_PUBLIC_POSTHOG_HOST` exist in all three
+Vercel environments (added 2026-08-14). **There is no PostHog dependency, no
+SDK, and no code reading them** — `/api/track` still only `console.log`s. So no
+events are being sent and nothing is being recorded.
+
+Phase E deliberately added **no** instrumentation: the walk-up funnel is already
+durably reconstructable from Postgres (`Order.source = "in_person"`,
+`Customer.signupSource = "in_person"`, `WalkUpSale` timestamps), which is the
+roadmap's settled position. Instrumentation stays a Phase 8 decision.
+
 ### Phase D — ✅ SHIPPED, INERT behind `WALKUP_ENABLED`
 
 Vendor can ring up a walk-up cart on `/dashboard/drops/[id]`. Creates a

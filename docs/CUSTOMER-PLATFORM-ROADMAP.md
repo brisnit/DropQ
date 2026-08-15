@@ -159,12 +159,13 @@ Stripe-required enforcement (A), the revoked-Stripe vendor alert (A.1), the
 inert `WalkUpSale` table (B), walk-up eligibility + `finalizePaidOrder`
 regression pins (C1), and the pure Stripe-params builder (C2).
 
-Phase D (vendor walk-up cart) is shipped **inert** behind a server-side
-`WALKUP_ENABLED` flag, default off — a vendor must not be able to ring up a cart
-before `/pay/{token}` exists.
+**Phases A–E are shipped and the walk-up flow is feature-complete — but
+INERT.** `WALKUP_ENABLED` is off in production, and `/pay/{token}` 404s. Turning
+it on is a separate, explicit decision followed by one controlled real
+transaction.
 
-**Next: Phase E** — the customer pay page, which also flips the flag. E–G each
-need their own approval. ⚠️ Anything touching checkout deploys only when
+**Next: activation** (a controlled first walk-up sale), then Phase F (vendor
+refunds) and Phase G (reporting cutover). Each needs its own approval. ⚠️ Anything touching checkout deploys only when
 `SELECT count(*) FROM "Drop" WHERE status='live'` is 0.
 
 ---
