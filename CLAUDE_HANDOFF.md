@@ -512,6 +512,52 @@ that reintroduces the spam.**
 vendor. Verified by test only. The first real firing logs
 `[stripe] charges disabled — vendor=…` in Vercel.
 
+### Phase C1 — ✅ SHIPPED. C2 deliberately HELD.
+
+**⚠️ PRODUCTION NOW HAS LIVE DROPS.** On 2026-08-15 The Clovery ran a live flash
+sale (charge-ready, real Stripe checkout). Every phase before this shipped into
+a production with **zero** live drops — that is why they could be called
+zero-blast-radius. **Check before touching checkout:**
+
+```sql
+SELECT count(*) FROM "Drop" WHERE status = 'live';
+```
+
+Phase C was approved as one phase claiming *"Risk none — nothing calls the new
+code."* That was **false for half of it**: extracting the Stripe session builder
+makes `placeOrderAction` call new code, on the exact path serving a live sale.
+So it was split:
+
+- **C1 ✅** — `canStartInPersonSale()` in `lib/payments.ts` (nothing calls it)
+  + `finalizePaidOrder` regression pins. Genuinely inert; shipped mid-sale.
+- **C2 ⏸ HELD** — the extraction. **Deploy only when no drop is live.**
+- `lib/reporting.ts` was dropped from C entirely — it belongs to Phase G.
+
+`canStartInPersonSale` is built on `isVendorSellable` (no second Stripe model),
+checks **ownership before sellability** so probing another vendor's drop leaks
+nothing, and deliberately does **not** require the drop to be live or in its
+ordering window — those govern customers, not a vendor at their own booth.
+
+**`app/api/dev/payments-selftest` — 43 assertions, 404s in production.**
+
+⚠️ **It never calls `finalizePaidOrder`.** That function opens its own
+`prisma.$transaction`, which would NOT enlist in a wrapper transaction — the
+writes would commit against production. It instead runs *the exact statements*
+(the pending-claim, the conditional stock increment) against the real tables
+inside rolled-back transactions, then asserts the rows are byte-identical.
+
+⚠️ **Its fixtures exclude rows on live drops.** The stock test rewrites
+inventory before rolling back. Without the filter, `findFirst` picked a safe row
+only by luck.
+
+**A stale Phase A assertion was corrected.** It asserted `live === 0` — a
+point-in-time fact, not an invariant; DropQ having live drops is the *goal*. Now
+asserts **every live drop belongs to a charge-ready vendor**, which is a real
+Phase A guarantee and would catch a publish-gate leak or a revoked-Stripe vendor
+still selling.
+
+Full detail: `docs/IN-PERSON-PAYMENTS-ARCHITECTURE.md` §19.
+
 ### Phase B — ✅ SHIPPED: `WalkUpSale` schema foundation (inert)
 
 `20260815033104_add_walk_up_sale`. **One new table. Zero alterations to any

@@ -33,6 +33,7 @@ image uploads are written to `/public/uploads` locally.
 | Suite | Command | Notes |
 |---|---|---|
 | Payments / sell gate (Phase A) | `npm run test:phase-a` | 77 assertions. Pure + static; writes nothing. |
+| Payments / walk-up eligibility | `curl localhost:3000/api/dev/payments-selftest` | 43 assertions. Rolled-back DB proofs + source pins on `finalizePaidOrder`. 404s in production. |
 | Vendor activation (Phase V) | `curl localhost:3000/api/dev/activation-selftest` | 75 assertions. **Needs a non-empty `STRIPE_SECRET_KEY`** — see the trap under Payments. 404s in production. |
 | Messaging / consent | `curl localhost:3000/api/dev/messaging-selftest` | 49 assertions. ⚠️ **Creates sellers, drops and orders — never run it while `.env` points at production.** |
 

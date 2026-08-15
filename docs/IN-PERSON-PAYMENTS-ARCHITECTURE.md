@@ -1,6 +1,6 @@
 # DropQ In-Person Payments — Architecture
 
-**Status: APPROVED. Phases A, A.1 and B SHIPPED. Phases C–G not started.**
+**Status: APPROVED. Phases A, A.1, B and C1 SHIPPED. C2 held; D–G not started.**
 
 The architecture, the two decisions in §10 and the seven-phase shape in §12 are
 signed off.
@@ -10,7 +10,9 @@ signed off.
 | **A** — enforce Stripe-required-to-sell | ✅ shipped, deployed, verified (§14, §15) |
 | **A.1** — vendor alert when Stripe pauses selling | ✅ shipped (§15.5) |
 | **B** — schema foundation (`WalkUpSale`) | ✅ shipped, migrated, verified (§16) |
-| **C–G** | not started; each needs its own approval |
+| **C1** — walk-up eligibility + finalize regression pins | ✅ shipped (§19) |
+| **C2** — extract the Stripe session builder | **not started** — deliberately held, see §19.1 |
+| **D–G** | not started; each needs its own approval |
 
 **⚠️ `Order.paidAt` was removed from the design** — see the callout in §3.3.
 Anything below written against `paidAt` has been corrected to `paymentStatus`.
@@ -1774,3 +1776,118 @@ It is also cleanly separable: onboarding touches the vendor dashboard and
 `Seller` state, while C–G touch checkout and `WalkUpSale`. They can run in
 parallel if there is capacity, but if they run in sequence, onboarding first is
 the higher-value order.
+
+---
+
+## 19. Phase C — split into C1 (shipped) and C2 (held)
+
+### 19.1 Why the split
+
+Phase C was approved as one phase whose stated risk was *"none — nothing calls
+the new code"*. **That was wrong about half of it**, and production changed in a
+way that made it matter.
+
+On 2026-08-15 The Clovery published **"Saturday flash sale — sweet corn custard
+filled doughnuts"** — a live drop, charge-ready vendor, ordering 06:45→19:00
+UTC, real Stripe checkout rendering. **Every prior phase shipped into a
+production with zero live drops**, which is exactly why A, B and V could be
+called zero-blast-radius. That is no longer true.
+
+Phase C's `createCheckoutSessionForOrder()` extraction refactors
+`placeOrderAction`'s Stripe session creation — the precise code path serving
+that sale. Extracting it means `placeOrderAction` calls new code, so "nothing
+calls it" cannot be true and the risk cannot be none.
+
+| | Scope | Risk | Timing |
+|---|---|---|---|
+| **C1** ✅ | `canStartInPersonSale()` + `finalizePaidOrder` regression pins | genuinely zero — nothing calls it | shipped during the live sale |
+| **C2** ⏸ | extract the Stripe session builder | changes every online checkout | **quiet window only** |
+
+`lib/reporting.ts` was **removed from Phase C entirely** — it advances Phase G's
+reporting cutover, not the walk-up experience.
+
+### 19.2 C1 as shipped
+
+`lib/payments.ts` gains `canStartInPersonSale(seller, drop)`. **Nothing calls
+it.** Built on `isVendorSellable()` — no second Stripe readiness model, because
+a vendor who can't take an online order can't take a walk-up one either.
+
+- **Ownership is checked before sellability**, so probing another vendor's drop
+  never reveals whether that vendor can sell.
+- **Deliberately does not require the drop to be `live` or in its ordering
+  window** (§6.1). Those govern customers browsing a storefront; the Casa
+  Makulay order proved a sale on a *closed* drop is still a real sale.
+- Refusal reasons: `not_your_drop` · `vendor_not_sellable` · `no_stock`.
+
+`app/api/dev/payments-selftest` — **43 assertions, 404s in production.**
+
+**`finalizePaidOrder` is unchanged.** The regression coverage proves its two
+atomic primitives by running *the exact statements it runs* against the real
+tables, inside transactions that always roll back, then asserting the rows are
+byte-identical afterwards:
+
+- the pending-claim is single-winner — **1 then 0**; a retry cannot re-finalize
+- the conditional stock increment claims exactly once when it fits, updates
+  **zero** rows when it would oversell, never passes the inventory cap, and the
+  oversold rollback returns the units
+
+⚠️ **It never calls `finalizePaidOrder` itself.** That function opens its own
+`prisma.$transaction`, which would **not** enlist in a wrapper transaction — the
+writes would commit against production. Anything testing it must exercise the
+statements, not the function.
+
+⚠️ **Fixtures deliberately exclude rows on live drops.** The stock test rewrites
+inventory before rolling back; with a real sale running, that is the last row it
+should be near. Without the filter `findFirst` had picked a safe row by luck.
+
+Source assertions additionally pin: the claim predicate, that the count-0
+short-circuit precedes the stock loop, that DropPoints/commission/email fire
+only on the winning claim, that the oversold refund keeps
+`refund_application_fee: true` and its idempotency key, and that C1 touched
+neither online checkout, `Order.source`, nor `recordRelationship`.
+
+### 19.3 A Phase A assertion had gone stale
+
+`scripts/phase-a-selftest.mjs` asserted **`live === 0`** — "no live drop is
+affected by this change". True while Phase A rolled out, but that is a
+point-in-time fact about production, not an invariant. **DropQ having live drops
+is the goal**, so the assertion was guaranteed to fail the moment the product
+worked.
+
+Replaced with the property Phase A actually guarantees and which is worth
+checking forever:
+
+> **every live drop belongs to a charge-ready vendor**
+
+That would catch a publish-gate leak, or a selling vendor whose Stripe was
+revoked while their drop stayed up. It passes today against the live flash sale.
+
+### 19.4 Verification
+
+phase-a **77/77** · payments **43/43** · tsc clean · build clean · drift empty ·
+no schema change.
+
+Post-deploy, **the live sale was re-checked and is intact**: HTTP 200, the
+Stripe checkout form still renders, `inventory=10 sold=0`, 0 orders. Production
+totals unchanged (orders 9, drops 11, sellers 9, `WalkUpSale` **0**,
+`PointsLedger` 8). All three dev selftests 404 in production.
+
+**No test order was placed and no Stripe charge was made.**
+
+### 19.5 C2 — what remains, and how to make it provable
+
+Extract the Stripe session creation from `lib/actions/order.ts` (now at `:177`;
+the §12 reference to `:169-217` is stale after Phase A).
+
+**Recommended shape, better than "extract verbatim":** split into a **pure
+`buildCheckoutSessionParams()`** returning the Stripe params object, plus the
+one-line `create` at the call site. The params object can then be deep-equalled
+against a frozen golden snapshot for both `absorb` and `pass` fee modes — a
+*proof* of no behaviour change, with no Stripe call. "Extract verbatim" offers
+no such proof.
+
+**Deploy only when no drop is live.** Check first:
+
+```sql
+SELECT count(*) FROM "Drop" WHERE status = 'live';
+```
