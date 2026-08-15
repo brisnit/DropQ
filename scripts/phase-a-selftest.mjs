@@ -243,9 +243,23 @@ try {
   ok("every production seller classifies without throwing", sellers.length > 0);
   ok("no production seller is in an undefined state",
      sellers.every((s) => isVendorSellable(s) || !!sellerBlockReason(s)));
-  const live = await prisma.drop.count({ where: { status: "live" } });
-  console.log(`  live drops in production: ${live}`);
-  ok("blast radius: no live drop is affected by this change", live === 0);
+  // This used to assert `live === 0` — true while Phase A was rolling out, but
+  // that was a point-in-time fact about production, not an invariant. DropQ
+  // having live drops is the goal. Replaced with the property Phase A actually
+  // guarantees, which is worth checking forever: a drop can only BE live if its
+  // vendor can take money. A failure here means either the publish gate leaked
+  // or a selling vendor's Stripe was revoked while their drop stayed up.
+  const liveDrops = await prisma.drop.findMany({
+    where: { status: "live" },
+    select: { title: true, seller: { select: { storeName: true, stripeChargesEnabled: true, stripeAccountId: true, disabledAt: true } } },
+  });
+  console.log(`  live drops in production: ${liveDrops.length}`);
+  for (const d of liveDrops) {
+    console.log(`    "${d.title}" — ${d.seller.storeName} (${isVendorSellable(d.seller) ? "charge-ready" : "NOT SELLABLE"})`);
+  }
+  ok("every live drop belongs to a charge-ready vendor",
+     liveDrops.every((d) => isVendorSellable(d.seller)),
+     liveDrops.filter((d) => !isVendorSellable(d.seller)).map((d) => d.title).join(", "));
   await prisma.$disconnect();
 } catch (e) {
   console.log(`  ! skipped DB check: ${e.message}`);
