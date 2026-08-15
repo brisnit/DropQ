@@ -561,18 +561,85 @@ collide.
    review, not a payment-phase drive-by.
 3. **Vendor Stripe onboarding is its own phase** — PHASE V in the roadmap.
 
-### 🔜 PHASE V — Vendor Onboarding / Activation (recorded, not started)
+### PHASE V — Vendor Activation · V.0 ✅ SHIPPED, V.1 designed
 
-**Recommended next, before in-person Phase C.** Reason: **5 of 9 production
-vendors are not charge-ready**, and walk-up sales need Stripe exactly as online
-sales do — so shipping C–G first delivers the feature to 44% of vendors.
+Full spec: **`docs/VENDOR-ACTIVATION.md`**.
 
-Full spec in `docs/CUSTOMER-PLATFORM-ROADMAP.md` → PHASE V: activation
-checklist, Stripe status granularity, and the Phase 8 activation funnel.
-**Derive readiness from existing state — do not add a `readyToSell` flag**; it
-would go stale the moment Stripe revokes charges, which is exactly what the A.1
-alert exists to catch. `lib/payments.ts` and `components/stripe-required-banner.tsx`
-already do most of the derivation — extend them, don't duplicate.
+**Ready to Sell === Stripe charge-ready. Nothing else.** Products, drops and
+profile fields are progress milestones, not requirements — `updateStoreAction`
+makes every profile field nullable, so "incomplete profile" does not exist as a
+concept and inventing one would pad a progress bar with a fake requirement.
+
+**V.0 shipped:** `lib/activation.ts` (server-only, pure) +
+`app/api/dev/activation-selftest/route.ts` — **63 assertions, writes nothing,
+404s in production**. Five milestones (account · email · Stripe · build a drop ·
+publish), a single `nextAction`, and a `stage` of `activating` /
+`ready_no_sale` / `complete`. Demo stores excluded via `isDemoStore`.
+
+⚠️ **Every later sub-phase must consume `lib/activation.ts`, not re-derive.**
+It imports `isVendorSellable` from `lib/payments.ts` rather than restating the
+Stripe rule. **It derives; it never enforces** — Phase A's server gate is still
+the only thing that stops a sale, and `test:phase-a` stays 77/77.
+
+**The finding that reframed the phase:** `stripe setup started` and
+`stripe charge-ready` are the **same 4 vendors**. Nobody has ever begun Stripe
+onboarding and abandoned it partway. The funnel doesn't leak *inside* Stripe —
+it leaks at the decision to click Connect. A better Stripe wizard would fix
+nothing; the intervention belongs on the dashboard and around drop creation.
+
+**A live bug V.2 must fix:** `app/dashboard/page.tsx:86` tells a vendor with a
+draft and no live drop *"Your drop is ready to publish"* — directly below the
+Phase A banner saying they can't sell. Two adjacent cards, contradictory
+instructions. V.2 **replaces** that card; it must not stack beside it.
+
+### ⚠️ Local dev runs with the Stripe gate WIDE OPEN
+
+Local `.env` has `STRIPE_SECRET_KEY=` **with an empty value**, so
+`isStripeEnabled()` is false and `isVendorSellable()` returns **true for
+everyone**. The first activation selftest run reported all 9 vendors as
+`charge_ready`. Anyone testing Phase A or activation locally will wrongly
+conclude the gating doesn't work. Use a dummy key:
+
+```
+STRIPE_SECRET_KEY=sk_test_dummy npm run dev
+curl localhost:3000/api/dev/activation-selftest
+```
+
+Nothing in the gating path calls Stripe, so a dummy value is safe.
+
+### V.1 — designed, NOT applied, awaiting approval
+
+`Seller.stripeChargesEnabledAt DateTime?` — `ALTER TABLE "Seller" ADD COLUMN`,
+one nullable column, **no backfill**.
+
+Semantics: the **first** time the seller became charge-ready. An activation
+timestamp, *not* current status — `stripeChargesEnabled` stays authoritative.
+Written exactly once via a second guarded `updateMany` predicated on
+`stripeChargesEnabledAt: null`, so re-activation can never overwrite it.
+
+**No historical backfill, deliberately.** The best available evidence for the 4
+charge-ready vendors is an upper bound off by 12–36 days, and two of them have
+no evidence at all. Writing `createdAt` or `now()` would fabricate the very
+metric the column exists to feed. Leaving NULL does **not** misclassify them:
+`charge_ready` comes from `isVendorSellable()` which never reads the timestamp,
+and `not_started` requires `stripeAccountId == null`. Residual exposure is 2
+vendors in a hypothetical future restriction, degrading to today's copy — and
+the A.1 email still fires regardless. See VENDOR-ACTIVATION.md §11.3.
+
+### V.2 / V.3 / V.Admin / V.4 — recorded, not started
+
+**V.Admin** (recommended after V.2) is admin visibility into who can't sell:
+same `stripeActivationState()`, no second status model. Priority comes from
+effort-without-payment — *"built a drop, no Stripe"* currently describes **3 of
+9 vendors**. Manual outreach only; no automated campaigns. Don't alert on
+brand-new signups (Grandies built a drop within 2 minutes of signing up).
+
+**Why Phase V runs before in-person Phase C:** 5 of 9 production vendors are
+not charge-ready, and walk-up sales need Stripe exactly as online sales do — so
+shipping C–G first would deliver the feature to 44% of the vendor base.
+
+**Do not add a `readyToSell` flag.** It would go stale the moment Stripe revokes
+charges, which is exactly what the A.1 alert exists to catch.
 
 ### Live production note (2026-08-15)
 

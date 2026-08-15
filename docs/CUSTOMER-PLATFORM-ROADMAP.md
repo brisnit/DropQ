@@ -203,14 +203,29 @@ from the product when the phase begins — `Seller` already carries
 `dropsCreated`, plus profile fields, and `VendorProduct` / `Drop` / `Order`
 answer the rest.
 
-- [ ] V.1 Activation checklist with progress state
-- [ ] V.2 Persistent but non-annoying **Finish Stripe Setup** CTA
-      *(`components/stripe-required-banner.tsx` already exists and already
-      distinguishes the failure modes — extend it, don't duplicate it)*
-- [ ] V.3 Contextual nudges while adding products and building drops, getting
-      stronger as the vendor approaches publishing
-- [ ] V.4 A clear **Ready to Sell** state
-- [ ] V.5 Richer Stripe status than the current boolean
+Full spec: **`docs/VENDOR-ACTIVATION.md`**.
+
+- [x] **V.0 — derived activation model.** `lib/activation.ts` + a 63-assertion
+      dev selftest. Pure derivation, no schema, nothing renders it yet. Every
+      later sub-phase and the admin view consume this one module rather than
+      re-deriving activation rules.
+- [ ] **V.1 — `Seller.stripeChargesEnabledAt`.** One nullable column, written
+      exactly once on the first charge-ready transition, never overwritten.
+      Distinguishes *restricted* from *never finished*. **Designed, awaiting
+      approval; no backfill — see VENDOR-ACTIVATION.md §11.3.**
+- [ ] **V.2 — Dashboard "Get ready to sell" card.** Replaces the existing
+      "Next step" card while activation is incomplete (that card currently tells
+      Stripe-less vendors their drop is ready to publish, which is false).
+      Collapses when done, disappears after the first paid order.
+- [ ] **V.3 — Contextual nudges** after saving a product/draft drop, and
+      disabling the "live" option in the drop editor for non-charge-ready
+      vendors. **Presentation only — the Phase A server gate stays authoritative.**
+- [ ] **V.Admin — Vendor Activation Operations.** Admin visibility into who
+      can't sell and who is worth contacting. Recommended **after V.2**; it is
+      the highest-immediate-value sub-phase, because 5 of 9 vendors cannot sell
+      and nobody can currently see that without a database query. Manual
+      outreach only — no automated campaigns.
+- [ ] **V.4 — activation analytics.** Deferred to Phase 8.5.
 
 ### Stripe status granularity
 
@@ -280,11 +295,16 @@ like everything else.
       top acquiring vendors, cross-vendor purchases
 - [ ] 8.4 Vendor analytics: their followers, customers they brought in,
       repeat rate — scoped so a vendor never sees platform-wide data
-- [ ] 8.5 **Vendor activation funnel** — signup → business setup → Stripe
-      started → charge-ready → first product → first draft drop → first live
-      drop → first paid order. See PHASE V. This is how we learn where vendor
-      activation actually breaks; today we only know the outcome (5 of 9
-      vendors not charge-ready), not the step they gave up on.
+- [ ] 8.5 **Vendor activation funnel** — `vendor_signup` →
+      `vendor_stripe_setup_started` → `vendor_stripe_charge_ready` →
+      `vendor_first_drop_created` → `vendor_first_drop_published` →
+      `vendor_first_paid_order`, plus the diagnostic `vendor_publish_blocked`
+      and `vendor_stripe_restricted`. Full vocabulary in
+      `docs/VENDOR-ACTIVATION.md` §13. This is how we learn where activation
+      breaks; today we only know the outcome (5 of 9 vendors not charge-ready),
+      not the step they gave up on. Measuring whether **admin outreach** lifts
+      activation additionally needs a contact timestamp — a V.Admin decision,
+      not designed yet.
 
 ---
 
