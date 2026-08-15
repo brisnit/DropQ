@@ -1,7 +1,6 @@
 # DropQ Phase V — Vendor Onboarding / Activation
 
-**Status: V.0 SHIPPED (derivation + tests). V.1 migration DESIGNED, not applied.
-V.2 / V.3 / V.Admin / V.4 recorded, not started.**
+**Status: V.0 and V.1 SHIPPED. V.2 / V.3 / V.Admin / V.4 recorded, not started.**
 
 Goal: a vendor should always know **what they've done, what's next, and when
 they're ready to sell** — instead of discovering requirements when something
@@ -559,7 +558,7 @@ Nothing in the activation or gating path calls Stripe, so a dummy value is safe.
 
 ---
 
-## 11. V.1 — migration design (NOT APPLIED)
+## 11. V.1 — as shipped
 
 ### 11.1 Schema change
 
@@ -576,7 +575,12 @@ model Seller {
 }
 ```
 
-### 11.2 Generated SQL
+### 11.2 Migration as applied
+
+`20260815042013_add_seller_stripe_charges_enabled_at`, applied with
+`migrate deploy`. The generated SQL was re-confirmed against the live database
+immediately before applying and was byte-identical to the reviewed version —
+**exactly one DDL statement**:
 
 ```sql
 -- AlterTable
@@ -793,3 +797,64 @@ is unmeasurable.
 Emit nothing for `isDemoStore` vendors. Identify by `Seller.id`, no PII.
 Postgres stays the source of truth for counts; PostHog answers timing and
 ordering.
+
+---
+
+## 14. V.1 — shipped
+
+`20260815042013_add_seller_stripe_charges_enabled_at`, applied 2026-08-15 with
+`migrate deploy`. **One nullable column. No backfill. No other table touched.**
+
+### 14.1 Verification
+
+- Generated SQL re-confirmed identical to the reviewed version immediately
+  before applying — one `ALTER TABLE ... ADD COLUMN`, nothing else.
+- `migrate status` clean (4 migrations) · drift check `-- This is an empty
+  migration.`
+- **All 9 sellers have `stripeChargesEnabledAt = NULL`.** No backfill ran.
+- **Every existing `Seller` field is byte-identical.** Hashing all nine rows
+  *excluding* the new column reproduces the pre-migration hash exactly
+  (`60696e8b0ff990f3`). The other nine business tables are unchanged outright.
+- Activation selftest **75/75** · `test:phase-a` **77/77** · `tsc` clean ·
+  `next build` clean.
+
+### 14.2 The six transition cases, proven against the real table
+
+Not modelled — the selftest runs the exact predicates the webhook ships, against
+the live `Seller` table, inside a transaction that always rolls back (verified:
+all rows still NULL afterwards).
+
+| Case | Result |
+|---|---|
+| first `false → true` flips the row | ✓ |
+| first `false → true` **sets** the timestamp | ✓ |
+| `true → true` is a no-op (0 rows flipped) | ✓ |
+| `true → false` **preserves** the timestamp | ✓ |
+| later `false → true` does **not** overwrite it | ✓ |
+| the test wrote nothing to production | ✓ |
+
+Plus the legacy cases: a charge-ready vendor with a NULL timestamp still derives
+`charge_ready` and `readyToSell: true`; `not_started` is reachable **only** via a
+null `stripeAccountId`; a legacy account that loses charges reads `unknown` and
+is told *"Finish Stripe setup"*, never "Connect Stripe" from scratch; and
+current sellability is provably independent of the timestamp.
+
+### 14.3 Where it is written
+
+Two places, both predicated on `stripeChargesEnabledAt: null` so the **first**
+activation wins:
+
+- `app/api/stripe/webhook/route.ts` — a **second, separately predicated**
+  `updateMany` after the A.1 transition detector. Folding it into that one update
+  would re-stamp on every re-activation, which is the bug this shape avoids.
+- `lib/actions/stripe.ts` `refreshStripeStatusAction` — same guarded write, so a
+  vendor who hits "Refresh status" during a webhook delay is still recorded.
+
+### 14.4 No historical backfill — final
+
+All 9 rows are NULL and stay that way. The best available evidence for the four
+charge-ready vendors was an upper bound off by 12–36 days, and two had none at
+all (§11.3). Seller creation date, first paid order, Stripe account creation and
+inferred windows were all considered and rejected as fabrication.
+
+The `unknown` state (§10.2) is what makes NULL honest rather than wrong.

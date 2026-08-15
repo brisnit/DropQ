@@ -75,10 +75,21 @@ export async function refreshStripeStatusAction() {
     const stripe = getStripe();
     if (stripe && seller.stripeAccountId) {
       const account = await stripe.accounts.retrieve(seller.stripeAccountId);
+      const chargesEnabled = !!account.charges_enabled;
       await prisma.seller.update({
         where: { id: seller.id },
-        data: { stripeChargesEnabled: !!account.charges_enabled },
+        data: { stripeChargesEnabled: chargesEnabled },
       });
+      // Stamp activation history if this is the first time we've seen them
+      // charge-ready — the account.updated webhook usually gets here first, but
+      // a vendor who hits "Refresh status" during a webhook delay should still
+      // be recorded. Predicated on null so it can never overwrite the original.
+      if (chargesEnabled) {
+        await prisma.seller.updateMany({
+          where: { id: seller.id, stripeChargesEnabledAt: null },
+          data: { stripeChargesEnabledAt: new Date() },
+        });
+      }
     }
   } catch (e) {
     console.error("Stripe status refresh failed:", e);

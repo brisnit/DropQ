@@ -142,6 +142,23 @@ export async function POST(req: NextRequest) {
         data: { stripeChargesEnabled: chargesEnabled },
       });
 
+      // Activation history (Phase V.1). Deliberately a SECOND, separately
+      // predicated update rather than a field on the one above: folding it in
+      // would re-stamp the column on every later re-activation. Predicating on
+      // `stripeChargesEnabledAt: null` means the row matches only while unset,
+      // so the FIRST activation wins and every later one updates zero rows.
+      //
+      // stripeChargesEnabled stays authoritative for CURRENT sellability; this
+      // column is history only, and is never cleared on true -> false. That is
+      // what lets lib/activation.ts tell "was selling, now restricted" from
+      // "never finished onboarding".
+      if (flipped.count > 0 && chargesEnabled) {
+        await prisma.seller.updateMany({
+          where: { stripeAccountId: account.id, stripeChargesEnabledAt: null },
+          data: { stripeChargesEnabledAt: new Date() },
+        });
+      }
+
       // Only on charge-ready -> not charge-ready. Becoming ready again needs no
       // alert: the vendor's storefront simply starts working and the dashboard
       // banner disappears.

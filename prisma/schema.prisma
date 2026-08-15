@@ -61,6 +61,16 @@ model Seller {
   // Stripe Connect (payouts)
   stripeAccountId      String? @unique
   stripeChargesEnabled Boolean @default(false)
+  /// The FIRST time this seller became Stripe charge-ready. An activation
+  /// timestamp, NOT a representation of current status — `stripeChargesEnabled`
+  /// remains authoritative for that. Set once on the first false->true
+  /// transition and never overwritten or cleared, so that
+  /// `!stripeChargesEnabled && stripeChargesEnabledAt != null` means "was
+  /// selling, Stripe has since restricted them" — a different situation from
+  /// "never finished onboarding", needing different words.
+  /// NULL for vendors who were already charge-ready before this column existed;
+  /// see docs/VENDOR-ACTIVATION.md §4.1 for why that is not backfilled.
+  stripeChargesEnabledAt DateTime?
 
   // Stripe Billing (DropQ subscription charged to the vendor)
   stripeCustomerId     String? @unique

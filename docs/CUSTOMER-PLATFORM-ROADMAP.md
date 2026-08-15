@@ -209,10 +209,13 @@ Full spec: **`docs/VENDOR-ACTIVATION.md`**.
       dev selftest. Pure derivation, no schema, nothing renders it yet. Every
       later sub-phase and the admin view consume this one module rather than
       re-deriving activation rules.
-- [ ] **V.1 — `Seller.stripeChargesEnabledAt`.** One nullable column, written
-      exactly once on the first charge-ready transition, never overwritten.
-      Distinguishes *restricted* from *never finished*. **Designed, awaiting
-      approval; no backfill — see VENDOR-ACTIVATION.md §11.3.**
+- [x] **V.1 — `Seller.stripeChargesEnabledAt`.** Shipped
+      (`20260815042013_add_seller_stripe_charges_enabled_at`). One nullable
+      column, written exactly once on the first charge-ready transition and
+      never overwritten. Distinguishes *restricted* from *never finished*.
+      **No backfill — all 9 sellers are NULL by design; see
+      VENDOR-ACTIVATION.md §11.3/§14.4.** `stripeChargesEnabled` remains
+      authoritative for current sellability.
 - [ ] **V.2 — Dashboard "Get ready to sell" card.** Replaces the existing
       "Next step" card while activation is incomplete (that card currently tells
       Stripe-less vendors their drop is ready to publish, which is false).

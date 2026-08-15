@@ -158,6 +158,112 @@ export async function GET() {
       .applicable === false);
   check("a real vendor is applicable", activationState(NOT_STARTED, HAS_DROP).applicable === true);
 
+  /* ------------- V.1 activation-timestamp transition semantics ----------- */
+  // Proven against the REAL Seller table, inside a transaction that always
+  // rolls back, so the exact predicates shipped in the webhook are exercised
+  // rather than a model of them.
+  {
+    const ROLLBACK = "__rollback__";
+    // Stamp exactly as app/api/stripe/webhook/route.ts does.
+    const applyTransition = async (
+      tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+      id: string,
+      chargesEnabled: boolean
+    ) => {
+      const flipped = await tx.seller.updateMany({
+        where: { id, stripeChargesEnabled: !chargesEnabled },
+        data: { stripeChargesEnabled: chargesEnabled },
+      });
+      if (flipped.count > 0 && chargesEnabled) {
+        await tx.seller.updateMany({
+          where: { id, stripeChargesEnabledAt: null },
+          data: { stripeChargesEnabledAt: new Date() },
+        });
+      }
+      return flipped.count;
+    };
+
+    const victim = await prisma.seller.findFirst({ select: { id: true } });
+    let t: {
+      afterFirst: Date | null;
+      afterOff: Date | null;
+      afterSecond: Date | null;
+      noopFlips: number;
+      firstFlips: number;
+    } | null = null;
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        // Start from a clean "never activated" state.
+        await tx.seller.update({
+          where: { id: victim!.id },
+          data: { stripeChargesEnabled: false, stripeChargesEnabledAt: null },
+        });
+
+        const firstFlips = await applyTransition(tx, victim!.id, true);
+        const afterFirst = (await tx.seller.findUnique({
+          where: { id: victim!.id }, select: { stripeChargesEnabledAt: true },
+        }))!.stripeChargesEnabledAt;
+
+        // true -> true must be a no-op.
+        const noopFlips = await applyTransition(tx, victim!.id, true);
+
+        // true -> false must PRESERVE the timestamp.
+        await applyTransition(tx, victim!.id, false);
+        const afterOff = (await tx.seller.findUnique({
+          where: { id: victim!.id }, select: { stripeChargesEnabledAt: true },
+        }))!.stripeChargesEnabledAt;
+
+        // Re-activation must NOT overwrite it.
+        await new Promise((r) => setTimeout(r, 5));
+        await applyTransition(tx, victim!.id, true);
+        const afterSecond = (await tx.seller.findUnique({
+          where: { id: victim!.id }, select: { stripeChargesEnabledAt: true },
+        }))!.stripeChargesEnabledAt;
+
+        t = { afterFirst, afterOff, afterSecond, noopFlips, firstFlips };
+        throw new Error(ROLLBACK);
+      });
+    } catch (e) {
+      if (!(e instanceof Error && e.message === ROLLBACK)) throw e;
+    }
+
+    const r = t as unknown as {
+      afterFirst: Date | null; afterOff: Date | null; afterSecond: Date | null;
+      noopFlips: number; firstFlips: number;
+    };
+    check("V.1 first false->true flips the row", r.firstFlips === 1);
+    check("V.1 first false->true SETS the timestamp", r.afterFirst !== null);
+    check("V.1 true->true is a no-op (0 rows flipped)", r.noopFlips === 0);
+    check("V.1 true->false PRESERVES the timestamp",
+      r.afterOff !== null && r.afterOff.getTime() === r.afterFirst!.getTime());
+    check("V.1 later false->true does NOT overwrite the timestamp",
+      r.afterSecond !== null && r.afterSecond.getTime() === r.afterFirst!.getTime(),
+      `first=${r.afterFirst?.toISOString()} second=${r.afterSecond?.toISOString()}`);
+
+    const stillNull = await prisma.seller.count({ where: { stripeChargesEnabledAt: null } });
+    const total = await prisma.seller.count();
+    check("V.1 transition test wrote nothing to production",
+      stillNull === total, `${stillNull}/${total} still NULL`);
+  }
+
+  /* -------- Legacy vendors: NULL timestamp must not misclassify them ------ */
+  check("legacy charge-ready + NULL timestamp is charge_ready, not not_started",
+    stripeActivationState(LEGACY_READY) === "charge_ready");
+  check("legacy charge-ready + NULL timestamp is Ready to Sell",
+    activationState(LEGACY_READY, NOTHING).readyToSell === true);
+  check("null stripeAccountId is the ONLY route to not_started",
+    stripeActivationState({ ...LEGACY_READY, stripeChargesEnabled: false }) !== "not_started" &&
+    stripeActivationState(NOT_STARTED) === "not_started");
+  check("legacy vendor with an account but no timestamp reads unknown, not not_started",
+    stripeActivationState({ ...LEGACY_READY, stripeChargesEnabled: false }) === "unknown");
+  check("an unknown-state vendor is never told 'Connect Stripe' from scratch",
+    activationState({ ...LEGACY_READY, stripeChargesEnabled: false }, NOTHING)
+      .nextAction!.cta === "Finish Stripe setup");
+  check("current sellability never depends on the timestamp",
+    activationState(LEGACY_READY, NOTHING).readyToSell ===
+      activationState(READY, NOTHING).readyToSell);
+
   /* ------------------------- Purity / no enforcement --------------------- */
   {
     const a = activationState(READY, HAS_DROP);

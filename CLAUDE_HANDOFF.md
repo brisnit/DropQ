@@ -561,7 +561,7 @@ collide.
    review, not a payment-phase drive-by.
 3. **Vendor Stripe onboarding is its own phase** — PHASE V in the roadmap.
 
-### PHASE V — Vendor Activation · V.0 ✅ SHIPPED, V.1 designed
+### PHASE V — Vendor Activation · V.0 ✅ + V.1 ✅ SHIPPED
 
 Full spec: **`docs/VENDOR-ACTIVATION.md`**.
 
@@ -571,8 +571,9 @@ makes every profile field nullable, so "incomplete profile" does not exist as a
 concept and inventing one would pad a progress bar with a fake requirement.
 
 **V.0 shipped:** `lib/activation.ts` (server-only, pure) +
-`app/api/dev/activation-selftest/route.ts` — **63 assertions, writes nothing,
-404s in production**. Five milestones (account · email · Stripe · build a drop ·
+`app/api/dev/activation-selftest/route.ts` — **75 assertions, 404s in
+production**. It writes nothing that survives: the only DB writes are inside a
+transaction that always rolls back, to prove the V.1 transition predicates. Five milestones (account · email · Stripe · build a drop ·
 publish), a single `nextAction`, and a `stage` of `activating` /
 `ready_no_sale` / `complete`. Demo stores excluded via `isDemoStore`.
 
@@ -607,24 +608,32 @@ curl localhost:3000/api/dev/activation-selftest
 
 Nothing in the gating path calls Stripe, so a dummy value is safe.
 
-### V.1 — designed, NOT applied, awaiting approval
+### V.1 ✅ SHIPPED — `Seller.stripeChargesEnabledAt`
 
-`Seller.stripeChargesEnabledAt DateTime?` — `ALTER TABLE "Seller" ADD COLUMN`,
-one nullable column, **no backfill**.
+`20260815042013_add_seller_stripe_charges_enabled_at`. One nullable column,
+**no backfill**, no other table touched. All 9 sellers are NULL and stay NULL.
 
-Semantics: the **first** time the seller became charge-ready. An activation
-timestamp, *not* current status — `stripeChargesEnabled` stays authoritative.
-Written exactly once via a second guarded `updateMany` predicated on
-`stripeChargesEnabledAt: null`, so re-activation can never overwrite it.
+Semantics: the **first** time DropQ observed the seller become charge-ready.
+Activation history, *not* current status — **`stripeChargesEnabled` remains
+authoritative for sellability, and `isVendorSellable()` never reads this
+column.**
 
-**No historical backfill, deliberately.** The best available evidence for the 4
-charge-ready vendors is an upper bound off by 12–36 days, and two of them have
-no evidence at all. Writing `createdAt` or `now()` would fabricate the very
-metric the column exists to feed. Leaving NULL does **not** misclassify them:
-`charge_ready` comes from `isVendorSellable()` which never reads the timestamp,
-and `not_started` requires `stripeAccountId == null`. Residual exposure is 2
-vendors in a hypothetical future restriction, degrading to today's copy — and
-the A.1 email still fires regardless. See VENDOR-ACTIVATION.md §11.3.
+⚠️ **Written by a SECOND, separately predicated `updateMany`** in
+`app/api/stripe/webhook/route.ts`, guarded by `stripeChargesEnabledAt: null`.
+**Do not fold it into the transition update above it** — that would re-stamp the
+column on every re-activation and destroy the original activation date. Same
+guarded write in `refreshStripeStatusAction`.
+
+**No historical backfill, deliberately and permanently.** The best evidence for
+the 4 charge-ready vendors was an upper bound off by 12–36 days; two had none.
+Seller creation date, first paid order and Stripe account creation were all
+rejected as fabrication. Leaving NULL does **not** misclassify them —
+`charge_ready` comes from `isVendorSellable()`, and `not_started` requires
+`stripeAccountId == null`. The `unknown` state covers the rest.
+
+Verified: every existing `Seller` field byte-identical (hash excluding the new
+column reproduces the pre-migration hash), 6 transition cases proven against the
+real table in rolled-back transactions, selftest 75/75, `test:phase-a` 77/77.
 
 ### V.2 / V.3 / V.Admin / V.4 — recorded, not started
 

@@ -28,6 +28,18 @@ npm run dev
 Open the app at **http://localhost:3000**. With no `BLOB_READ_WRITE_TOKEN` set,
 image uploads are written to `/public/uploads` locally.
 
+## Tests
+
+| Suite | Command | Notes |
+|---|---|---|
+| Payments / sell gate (Phase A) | `npm run test:phase-a` | 77 assertions. Pure + static; writes nothing. |
+| Vendor activation (Phase V) | `curl localhost:3000/api/dev/activation-selftest` | 75 assertions. **Needs a non-empty `STRIPE_SECRET_KEY`** — see the trap under Payments. 404s in production. |
+| Messaging / consent | `curl localhost:3000/api/dev/messaging-selftest` | 49 assertions. ⚠️ **Creates sellers, drops and orders — never run it while `.env` points at production.** |
+
+Plus `npx tsc --noEmit` and `npm run build`. If `tsc` fails with duplicate
+`PageProps`/`LayoutProps`, clear the stale iCloud copies first:
+`find .next app/generated -name "* [0-9].*" -delete`.
+
 ## Deploy to Vercel
 
 1. **Database** — Vercel project → **Storage → Create → Postgres** (Neon). This
@@ -138,6 +150,31 @@ small platform fee per transaction (a **destination charge** with an
 **Demo mode (default):** with no Stripe keys set, checkout completes instantly with
 no real charge — great for trying the app. The Payments page shows a "Demo mode"
 notice.
+
+> ### ⚠️ Local-dev trap: an empty `STRIPE_SECRET_KEY` disables the sell gate
+>
+> DropQ's governing platform rule is that a vendor **cannot sell unless their
+> Stripe account is charge-ready** (`isVendorSellable()` in
+> [lib/payments.ts](lib/payments.ts), enforced by `placeOrderAction` and
+> `resolveDropStatus`).
+>
+> That rule short-circuits to **allow everything** when `isStripeEnabled()` is
+> false — i.e. when `STRIPE_SECRET_KEY` is unset **or set to an empty string**.
+> This is deliberate: it is what keeps demo mode and seeding usable. But it means
+> a local run with an empty key shows **every vendor as charge-ready and no
+> gating at all**, which is easy to misread as the production gate being broken.
+> It is not — production always has a real key.
+>
+> **To exercise the real gate locally**, set any non-empty value. Nothing in the
+> gating or activation path calls Stripe, so a dummy works:
+>
+> ```bash
+> STRIPE_SECRET_KEY=sk_test_dummy npm run dev
+> curl localhost:3000/api/dev/activation-selftest   # 75 assertions
+> ```
+>
+> With an empty key that self-test reports all vendors `charge_ready` and fails
+> ~11 assertions. **Never "fix" that by weakening the gate.**
 
 **Turn on real payments:**
 1. Create a [Stripe](https://dashboard.stripe.com) account and enable **Connect**
