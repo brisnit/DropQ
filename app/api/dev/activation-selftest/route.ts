@@ -5,6 +5,8 @@ import {
   stripeActivationState,
   stripeBlocksSelling,
   activationFacts,
+  activationCardMode,
+  showsGenericNextStep,
   type ActivationSeller,
   type ActivationFacts,
 } from "@/lib/activation";
@@ -263,6 +265,66 @@ export async function GET() {
   check("current sellability never depends on the timestamp",
     activationState(LEGACY_READY, NOTHING).readyToSell ===
       activationState(READY, NOTHING).readyToSell);
+
+  /* ----------------- V.2 dashboard card modes (the 9 scenarios) ---------- */
+  const mode = (sel: ActivationSeller, f: ActivationFacts) =>
+    activationCardMode(activationState(sel, f));
+  const generic = (sel: ActivationSeller, f: ActivationFacts) =>
+    showsGenericNextStep(activationState(sel, f));
+
+  check("V.2 not started, no drop -> full checklist", mode(NOT_STARTED, NOTHING) === "full");
+  check("V.2 not started, draft drop -> full checklist", mode(NOT_STARTED, HAS_DROP) === "full");
+  check("V.2 charge-ready, no drop -> compact", mode(READY, NOTHING) === "compact");
+  check("V.2 charge-ready, draft drop -> compact", mode(READY, HAS_DROP) === "compact");
+  check("V.2 published, unsold -> compact", mode(READY, PUBLISHED) === "compact");
+  check("V.2 first paid order -> card disappears", mode(READY, SOLD) === "hidden");
+  check("V.2 restricted vendor -> paused, NOT a fresh checklist",
+    mode(RESTRICTED, PUBLISHED) === "paused");
+  check("V.2 legacy/unknown Stripe -> full checklist", mode(INCOMPLETE, NOTHING) === "full");
+  check("V.2 demo store -> hidden regardless of state",
+    mode({ ...NOT_STARTED, slug: "marble-crumb" }, HAS_DROP) === "hidden" &&
+    mode({ ...READY, slug: "marble-crumb" }, SOLD) === "hidden");
+
+  // The whole point of V.2: a vendor who sold, then got restricted, must
+  // reappear — and must NOT be walked through onboarding again.
+  check("V.2 restricted AFTER selling -> reappears as paused, not hidden",
+    mode(RESTRICTED, SOLD) === "paused");
+  check("V.2 a restricted vendor is never shown the 5-step checklist",
+    mode(RESTRICTED, SOLD) !== "full" && mode(RESTRICTED, PUBLISHED) !== "full");
+
+  /* -------- No contradictory guidance (the Grandies bug this fixes) ------- */
+  check("V.2 generic Next-step card is suppressed whenever activation shows",
+    !generic(NOT_STARTED, HAS_DROP) && !generic(READY, PUBLISHED) &&
+    !generic(RESTRICTED, SOLD) && !generic(INCOMPLETE, NOTHING));
+  check("V.2 generic Next-step card returns once the vendor is selling",
+    generic(READY, SOLD) === true);
+  check("V.2 demo store keeps the normal dashboard",
+    generic({ ...NOT_STARTED, slug: "marble-crumb" }, HAS_DROP) === true);
+  {
+    // Grandies: draft drop, no Stripe. Must be told to connect Stripe, and must
+    // NOT be told to publish.
+    const st = activationState(NOT_STARTED, HAS_DROP);
+    check("V.2 Grandies-like state is told to connect Stripe",
+      st.nextAction!.key === "stripe" && st.nextAction!.cta === "Connect Stripe");
+    check("V.2 Grandies-like state is NEVER told to publish",
+      st.nextAction!.key !== "publish" &&
+      !/publish it to start taking orders/i.test(st.nextAction!.reason) &&
+      showsGenericNextStep(st) === false);
+    check("V.2 Grandies-like CTA points at the existing Stripe flow",
+      st.nextAction!.href === "/dashboard/payments");
+  }
+  check("V.2 every Stripe next-action routes to the existing payments page",
+    [activationState(NOT_STARTED, NOTHING), activationState(INCOMPLETE, NOTHING),
+     activationState(RESTRICTED, PUBLISHED)]
+      .every((x) => x.nextAction!.href === "/dashboard/payments"));
+  check("V.2 an existing-account vendor is never told to connect from scratch",
+    activationState(INCOMPLETE, NOTHING).nextAction!.cta !== "Connect Stripe" &&
+    activationState(RESTRICTED, NOTHING).nextAction!.cta !== "Connect Stripe");
+
+  /* ------ V.2 does not change enforcement: still derived, never gating ---- */
+  check("V.2 card mode never affects readyToSell",
+    activationState(READY, SOLD).readyToSell === true &&
+    activationState(NOT_STARTED, SOLD).readyToSell === false);
 
   /* ------------------------- Purity / no enforcement --------------------- */
   {

@@ -9,6 +9,8 @@ import { Stat, Section } from "@/components/dashboard-ui";
 import { LinkButton, Badge } from "@/components/ui";
 import { CopyLinkButton } from "@/components/copy-link-button";
 import { StripeRequiredBanner } from "@/components/stripe-required-banner";
+import { VendorActivationCard } from "@/components/vendor-activation-card";
+import { loadActivationState, showsGenericNextStep } from "@/lib/activation";
 
 export const metadata = { title: "Overview — DropQ" };
 
@@ -64,7 +66,14 @@ export default async function OverviewPage() {
   }));
   const bonusUntil = hasGrowthBonus(seller) ? formatDate(seller.growthBonusUntil!) : null;
 
-  // What should they do next?
+  // Vendor activation (Phase V). Single source of truth for what this vendor
+  // has done and what to do next — the card supersedes the generic "Next step"
+  // card below whenever it renders, so the dashboard can never show "Connect
+  // Stripe to start selling" above "Your drop is ready to publish".
+  const activation = await loadActivationState(seller);
+  const genericNextStep = showsGenericNextStep(activation);
+
+  // What should they do next? (Only shown once activation is out of the way.)
   let next: { tone: string; title: string; body: string; href: string; cta: string };
   if (drops.length === 0) {
     next = {
@@ -110,7 +119,10 @@ export default async function OverviewPage() {
 
   return (
     <Section>
-      <StripeRequiredBanner seller={seller} />
+      {/* The activation card carries the Stripe message itself while it's on
+          screen, so showing the banner too would say the same thing twice. */}
+      {genericNextStep && <StripeRequiredBanner seller={seller} />}
+      <VendorActivationCard state={activation} />
 
       {/* Header: store name + dominant New Drop action */}
       <div className="mb-6">
@@ -140,7 +152,8 @@ export default async function OverviewPage() {
         </Link>
       </div>
 
-      {/* Next action */}
+      {/* Next action — suppressed while the activation module is guiding them. */}
+      {genericNextStep && (
       <div className={`rounded-card p-6 sm:p-7 mb-7 flex flex-wrap items-center justify-between gap-4 ${next.tone}`}>
         <div className="max-w-xl">
           <p className="text-xs font-semibold uppercase tracking-wider opacity-80">
@@ -156,6 +169,7 @@ export default async function OverviewPage() {
           {next.cta} →
         </Link>
       </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">

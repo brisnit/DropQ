@@ -561,7 +561,7 @@ collide.
    review, not a payment-phase drive-by.
 3. **Vendor Stripe onboarding is its own phase** — PHASE V in the roadmap.
 
-### PHASE V — Vendor Activation · V.0 ✅ + V.1 ✅ SHIPPED
+### PHASE V — Vendor Activation · V.0 ✅ V.1 ✅ V.2 ✅ SHIPPED
 
 Full spec: **`docs/VENDOR-ACTIVATION.md`**.
 
@@ -635,7 +635,44 @@ Verified: every existing `Seller` field byte-identical (hash excluding the new
 column reproduces the pre-migration hash), 6 transition cases proven against the
 real table in rolled-back transactions, selftest 75/75, `test:phase-a` 77/77.
 
-### V.2 / V.3 / V.Admin / V.4 — recorded, not started
+### V.2 ✅ SHIPPED — the dashboard activation card
+
+`components/vendor-activation-card.tsx`, wired into `app/dashboard/page.tsx`.
+No schema change. **Guidance only** — Phase A's server gates remain the sole
+enforcement.
+
+⚠️ **It supersedes, it does not stack.** `showsGenericNextStep(state)` gates
+**both** the old "Next step" card and the `StripeRequiredBanner` on the
+dashboard home. Do not re-add either unconditionally — that recreates the exact
+contradiction this phase removed (*"Connect Stripe to start selling"* directly
+above *"Your drop is ready to publish"*). The banner is untouched on
+`/dashboard/drops*`, where there is no card.
+
+Four modes from `activationCardMode()` in `lib/activation.ts` — `full` /
+`paused` / `compact` / `hidden`. **The component decides nothing**; V.3 and
+V.Admin must ask the same function.
+
+⚠️ **`ActivationStage` was corrected here.** V.0 derived `complete` from
+`paidOrders > 0` alone, which would have made a vendor who sold and was *then
+restricted* disappear from activation UI while their storefront was down.
+`!readyToSell` now outranks past success and splits into `paused` (they already
+finished onboarding — one focused message, never the checklist again) vs
+`activating`. Safe because V.0 was inert.
+
+**Tests: 95/95** in the activation selftest, covering all nine scenarios plus
+"Grandies is never told to publish" and "restricted after selling reappears as
+paused, not hidden".
+
+**Verified against real vendors** by rendering the dashboard locally against the
+production database with minted sessions (read-only; no data modified):
+Grandies → full checklist, *"Your drop is ready. Connect Stripe to publish it."*;
+The Clovery → hidden, normal card back; Casa Makulay + Britts Bunnies →
+compact; Marble & Crumb → excluded. **No vendor showed the contradiction.**
+
+The `paused` variant is tested but **not yet observed in production** — it needs
+Stripe to actually restrict someone.
+
+### V.3 / V.Admin / V.4 — recorded, not started
 
 **V.Admin** (recommended after V.2) is admin visibility into who can't sell:
 same `stripeActivationState()`, no second status model. Priority comes from

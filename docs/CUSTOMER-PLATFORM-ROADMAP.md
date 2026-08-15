@@ -216,10 +216,13 @@ Full spec: **`docs/VENDOR-ACTIVATION.md`**.
       **No backfill — all 9 sellers are NULL by design; see
       VENDOR-ACTIVATION.md §11.3/§14.4.** `stripeChargesEnabled` remains
       authoritative for current sellability.
-- [ ] **V.2 — Dashboard "Get ready to sell" card.** Replaces the existing
-      "Next step" card while activation is incomplete (that card currently tells
-      Stripe-less vendors their drop is ready to publish, which is false).
-      Collapses when done, disappears after the first paid order.
+- [x] **V.2 — Dashboard "Get ready to sell" card.** Shipped. Supersedes both the
+      old "Next step" card and the Stripe banner on the dashboard home, so the
+      contradiction (*"Connect Stripe"* above *"Your drop is ready to publish"*)
+      can no longer occur. Four derived modes: full checklist / **paused** (was
+      selling, Stripe restricted — never re-runs onboarding) / compact
+      *"✓ Ready to sell"* / hidden once selling. 95/95 tests; verified against
+      all real vendors.
 - [ ] **V.3 — Contextual nudges** after saving a product/draft drop, and
       disabling the "live" option in the drop editor for non-charge-ready
       vendors. **Presentation only — the Phase A server gate stays authoritative.**

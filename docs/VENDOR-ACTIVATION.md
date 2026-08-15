@@ -1,6 +1,6 @@
 # DropQ Phase V — Vendor Onboarding / Activation
 
-**Status: V.0 and V.1 SHIPPED. V.2 / V.3 / V.Admin / V.4 recorded, not started.**
+**Status: V.0, V.1 and V.2 SHIPPED. V.3 / V.Admin / V.4 recorded, not started.**
 
 Goal: a vendor should always know **what they've done, what's next, and when
 they're ready to sell** — instead of discovering requirements when something
@@ -858,3 +858,85 @@ all (§11.3). Seller creation date, first paid order, Stripe account creation an
 inferred windows were all considered and rejected as fabrication.
 
 The `unknown` state (§10.2) is what makes NULL honest rather than wrong.
+
+---
+
+## 15. V.2 — shipped
+
+`components/vendor-activation-card.tsx` + wiring in `app/dashboard/page.tsx`.
+No schema change. **Guidance only** — Phase A's server gates are still the sole
+enforcement, and `test:phase-a` stays 77/77.
+
+### 15.1 It supersedes, it does not stack
+
+`showsGenericNextStep(state)` gates **both** the old "Next step" card and the
+`StripeRequiredBanner` on the dashboard home. Whenever the activation module
+renders anything, both are suppressed — so the §2.1 contradiction (*"Connect
+Stripe to start selling"* directly above *"Your drop is ready to publish"*)
+cannot occur. The banner stays untouched on `/dashboard/drops*`, where there is
+no activation card.
+
+### 15.2 Four modes, derived not hard-coded
+
+`activationCardMode(state)` lives in `lib/activation.ts` so V.3 and V.Admin ask
+the same question. The component decides nothing.
+
+| Mode | When | UI |
+|---|---|---|
+| `full` | can't sell, never sold | checklist, progress bar, one CTA |
+| `paused` | got past onboarding, Stripe has since stopped them | one focused "Selling is paused" message |
+| `compact` | can sell, no order yet | single line — *"✓ Ready to sell · <next>"* |
+| `hidden` | selling and has sold, or a demo store | nothing; normal dashboard returns |
+
+### 15.3 ⚠️ `ActivationStage` was corrected in V.2
+
+V.0 derived `stage: "complete"` from `paidOrders > 0` alone. That was wrong for
+the case your brief calls out: **a vendor who sold and was then restricted would
+have vanished from activation UI entirely**, despite their storefront being
+down. Equally, running them back through a five-step onboarding checklist they
+finished months ago would be insulting.
+
+So `!readyToSell` now outranks past success, and splits:
+
+```
+!readyToSell && (restricted || hasEverSold)  -> "paused"   (focused message)
+!readyToSell                                 -> "activating" (checklist)
+readyToSell && hasEverSold                   -> "complete"  (hidden)
+readyToSell                                  -> "ready_no_sale" (compact)
+```
+
+Safe to change: V.0 was inert, nothing consumed it. Tested both ways —
+*"restricted AFTER selling reappears as paused, not hidden"* and *"a restricted
+vendor is never shown the 5-step checklist"*.
+
+### 15.4 Tests — 95/95
+
+All nine required scenarios plus the regressions:
+not-started/no-drop → full · not-started/draft → full · charge-ready/no-drop →
+compact · charge-ready/draft → compact · published-unsold → compact ·
+first-paid-order → hidden · restricted → paused · legacy-unknown → full ·
+demo store → hidden.
+
+Plus: the generic Next-step card is suppressed whenever activation shows and
+returns once selling; **the Grandies state is told to connect Stripe, is never
+told to publish, and its CTA points at `/dashboard/payments`**; a vendor with an
+existing Stripe account is never told to "Connect Stripe" from scratch; and card
+mode provably never affects `readyToSell`.
+
+### 15.5 Verified against real vendors
+
+Rendered locally against the **production database** with real vendor sessions:
+
+| Vendor | Rendered |
+|---|---|
+| **Grandies** (draft drop, no Stripe) | *Get ready to sell · 2 of 5 complete* · ✓ account · ○ email · ○ **Connect Stripe** `Required to sell` · ✓ build a drop · ○ publish · *"Your drop is ready. Connect Stripe to publish it."* → **Connect Stripe** |
+| The Clovery (5 paid orders) | activation hidden; normal "Next step" card returns |
+| Casa Makulay (charge-ready, unsold) | compact *"✓ Ready to sell"* |
+| Britts Bunnies (charge-ready, no drop) | compact *"✓ Ready to sell"* |
+| Marble & Crumb (demo store) | activation excluded; normal dashboard + Stripe banner |
+
+**No vendor rendered the publish contradiction.** No production data was
+modified — sessions were minted locally against read-only page renders.
+
+The `paused` variant is covered by tests but **not yet observed in production**:
+it needs Stripe to actually restrict a vendor, and none is restricted today.

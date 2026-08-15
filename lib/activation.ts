@@ -108,10 +108,21 @@ export type ActivationFacts = {
   paidOrders: number;
 };
 
+/**
+ * Drives how prominent the activation UI should be.
+ *
+ * `paused` exists because a vendor who was selling and has since been
+ * restricted must NOT be shown a five-step onboarding checklist — they already
+ * did all of it. They need one focused "selling is paused" message. Equally
+ * they must not simply disappear from activation UI just because they once had
+ * a paid order: they cannot sell right now, and that is the whole point of the
+ * module.
+ */
 export type ActivationStage =
-  | "activating" // still has outstanding milestones
-  | "ready_no_sale" // everything done, waiting on a first customer
-  | "complete"; // has sold; onboarding is over
+  | "activating" // never sold, not ready — full checklist
+  | "paused" // was past onboarding, Stripe has since stopped them selling
+  | "ready_no_sale" // can sell, no order yet — compact nudge
+  | "complete"; // can sell and has sold — activation UI is done
 
 export type NextAction = {
   key: MilestoneKey | "share";
@@ -178,11 +189,19 @@ export function activationState(
   ];
 
   const completed = milestones.filter((m) => m.done).length;
-  const stage: ActivationStage = hasEverSold
-    ? "complete"
-    : completed === milestones.length
-      ? "ready_no_sale"
-      : "activating";
+
+  // Order matters. Not being able to sell always outranks past success: a
+  // restricted vendor with 200 orders still needs to be told their storefront
+  // is down. But they get `paused`, not `activating` — re-running them through
+  // an onboarding checklist they finished months ago would be insulting and
+  // would bury the one thing that actually needs doing.
+  const stage: ActivationStage = !readyToSell
+    ? stripe === "restricted" || hasEverSold
+      ? "paused"
+      : "activating"
+    : hasEverSold
+      ? "complete"
+      : "ready_no_sale";
 
   return {
     applicable: !isDemoStore(seller),
@@ -275,6 +294,44 @@ function nextAction(
   }
 
   return null;
+}
+
+/**
+ * How prominent the dashboard activation module should be. Derived here rather
+ * than in the component so the rule is testable and so V.3's nudges and
+ * V.Admin's view can ask the same question.
+ *
+ *   full    the vendor cannot sell and has never sold — show the checklist
+ *   paused  they got past onboarding and Stripe has since stopped them
+ *   compact they can sell — one line plus the next nudge
+ *   hidden  selling and has sold, or a demo store: get out of the way
+ */
+export type ActivationCardMode = "full" | "paused" | "compact" | "hidden";
+
+export function activationCardMode(state: ActivationState): ActivationCardMode {
+  if (!state.applicable) return "hidden";
+  switch (state.stage) {
+    case "activating":
+      return "full";
+    case "paused":
+      return "paused";
+    case "ready_no_sale":
+      return "compact";
+    case "complete":
+      return "hidden";
+  }
+}
+
+/**
+ * Should the dashboard's generic "Next step" card render?
+ *
+ * No, whenever the activation module is showing anything — otherwise a vendor
+ * without Stripe sees "Connect Stripe to start selling" directly above "Your
+ * drop is ready to publish", which is the exact contradiction V.2 exists to
+ * remove. The activation module supersedes it; it is not an extra card.
+ */
+export function showsGenericNextStep(state: ActivationState): boolean {
+  return activationCardMode(state) === "hidden";
 }
 
 /* --------------------------------- Loader -------------------------------- */
