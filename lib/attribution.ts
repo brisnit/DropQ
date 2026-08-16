@@ -104,10 +104,22 @@ export async function readTouch(): Promise<FirstTouch | null> {
 /**
  * Stamp acquisition onto a customer. No-op if they already have a first
  * vendor — that's the whole point of first-touch.
+ *
+ * `authoritative` says the caller's own signal outranks the `dq_touch` cookie.
+ * Only the walk-up payment path sets it: the customer was physically standing
+ * with the vendor, and a browsing cookie — possibly weeks old, possibly for a
+ * different vendor entirely — is not better evidence than that. A real canary
+ * sale was credited to a storefront visit from two days earlier before this
+ * existed.
+ *
+ * Everything else keeps cookie-first ordering, where the cookie IS the
+ * acquisition evidence. The already-attributed guard below runs first either
+ * way, so this can never rewrite an existing customer's acquisition.
  */
 export async function applyFirstTouch(
   customerId: string,
-  fallback?: Omit<FirstTouch, "at"> | null
+  fallback?: Omit<FirstTouch, "at"> | null,
+  opts?: { authoritative?: boolean }
 ): Promise<void> {
   try {
     const customer = await prisma.customer.findUnique({
@@ -118,7 +130,10 @@ export async function applyFirstTouch(
     // Already attributed — never overwrite.
     if (customer.firstVendorId || customer.signupSource) return;
 
-    const touch = (await readTouch()) ?? (fallback ? { ...fallback, at: new Date().toISOString() } : null);
+    const provided = fallback ? { ...fallback, at: new Date().toISOString() } : null;
+    const touch = opts?.authoritative
+      ? (provided ?? (await readTouch()))
+      : ((await readTouch()) ?? provided);
     if (!touch) return;
 
     // Only reference a vendor/drop that still exists.

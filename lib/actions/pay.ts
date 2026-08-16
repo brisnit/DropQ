@@ -108,13 +108,21 @@ export async function payWalkUpSaleAction(
 
   // Acquisition: this customer entered DropQ standing in front of the vendor.
   // Distinct from "qr", which means they scanned a share link and self-ordered.
+  //
+  // `authoritative` because a physical, vendor-initiated sale beats whatever
+  // `dq_touch` happens to be on the phone. The first real canary was credited
+  // to a different vendor's storefront from a two-day-old cookie.
   if (customerId) {
-    await applyFirstTouch(customerId, {
-      vendorId: existing.sellerId,
-      dropId: existing.dropId,
-      source: "in_person",
-      detail: existing.seller.slug,
-    }).catch(() => {});
+    await applyFirstTouch(
+      customerId,
+      {
+        vendorId: existing.sellerId,
+        dropId: existing.dropId,
+        source: "in_person",
+        detail: existing.seller.slug,
+      },
+      { authoritative: true }
+    ).catch(() => {});
   }
 
   // ---- The conversion. One transaction so a losing racer leaves no orphan. --

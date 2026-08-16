@@ -3231,9 +3231,7 @@ reporting a problem, but nobody has deliberately inspected its layout on a
 device. Its two inputs shrink to 113px each at 320px: tight but functional, and
 **deliberately left unchanged** rather than churn the UI before a canary.
 
-## 28.8 🟠 OPEN — acquisition attribution via stale `dq_touch`
-
-The one defect this run surfaced that is **not yet fixed**.
+## 28.8 ✅ RESOLVED — acquisition attribution via stale `dq_touch`
 
 ```
 signupSource:  "storefront"     ← should be "in_person"
@@ -3253,7 +3251,53 @@ relationship are all correct, and `CustomerVendor.relationshipSource` is properl
 The effect is that in-person acquisition will be under-counted whenever the
 customer has ever touched any DropQ storefront in the previous 30 days.
 
-Proposed minimal fix in §28.10.
+**Fix.** `applyFirstTouch` takes an optional third argument:
+
+```ts
+const provided = fallback ? { ...fallback, at: new Date().toISOString() } : null;
+const touch = opts?.authoritative
+  ? (provided ?? (await readTouch()))   // physical sale outranks a stale cookie
+  : ((await readTouch()) ?? provided);  // unchanged for every web path
+```
+
+**`lib/actions/pay.ts` is the only caller that passes `{ authoritative: true }`.**
+`order.ts`, `vendor-follow.ts` and `messages/verify` are untouched and remain
+cookie-first, because for those paths the cookie IS the acquisition evidence.
+
+What it changes, and only for a **newly created** customer in a **walk-up** sale:
+`signupSource` → `in_person`, `firstVendorId` → the walk-up vendor, `firstDropId`
+→ the walk-up drop, `firstTouchAt` → the sale time.
+
+What it cannot change:
+
+- **Existing customers.** The `if (customer.firstVendorId || customer.signupSource) return;`
+  guard runs BEFORE any of this and is untouched, so an already-attributed
+  customer can never be rewritten — including by an authoritative caller. A
+  returning walk-up customer keeps their original acquisition, which is correct
+  first-touch behaviour.
+- **Storefront / follow / verify acquisition.** No flag, no behaviour change.
+- **`CustomerVendor`.** `applyFirstTouch` never writes it. Relationship rows come
+  from `recordRelationship` inside `finalizePaidOrder`, still `purchase`, still
+  only after successful payment.
+- **The no-cookie case.** Already used the fallback; unchanged.
+
+**Coverage:** `app/api/dev/attribution-selftest`. Cookie state is per-request and
+`cookies()` is read-only, so one GET cannot cover both cases — the route detects
+whether `dq_touch` is present and reports its scenario, and the runner calls it
+twice:
+
+| Test | Scenario | Asserts |
+|---|---|---|
+| T1 | conflicting cookie | walk-up customer gets `in_person` + the walk-up vendor/drop, and a fresh `firstTouchAt` |
+| T2 | no cookie | still `in_person` + the walk-up vendor |
+| T3 | conflicting cookie | pre-attributed customer keeps source, vendor and `firstTouchAt` even under `authoritative` |
+| T4 | conflicting cookie | a non-authoritative call is still cookie-first — the cookie's vendor wins |
+
+18 checks with a cookie, 11 without, all green, with every table count asserted
+back to baseline. Verified to actually catch the bug by removing
+`{ authoritative: true }`: T1 fails with `signupSource: storefront`,
+`firstVendorId` = Marble & Crumb, `firstTouchAt: 2026-08-14` — byte-for-byte the
+production symptom.
 
 ## 28.9 Current state
 
@@ -3264,20 +3308,11 @@ Proposed minimal fix in §28.10.
 | External vendors | gated out; verified for The Clovery and Paraiso |
 | Kill switch | clear `internalKind` — **instant, no deploy**. Unsetting the env var needs a redeploy |
 | Canary drop | Canary Test 2 `draft`; original canary `closed`; live drops 0 |
-| Suites | webhook **13/13** · walkup-pay **28/28** · payments **182/182** · activation **144/144** · phase-a **77/77** |
+| Suites | webhook **13/13** · walkup-pay **28/28** · attribution **18/18 + 11/11** · payments **182/182** · activation **144/144** · phase-a **77/77** |
 
 ## 28.10 Remaining work before the first real vendor
 
-1. **Attribution fix (§28.8)** — proposed: give `applyFirstTouch` an optional
-   flag letting a caller declare its fallback authoritative, set only by
-   `lib/actions/pay.ts`. It changes `signupSource`, `firstVendorId`,
-   `firstDropId` and `firstTouchAt` **for newly created walk-up customers only**.
-   The existing `if (customer.firstVendorId || customer.signupSource) return;`
-   guard runs first and is untouched, so **already-attributed customers cannot
-   be rewritten**. Storefront/follow/verify paths keep cookie-first behaviour.
-   **`CustomerVendor` is not touched at all** — `applyFirstTouch` never writes
-   it. Needs a regression test that drives the action with a conflicting
-   `dq_touch` cookie present.
+1. ~~Attribution fix~~ — **done, see §28.8.**
 2. **`/pay/{token}` on a real phone** — a deliberate visual check, not just a
    successful payment.
 3. Optional: verify the $0.02 application fee on the connected account in the
