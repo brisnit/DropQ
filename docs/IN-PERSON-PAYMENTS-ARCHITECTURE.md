@@ -2908,3 +2908,99 @@ column 77px → 178px; desktop verified pixel-identical at 640/1024/1280.
 
 `/pay/[token]` was audited at 320/375/390/430 and is already clean — no overflow
 even with a 74-character line item. Left unchanged.
+
+## 27. Canary attempts 2 and 3, 2026-08-16 — what they proved, and two defects
+
+Neither attempt exercised Walk-Up. Both ended up in normal storefront checkout,
+on the ORIGINAL canary drop, which was republished to `live` each time. Canary
+Test 2 (`draft`) was never touched: `WalkUpSale` stayed at 1 (the expired one),
+`Order.source` was `online` both times, and the request log shows
+`POST /s/britts-bunnies/<dropId>` with no `POST /pay/{token}` at all.
+
+### 27.1 ✅ Evidence these two runs DID establish
+
+Both were real $1.00 charges on the Britts Bunnies connected account. Between
+them they confirm, in production:
+
+- Stripe Checkout on a connected account works end to end
+- **`feeCents = 2`** on a $1.00 sale, absorb mode — the 2% platform fee is right
+- `finalizePaidOrder` wins its claim exactly once; no duplicate orders
+- inventory decrements by exactly 1 per paid order
+- `PointsLedger` writes exactly one purchase entry
+- **`CustomerVendor` purchase facts are written only after payment succeeds** —
+  proven twice, once against a new relationship row and once against an existing
+  one that was updated (orderCount 1 → 2)
+- a returning customer is *matched*, not duplicated, and their original
+  `signupSource` is preserved
+- **DropQ's own finalization is ~45–61ms.** It is not a latency contributor
+- the storefront responsive fix works on a real phone — the founder used the
+  repaired `/s/{slug}/{dropId}` page at real mobile width and saw no overflow,
+  no clipping and no skew. Subjective note: *"payment felt good and did not feel
+  too slow."*
+
+**Still unproven:** everything past Order creation on the walk-up path —
+`stripe.checkout.sessions.create` for a walk-up sale, `stripeSessionId`
+persistence, the redirect, and the vendor's `✓ Paid` transition.
+
+### 27.2 🔴 P1 — the Stripe webhook is returning 400
+
+Found only because the third attempt had production request logs:
+
+```
+03:05:05.761  POST /api/stripe/webhook  → 400
+03:05:17.797  GET  /order/<id>                 ← customer redirect lands
+03:05:18.062  Order paid                       ← 265ms after the redirect
+```
+
+The webhook failed **12.3 seconds before** the order was finalized. **The
+customer's browser redirect won the claim, not the webhook.**
+
+A 400 from that route is only ever "Stripe not configured" or "Invalid
+signature". Ruled out by inspection: `STRIPE_WEBHOOK_SECRET` is set and is 57
+days old against a 47-minute-old deployment (so no missing-redeploy), the raw
+body is read with `req.text()` before `constructEvent`, there is no route
+`bodyParser` config, and `middleware.ts` matches only `/s/:slug` and
+`/s/:slug/:dropId` — never `/api/*`. Stripe did reach the endpoint, so the URL
+is correct. That leaves signature verification.
+
+**Structural cause to check first.** The route handles two different delivery
+contexts with **one** secret:
+
+| Event | Context |
+|---|---|
+| `checkout.session.completed` | connected account (direct charges) |
+| `charge.dispute.created` / `.closed` | connected account |
+| `account.updated` | Connect |
+| `customer.subscription.updated` / `.deleted` | platform account |
+
+In Stripe those are two endpoints — account and Connect — each with its own
+signing secret. `route.ts` reads only `process.env.STRIPE_WEBHOOK_SECRET`, so
+whichever class does not match that secret returns 400 forever. The observed
+failure was `checkout.session.completed`, i.e. the Connect side.
+
+**Why it stayed hidden:** the redirect path finalizes successfully, so every
+order looked fine. The webhook is the fallback for the case where the customer's
+browser never returns — which is precisely the walk-up risk profile (pay, pocket
+the phone, walk away). It also means `account.updated` may not be reaching the
+vendor-activation detector.
+
+### 27.3 🟠 The two QR codes were too easy to confuse
+
+Not a testing mistake — a product defect. On the vendor drop page the Share QR
+is **always** rendered, sits in a visually stronger card, has a Download button,
+and on a live drop was labelled **"Live order QR"** under the heading **"Live
+order link — show this QR on-site"**. That copy instructs a vendor making an
+in-person sale to use the wrong code. The payment QR had only a small
+`text-sm` caption and did not show the amount.
+
+Worse, the payment QR was rendered **only when the URL carried `?walkup=<id>`**,
+so a refresh or a Back tap made it disappear while the sale was still open —
+leaving the Share QR as the only code on screen.
+
+Fixed with labelling, not architecture: the payment QR gets a tinted bordered
+panel headed "💳 Customer payment QR · in-person sale" with "Have the customer
+scan this to pay $X.XX" and the item count beside it; the share QR is now
+"🔗 Share drop QR — opens the public drop page" plus "Not for taking payment in
+person" whenever walk-up is available; the status chip reads "Waiting for the
+customer to scan…"; and the page falls back to the newest open sale so the
+payment QR survives a refresh.

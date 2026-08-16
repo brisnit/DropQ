@@ -70,12 +70,26 @@ export default async function DropDetailPage({
   // when it's off, so the page renders exactly as it did before Phase D.
   const walkUpOn = isWalkUpEnabled(seller);
   const walkUpEligible = walkUpOn ? canStartInPersonSale(seller, drop) : null;
-  const walkUpSale =
-    walkUpOn && walkUpId
-      ? await prisma.walkUpSale.findFirst({
+  // Falls back to the newest still-open sale when `?walkup=` is missing. Without
+  // it a refresh or a tap of Back made the payment QR vanish while the sale was
+  // still live — leaving the Share QR as the only code on screen, which is a
+  // good way to get the wrong one scanned.
+  const walkUpSale = !walkUpOn
+    ? null
+    : ((walkUpId &&
+        (await prisma.walkUpSale.findFirst({
           where: { id: walkUpId, sellerId: seller.id, dropId: drop.id },
-        })
-      : null;
+        }))) ||
+      (await prisma.walkUpSale.findFirst({
+        where: {
+          sellerId: seller.id,
+          dropId: drop.id,
+          orderId: null,
+          canceledAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        orderBy: { createdAt: "desc" },
+      })));
 
   const h = await headers();
   const host = h.get("host") ?? "localhost:3001";
@@ -370,30 +384,44 @@ export default async function DropDetailPage({
 
                 {/* Phase E: /pay/{token} is live, so the QR is real. Large on
                     purpose — it gets scanned across a table. */}
+                {/* This QR and the "Share drop" QR further down do completely
+                    different jobs, and a vendor mid-sale has confused them. So
+                    it is titled, tinted, and states the amount next to the code
+                    — the share QR stays plain and is labelled as a share link. */}
                 {state === "open" && (
-                  <div className="mt-4 flex flex-wrap items-center gap-5">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={walkUpQr!}
-                      alt="Scan to pay"
-                      width={220}
-                      height={220}
-                      className="w-[220px] h-[220px] rounded-xl border border-line bg-white p-2"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold">Customer scans this to pay</p>
-                      <p className="font-mono text-xs break-all mt-1 text-muted">
-                        {payUrlFor(walkUpSale.token, shareUrl.split("/s/")[0])}
-                      </p>
-                      <div className="mt-2">
-                        <ShareButton
-                          url={payUrlFor(walkUpSale.token, shareUrl.split("/s/")[0])}
-                          title={`Pay ${seller.storeName}`}
-                        />
+                  <div className="mt-4 rounded-card border-2 border-sage bg-sage-tint/40 p-4">
+                    <p className="text-xs uppercase tracking-wider font-semibold text-sage">
+                      💳 Customer payment QR · in-person sale
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-5">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={walkUpQr!}
+                        alt={`Payment QR — customer scans to pay ${formatMoney(total)}`}
+                        width={220}
+                        height={220}
+                        className="w-[220px] h-[220px] rounded-xl border-2 border-sage bg-white p-2"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="font-display text-xl font-semibold">
+                          Have the customer scan this to pay {formatMoney(total)}
+                        </p>
+                        <p className="text-sm text-muted mt-1">
+                          {lines.reduce((n, l) => n + l.quantity, 0)} item(s) · pays this sale only
+                        </p>
+                        <p className="font-mono text-xs break-all mt-2 text-muted">
+                          {payUrlFor(walkUpSale.token, shareUrl.split("/s/")[0])}
+                        </p>
+                        <div className="mt-2">
+                          <ShareButton
+                            url={payUrlFor(walkUpSale.token, shareUrl.split("/s/")[0])}
+                            title={`Pay ${seller.storeName}`}
+                          />
+                        </div>
+                        <p className="text-xs text-muted mt-2">
+                          Expires {WALKUP_TTL_MINUTES} minutes after it was created.
+                        </p>
                       </div>
-                      <p className="text-xs text-muted mt-2">
-                        Expires {WALKUP_TTL_MINUTES} minutes after it was created.
-                      </p>
                     </div>
                   </div>
                 )}
@@ -416,8 +444,11 @@ export default async function DropDetailPage({
       <div className="grid md:grid-cols-[1fr_auto] gap-4 mb-8 items-stretch">
         <div className="bg-ink text-cream rounded-card p-5 flex flex-col justify-between gap-4">
           <div className="min-w-0">
+            {/* Was "Live order link — show this QR on-site", which reads as an
+                instruction to use it for in-person payment. It is a public link
+                to the whole drop; walk-up has its own QR above. */}
             <p className="text-xs uppercase tracking-wider text-cream/60">
-              {isLiveDrop ? "Live order link — show this QR on-site" : "Share this drop"}
+              🔗 Share drop — public link to this drop
             </p>
             <p className="font-mono text-sm break-all mt-1">{shareUrl}</p>
           </div>
@@ -430,17 +461,19 @@ export default async function DropDetailPage({
         </div>
 
         <div className="bg-paper border border-line rounded-card p-5 flex flex-col items-center gap-3 text-center">
-          <p className="text-xs uppercase tracking-wider text-muted">
-            {isLiveDrop ? "Live order QR" : "Drop QR"}
-          </p>
+          <p className="text-xs uppercase tracking-wider text-muted">🔗 Share drop QR</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={qrDataUrl}
-            alt={isLiveDrop ? "QR code for live on-site orders" : "QR code linking to this drop"}
+            alt="Share QR — opens the public page for this drop"
             width={132}
             height={132}
             className="rounded-xl border border-line"
           />
+          <p className="text-xs text-muted -mt-1">
+            Opens the public drop page.
+            {walkUpOn && " Not for taking payment in person."}
+          </p>
           <a
             href={qrDataUrl}
             download={`dropq-${seller.slug}-${drop.id}.png`}

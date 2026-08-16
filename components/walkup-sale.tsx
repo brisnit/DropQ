@@ -155,7 +155,9 @@ type StatusPayload = {
 };
 
 const LABEL: Record<StatusPayload["state"], { text: string; cls: string }> = {
-  waiting: { text: "Waiting for the customer…", cls: "bg-line text-ink-soft" },
+  // "…to scan" so the pre-scan state is unambiguous: nothing has happened yet
+  // and this QR is the thing the customer still has to act on.
+  waiting: { text: "Waiting for the customer to scan…", cls: "bg-line text-ink-soft" },
   customer_paying: { text: "Customer is paying…", cls: "bg-quad/15 text-tertiary" },
   paid: { text: "✓ Paid", cls: "bg-sage-tint text-sage" },
   refunded: { text: "Sold out — refunded", cls: "bg-brand-tint text-brand-dark" },
