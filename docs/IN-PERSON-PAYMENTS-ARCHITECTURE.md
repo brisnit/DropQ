@@ -3004,3 +3004,285 @@ scan this to pay $X.XX" and the item count beside it; the share QR is now
 person" whenever walk-up is available; the status chip reads "Waiting for the
 customer to scan…"; and the page falls back to the newest open sale so the
 payment QR survives a refresh.
+
+---
+
+# 28. ✅ PASS — Walk-Up validated end to end in production, 2026-08-16
+
+**Read this section first.** It is the source of truth for where Walk-Up stands.
+§26 and §27 are kept as history — three attempts that did not exercise the
+feature — but this is the run that did.
+
+On the fourth attempt a real customer, on a real phone, paid a real $1.00 to a
+real connected account through the vendor-initiated walk-up flow. Every stage
+from `+ New in-person sale` to `✓ Paid` executed in production.
+
+## 28.1 The validated lifecycle, with record IDs
+
+| | |
+|---|---|
+| Vendor | Britts Bunnies `cmqa8276c0000l204mbtgzwnd` (`internalKind: canary`) |
+| Drop | **DropQ Walk-Up Canary Test 2** `cmsv6bno10001ske5tvzxwziv` — **stayed `draft` throughout** |
+| Product | Chocolate Chips `cmsv6bno10003ske5x31tcwym`, $1.00, sold **0 → 1** |
+| **WalkUpSale** | **`cmsvdrajb0001if04k50bsbk5`** |
+| **Order** | **`cmsvdskgr0002jo04zsko478o`** — **`source: "in_person"`** |
+| Customer | `cmsvdskfv0000jo04ngmme6f8` |
+| CustomerVendor | `cmsvdt4rb0005jp04yffh342m` — `orderCount 1`, `$1.00`, `relationshipSource: purchase` |
+| PointsLedger | `cmsvdt4q30003jp046pc9movr` — +1, `purchase` |
+| Stripe session | `cs_live_a1WB8jL6wlS56jAaRbRp…` |
+| Stripe PaymentIntent | `pi_3U4wtNJpdt2PiS0z0I34sfos` |
+| Money | total **100¢**, `feeCents` **2** (2% absorb) on the vendor's connected account |
+| OrderEvents | `created/in_person`, `payment/paid` |
+
+`WalkUpSale.orderId` points at exactly that Order — the atomic single-winner
+conversion worked. Row deltas were exactly `order +1, orderItem +1,
+orderEvent +2, customer +1, customerVendor +1, pointsLedger +1, walkUpSale +1`,
+with `drop +0` and `seller +0`. Live drops stayed **0**; the original canary
+(§27) was untouched at sold 2.
+
+**The drop never had to be published.** Walk-Up does not require a live or open
+drop, which is what makes it safe to run against a `draft` canary.
+
+## 28.2 Measured timings
+
+```
+05:44:35.351  ① WalkUpSale created                 vendor taps Start sale
+05:44:36.702     vendor polling begins, ~3.0s cadence
+05:45:06.327  ② GET /pay/{token}                   customer scans QR   (+30.9s)
+05:45:34.702  ③ POST /pay/{token} → 303            identity submitted  (+28.4s)
+05:45:34.843     Customer created
+05:45:34.875  ④ Order pending · sale claimed · Stripe session created
+              ⋮  customer on Stripe's hosted page — 26.0s
+05:46:00.897  ⑤ POST /api/stripe/webhook → 200     ★ WEBHOOK WINS THE CLAIM
+05:46:01.107  ⑥ Order paid                          +210ms
+05:46:01.132     PointsLedger +1                     +25ms
+05:46:01.169     Customer.firstPurchaseAt            +62ms
+05:46:01.176     CustomerVendor written              +69ms
+05:46:03.740  ⑦ status endpoint first returns paid → vendor UI shows ✓ Paid
+05:46:04.353     customer redirect lands             3.4s LATE, lost the race
+```
+
+**Payment reaching DropQ → vendor sees ✓ Paid: 2.84s.**
+
+| Segment | Time |
+|---|---|
+| Webhook arrival → Order paid | 210ms |
+| Paid → side effects complete | 69ms |
+| **Paid → status endpoint reports paid** | **2.63s (polling)** |
+
+DropQ's own work is **~280ms, under 10% of the total**. The rest is the poll
+interval. The founder's subjective note: *"payment felt good and did not feel
+too slow."*
+
+### The webhook won — and why that matters
+
+The webhook finalized at 05:46:00.897; the customer's redirect did not arrive
+until 05:46:04.353. Until the §28.4 fix the webhook returned 400, so the
+redirect was the only finalizer. Had this run happened a day earlier the vendor
+would have waited 3.4s longer — and if the customer had pocketed their phone
+before the redirect completed, **the order would never have finalized at all**.
+That is precisely the walk-up failure mode, and it is now closed.
+
+### Polling — deliberately unchanged
+
+The ~3s interval is confirmed as the dominant latency term and is **left as is
+by decision**, not oversight. 2.84s tested fine in the real world. Treat any
+change (shorter interval, push/SSE, optimistic update on Stripe return) as
+**future UX polish, not a blocker**. Do not "fix" this without a reason.
+
+### Two aborted polls — non-blocking
+
+`/api/walkup/{id}/status` logged status `0` twice (05:45:24.704, 05:45:54.744)
+out of ~25 polls. Status `0` is a client-side abort/timeout, not a server error;
+the next poll recovered both times with no visible effect and no gap in vendor
+state. **Documented as non-blocking.** It would only warrant investigation if
+aborts clustered around the paid transition or a vendor reported a stuck
+"Waiting" state.
+
+## 28.3 Relationship, inventory and points — the invariant holds
+
+The Order sat `pending` for **26.2 seconds** with a **CustomerVendor delta of
+exactly 0**, sampled every second. Purchase facts appeared only after
+`finalizePaidOrder` won its claim, 69ms later.
+
+> Starting or attempting payment does not count as a purchase. Successful
+> payment does.
+
+That is now proven on the walk-up path itself, not merely on the shared online
+path. Inventory (`sold 0 → 1`) and DropPoints (+1) likewise moved only after
+payment. `relationshipSource` is `purchase`; `followedAt` stayed null — buying
+is not consent to be marketed to.
+
+## 28.4 🔴 RESOLVED — the Connect webhook signing secret
+
+**Symptom:** every `checkout.session.completed` returned **HTTP 400 "Invalid
+signature"** at a 100% failure rate, invisibly.
+
+**Root cause:** one URL receives events from **two Stripe destinations**, each
+signing with its own secret:
+
+| Destination | Events |
+|---|---|
+| `engaging-victory` (account) | `customer.subscription.*` |
+| `energetic-jubilee` (**Connect**) | `checkout.session.completed`, `charge.dispute.*`, `account.updated` |
+
+Because DropQ takes **direct charges on connected accounts**, checkout events
+arrive on the Connect destination. `route.ts` read only
+`STRIPE_WEBHOOK_SECRET`, so the Connect class could never verify.
+
+**Why it hid for weeks:** the customer's `/order/[id]` redirect finalizes orders
+independently, so every order looked correct. The webhook is only the fallback —
+and the fallback was dead. It also carries `account.updated`, so vendor
+activation state may have been going stale too.
+
+**Fix:** `webhookSecrets()` returns every configured secret, `.trim()`ed, and
+verification tries each in turn, first match wins. Adding
+`STRIPE_WEBHOOK_SECRET_CONNECT` fixed Connect without disturbing the account
+destination; with the var absent, behaviour is exactly as before.
+
+**Proof:** the 8:05 PM event was resent from the Stripe dashboard.
+
+```
+04:57:57 UTC (21:57 PDT)  400   ← wrong secret
+05:29:23 UTC (22:29 PDT)  200   ← ✓ Stripe: "Delivered · Recovered · ok"
+```
+
+**Idempotency proof.** That replay hit an order already `paid`. Snapshot
+before/after was byte-identical (`9c018af00d228d50`): OrderEvents stayed 2, no
+second point, CustomerVendor still `orderCount 2 / $2.00`, product still
+`sold 2`, all global counts unchanged. `finalizePaidOrder` claims via
+`updateMany({ where: { id, status: "pending" } })`; on a paid order that matches
+zero rows and short-circuits to `state: "done"` before any side effect.
+
+**Diagnostic worth keeping:** a 400 response body now names which secrets were
+*tried* (`Invalid signature (tried: account, connect)`) — labels only, never
+values. Stripe displays the response body per delivery attempt, and Vercel's CLI
+log view does not surface `console` output, so this is the only way to tell "the
+secret isn't loaded" from "it's loaded but wrong" without guessing.
+
+## 28.5 🔴 RESOLVED — `drop.slug` / `as never` in `payWalkUpSaleAction`
+
+Phase E shipped with:
+
+```ts
+include: { seller: true, drop: { select: { id: true, slug: true } } as never }
+```
+
+`Drop` has no `slug` — only `Seller` does. Prisma rejected the query at runtime,
+so the action **died on its first statement and could never take a payment**.
+The include was dead anyway; all three uses read `existing.dropId`.
+
+The `as never` is the lesson: it silenced `tsc`, and every other test covered
+pure helpers, so the build, the typechecker and 181 payment checks all stayed
+green while the feature was completely broken. No money was ever at risk — the
+crash precedes product lookup, the conversion transaction and the Stripe call.
+
+**Coverage added:** `app/api/dev/walkup-pay-selftest` **executes the action
+against the database**. Its load-bearing assertion is "no
+PrismaClientValidationError", which needs no Stripe key because the query runs
+before the Stripe guard — so schema drift here fails CI in a bare environment.
+Verified to actually catch the bug by reintroducing it (4 failures). Not a
+rolled-back transaction: the action uses the module-level `prisma` singleton, so
+it creates fixtures, executes, asserts, tears down in a `finally`, and then
+asserts all ten table counts are back to baseline.
+
+An audit of every `as never` / `as any` in `app`, `lib` and `scripts` found no
+other cast hiding an invalid Prisma query.
+
+## 28.6 🟠 RESOLVED — Share QR vs Customer Payment QR
+
+Two attempts ended in storefront checkout while intending Walk-Up. **A product
+defect, not user error.** The Share QR is always rendered, sits in a stronger
+card, has a Download button, and on a live drop was headed *"Live order link —
+show this QR on-site"* and labelled *"Live order QR"* — copy that instructs a
+vendor making an in-person sale to use the wrong code. The payment QR had a
+small caption and never showed the amount. Worse, it rendered **only when the
+URL carried `?walkup=<id>`**, so a refresh or Back tap made it vanish while the
+sale was still open, leaving the Share QR as the only code on screen.
+
+Fixed by labelling, not architecture:
+
+- payment QR: tinted bordered panel, **"💳 Customer payment QR · in-person
+  sale"**, **"Have the customer scan this to pay $X.XX"**, item count alongside
+- share QR: **"🔗 Share drop QR"** · "Opens the public drop page." · **"Not for
+  taking payment in person."** whenever walk-up is available
+- status chip: **"Waiting for the customer to scan…"**
+- the page falls back to the newest open sale, so the payment QR survives a
+  refresh
+
+## 28.7 ✅ Mobile — what was and was not tested
+
+The **storefront** product card overflowed on phones: a flex row whose image and
+quantity control were both `shrink-0`, so the details column absorbed every
+pixel — 77px at 320px, card pushed ~13px past the viewport and *clipped* (nothing
+scrolls, which is why it read as "skewed"). Both grid items also lacked
+`min-w-0`, so `min-width: auto` carried the overflow to the page edge. Rebuilt as
+a grid: two columns on phones with the control on its own row, three from `sm`
+up. Details column 77px → 178px. Desktop verified pixel-identical at
+640/1024/1280.
+
+**Confirmed on a real phone in production** during a canary run: no overflow, no
+clipping, no skew.
+
+⚠️ **`/pay/{token}` has NOT been visually verified on a phone.** It was measured
+in headless Chrome at 320/375/390/430 and is clean — no overflow even with a
+74-character line item — and the founder completed a real payment on it without
+reporting a problem, but nobody has deliberately inspected its layout on a
+device. Its two inputs shrink to 113px each at 320px: tight but functional, and
+**deliberately left unchanged** rather than churn the UI before a canary.
+
+## 28.8 🟠 OPEN — acquisition attribution via stale `dq_touch`
+
+The one defect this run surfaced that is **not yet fixed**.
+
+```
+signupSource:  "storefront"     ← should be "in_person"
+firstVendorId: Marble & Crumb   ← should be Britts Bunnies
+firstTouchAt:  2026-08-14       ← two days before the sale
+```
+
+`applyFirstTouch` prefers the `dq_touch` cookie over the caller's fallback, and
+the phone carried a 2-day-old cookie from browsing a different vendor's
+storefront. First-write-wins is the documented design, but for a
+**vendor-initiated physical sale** it is wrong: the customer was standing in
+front of Britts Bunnies.
+
+**Blast radius is acquisition KPIs only.** Money, fee, inventory, points and the
+relationship are all correct, and `CustomerVendor.relationshipSource` is properly
+`purchase`. A customer with no prior DropQ history attributes correctly today.
+The effect is that in-person acquisition will be under-counted whenever the
+customer has ever touched any DropQ storefront in the previous 30 days.
+
+Proposed minimal fix in §28.10.
+
+## 28.9 Current state
+
+| | |
+|---|---|
+| `WALKUP_ENABLED` | **`internal`** — gate is `Seller.internalKind != null` |
+| Enabled vendors | Britts Bunnies only (`canary`) |
+| External vendors | gated out; verified for The Clovery and Paraiso |
+| Kill switch | clear `internalKind` — **instant, no deploy**. Unsetting the env var needs a redeploy |
+| Canary drop | Canary Test 2 `draft`; original canary `closed`; live drops 0 |
+| Suites | webhook **13/13** · walkup-pay **28/28** · payments **182/182** · activation **144/144** · phase-a **77/77** |
+
+## 28.10 Remaining work before the first real vendor
+
+1. **Attribution fix (§28.8)** — proposed: give `applyFirstTouch` an optional
+   flag letting a caller declare its fallback authoritative, set only by
+   `lib/actions/pay.ts`. It changes `signupSource`, `firstVendorId`,
+   `firstDropId` and `firstTouchAt` **for newly created walk-up customers only**.
+   The existing `if (customer.firstVendorId || customer.signupSource) return;`
+   guard runs first and is untouched, so **already-attributed customers cannot
+   be rewritten**. Storefront/follow/verify paths keep cookie-first behaviour.
+   **`CustomerVendor` is not touched at all** — `applyFirstTouch` never writes
+   it. Needs a regression test that drives the action with a conflicting
+   `dq_touch` cookie present.
+2. **`/pay/{token}` on a real phone** — a deliberate visual check, not just a
+   successful payment.
+3. Optional: verify the $0.02 application fee on the connected account in the
+   Stripe dashboard; confirm the receipt email arrived (no `Notification` row is
+   written for receipts, so it is not queryable).
+
+**Not blockers:** the 3s poll (§28.2), the two aborted polls (§28.2), the 113px
+inputs (§28.7).
