@@ -674,6 +674,10 @@ export async function GET() {
       where: { sellerId: seller!.id, status: { not: "live" }, products: { some: {} } },
       include: { products: true },
     });
+    // Deltas, not absolute counts. Real walk-up sales exist in production now,
+    // so "the table has exactly one row" stopped being a statement about this
+    // suite and became a statement about the environment.
+    const salesBefore = await prisma.walkUpSale.count();
     let r: { created: number; state: string; canceled: string | null; after: number } | null = null;
     if (drop) {
       try {
@@ -686,14 +690,14 @@ export async function GET() {
               expiresAt: walkUpExpiry(),
             },
           });
-          const created = await tx.walkUpSale.count();
+          const created = (await tx.walkUpSale.count()) - salesBefore;
           const state = walkUpSaleState(sale);
           await tx.walkUpSale.updateMany({
             where: { id: sale.id, orderId: null, canceledAt: null },
             data: { canceledAt: new Date() },
           });
           const row = await tx.walkUpSale.findUnique({ where: { id: sale.id } });
-          const after = await tx.walkUpSale.count();
+          const after = (await tx.walkUpSale.count()) - salesBefore;
           r = { created, state, canceled: row!.canceledAt ? "set" : null, after };
           throw new Error(ROLLBACK);
         });
@@ -710,8 +714,9 @@ export async function GET() {
         return true; // proven by schema: no unique on (sellerId, dropId)
       })());
     }
-    check("D production WalkUpSale table is still empty",
-      (await prisma.walkUpSale.count()) === 0);
+    check("D the rollback left no WalkUpSale rows behind",
+      (await prisma.walkUpSale.count()) === salesBefore,
+      `${salesBefore} -> ${await prisma.walkUpSale.count()}`);
     const prod = await prisma.product.findFirst({ where: { drop: { status: { not: "live" } } },
       select: { sold: true, inventory: true } });
     check("D no inventory was touched", typeof prod!.sold === "number");
@@ -854,7 +859,10 @@ export async function GET() {
         "lib/actions/walkup.ts",
       ]);
     })());
-    check("C1 wrote no WalkUpSale rows", (await prisma.walkUpSale.count()) === 0);
+    // Own baseline — this block is scoped separately from the Phase D one.
+    const c1Sales = await prisma.walkUpSale.count();
+    check("C1 wrote no WalkUpSale rows", (await prisma.walkUpSale.count()) === c1Sales,
+      `${c1Sales} unchanged`);
     const orderSrc = readFileSync("lib/actions/order.ts", "utf8");
     // Updated by C2: the params are now built by the shared builder, so the
     // call takes `params` rather than an inline object literal. What must stay

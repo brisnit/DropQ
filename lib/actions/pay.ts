@@ -59,9 +59,14 @@ export async function payWalkUpSaleAction(
   if (phone && phone.replace(/\D/g, "").length < 10)
     return { error: "That mobile number doesn't look right." };
 
+  // Only the seller is needed. An earlier `drop: { select: { id, slug } }` was
+  // dead — every use below reads `existing.dropId` — and `Drop` has no `slug`,
+  // so Prisma rejected the whole query at runtime. An `as never` cast hid that
+  // from the compiler, and no test executed this function against a database,
+  // so the action could never take a payment. Include only what is used.
   const existing = await prisma.walkUpSale.findUnique({
     where: { token },
-    include: { seller: true, drop: { select: { id: true, slug: true } } as never },
+    include: { seller: true },
   });
   if (!existing) return { error: "This payment link isn't valid." };
   if (!isWalkUpEnabled(existing.seller))
