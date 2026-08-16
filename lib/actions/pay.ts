@@ -9,6 +9,7 @@ import { applyFirstTouch } from "@/lib/attribution";
 import { buildCheckoutSessionParams, defaultExpiresAt } from "@/lib/checkout-session";
 import {
   isWalkUpEnabled,
+  walkUpMode,
   linesFromJson,
   snapshotToOrderItems,
   walkUpSaleState,
@@ -42,8 +43,9 @@ export async function payWalkUpSaleAction(
   _prev: PayState,
   formData: FormData
 ): Promise<PayState> {
-  // The flag is a real kill switch, checked server-side on the public path too.
-  if (!isWalkUpEnabled()) return { error: "This payment link isn't available." };
+  // Checked server-side on the public path too. In "internal" mode eligibility
+  // depends on the sale's seller, re-checked once the sale is loaded below.
+  if (walkUpMode() === "off") return { error: "This payment link isn't available." };
 
   const token = String(formData.get("token") ?? "");
   const firstName = String(formData.get("firstName") ?? "").trim();
@@ -62,6 +64,8 @@ export async function payWalkUpSaleAction(
     include: { seller: true, drop: { select: { id: true, slug: true } } as never },
   });
   if (!existing) return { error: "This payment link isn't valid." };
+  if (!isWalkUpEnabled(existing.seller))
+    return { error: "This payment link isn't available." };
   if (walkUpSaleState(existing) !== "open")
     return { error: "This sale is no longer active. Ask the vendor to start a new one." };
 

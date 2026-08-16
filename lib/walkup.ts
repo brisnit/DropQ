@@ -27,15 +27,43 @@ export const MAX_WALKUP_LINES = 50;
 export const MAX_WALKUP_QTY_PER_LINE = 999;
 
 /**
- * Server-side feature gate. Deliberately NOT `NEXT_PUBLIC_`: availability must
- * stay authoritative even if the client bundle is modified, so the server
- * action checks this too and refuses when it is off.
+ * Server-side feature gate, three states. Deliberately NOT `NEXT_PUBLIC_`:
+ * availability must stay authoritative even if the client bundle is modified,
+ * so every server path checks it rather than trusting hidden UI.
  *
- * Default OFF. Phase E turns it on, once `/pay/{token}` exists — until then a
- * vendor could ring up a cart that no customer could pay.
+ *   unset / anything else → off for everyone
+ *   "internal"            → only vendors classified internal (the pilot cohort)
+ *   "true"                → every eligible vendor
+ *
+ * `internal` exists so the canary pilot needs no hard-coded vendor name, id or
+ * email: the cohort is whoever `Seller.internalKind` says it is, so
+ * reclassifying a vendor moves them in or out with a single database update.
+ *
+ * ⚠️ This gates AVAILABILITY only. It never bypasses payment safety —
+ * `canStartInPersonSale()` still requires the vendor to be Stripe charge-ready,
+ * and an internal vendor without Stripe cannot sell.
  */
-export function isWalkUpEnabled(): boolean {
-  return process.env.WALKUP_ENABLED === "true";
+export type WalkUpMode = "off" | "internal" | "all";
+
+export function walkUpMode(): WalkUpMode {
+  const v = process.env.WALKUP_ENABLED;
+  if (v === "true") return "all";
+  if (v === "internal") return "internal";
+  return "off";
+}
+
+/** Seller shape the gate needs. Kept minimal so any caller can satisfy it. */
+export type WalkUpSeller = { internalKind: string | null };
+
+/**
+ * In `internal` mode a seller is REQUIRED — calling without one returns false,
+ * which is the safe default for "is this feature on at all?" checks.
+ */
+export function isWalkUpEnabled(seller?: WalkUpSeller | null): boolean {
+  const mode = walkUpMode();
+  if (mode === "off") return false;
+  if (mode === "all") return true;
+  return !!seller?.internalKind;
 }
 
 /**

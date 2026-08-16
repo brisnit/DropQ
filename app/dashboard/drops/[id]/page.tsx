@@ -68,7 +68,7 @@ export default async function DropDetailPage({
   // ---- Walk-up sales (Phase D) ----------------------------------------
   // Server-side flag is authoritative; the entry point simply doesn't exist
   // when it's off, so the page renders exactly as it did before Phase D.
-  const walkUpOn = isWalkUpEnabled();
+  const walkUpOn = isWalkUpEnabled(seller);
   const walkUpEligible = walkUpOn ? canStartInPersonSale(seller, drop) : null;
   const walkUpSale =
     walkUpOn && walkUpId

@@ -5,7 +5,7 @@ import { getStripe } from "@/lib/stripe";
 import { getCurrentCustomer } from "@/lib/customer-auth";
 import { formatMoney } from "@/lib/format";
 import { vendorPalette } from "@/lib/color";
-import { isWalkUpEnabled, linesFromJson, walkUpSaleState, walkUpTotalCents } from "@/lib/walkup";
+import { isWalkUpEnabled, walkUpMode, linesFromJson, walkUpSaleState, walkUpTotalCents } from "@/lib/walkup";
 import { PayForm } from "./pay-form";
 
 export const metadata = { title: "Pay — DropQ" };
@@ -47,7 +47,10 @@ export default async function PayPage({
   params: Promise<{ token: string }>;
   searchParams: Promise<{ canceled?: string }>;
 }) {
-  if (!isWalkUpEnabled()) notFound();
+  // Off for everyone: 404 before any lookup. In "internal" mode we must resolve
+  // the sale's seller first — but the response is an identical notFound() in
+  // both cases, so this never reveals whether a token exists.
+  if (walkUpMode() === "off") notFound();
 
   const { token } = await params;
   const { canceled } = await searchParams;
@@ -55,10 +58,11 @@ export default async function PayPage({
   const sale = await prisma.walkUpSale.findUnique({
     where: { token },
     include: {
-      seller: { select: { storeName: true, logoUrl: true, accent: true, slug: true, stripeAccountId: true } },
+      seller: { select: { storeName: true, logoUrl: true, accent: true, slug: true, stripeAccountId: true, internalKind: true } },
     },
   });
   if (!sale) notFound();
+  if (!isWalkUpEnabled(sale.seller)) notFound();
 
   const state = walkUpSaleState(sale);
   const store = sale.seller.storeName;

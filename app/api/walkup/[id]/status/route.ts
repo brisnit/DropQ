@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { getCurrentSeller } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { isWalkUpEnabled, walkUpSaleState } from "@/lib/walkup";
+import { isWalkUpEnabled, walkUpMode, walkUpSaleState } from "@/lib/walkup";
 
 /**
  * Vendor poll for a walk-up sale (Phase E). Seller-owned.
@@ -16,7 +16,10 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!isWalkUpEnabled()) return new Response("Not found", { status: 404 });
+  // Cheap reject first: when the feature is off for everyone there is nothing
+  // to look up. In "internal" mode eligibility depends on the seller, checked
+  // below once we have them.
+  if (walkUpMode() === "off") return new Response("Not found", { status: 404 });
 
   const seller = await getCurrentSeller();
   if (!seller) return new Response("Unauthorized", { status: 401 });
@@ -30,6 +33,7 @@ export async function GET(
     },
   });
   if (!sale || sale.sellerId !== seller.id) return new Response("Not found", { status: 404 });
+  if (!isWalkUpEnabled(seller)) return new Response("Not found", { status: 404 });
 
   const base = walkUpSaleState(sale);
   let state:

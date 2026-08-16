@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { canStartInPersonSale, isVendorSellable } from "@/lib/payments";
 import {
   isWalkUpEnabled,
+  walkUpMode,
   linesFromJson,
   snapshotToOrderItems,
   newWalkUpToken,
@@ -513,6 +514,91 @@ export async function GET() {
     ]) === 1300);
   }
 
+  // -- three-state gate + internal classification (pilot) --
+  {
+    const CANARY = { internalKind: "canary" };
+    const REAL = { internalKind: null };
+    const w = readFileSync("lib/walkup.ts", "utf8");
+
+    check("gate reads WALKUP_ENABLED with three states",
+      /v === "true"/.test(w) && /v === "internal"/.test(w));
+    check("gate is server-side, never NEXT_PUBLIC",
+      /process\.env\.WALKUP_ENABLED/.test(w) && !/NEXT_PUBLIC_WALKUP/.test(w));
+    check("gate mode matches the env var",
+      walkUpMode() === (process.env.WALKUP_ENABLED === "true" ? "all"
+        : process.env.WALKUP_ENABLED === "internal" ? "internal" : "off"),
+      `env=${process.env.WALKUP_ENABLED ?? "unset"} mode=${walkUpMode()}`);
+
+    // Behaviour is asserted per-mode by reimplementing the documented rule and
+    // pinning the real function against it in whichever mode we're running.
+    const expect = (mode: string, seller?: { internalKind: string | null } | null) =>
+      mode === "off" ? false : mode === "all" ? true : !!seller?.internalKind;
+    check("in the CURRENT mode, a canary matches the documented rule",
+      isWalkUpEnabled(CANARY) === expect(walkUpMode(), CANARY));
+    check("in the CURRENT mode, a real vendor matches the documented rule",
+      isWalkUpEnabled(REAL) === expect(walkUpMode(), REAL));
+    check("calling with no seller is safe (false unless mode is 'all')",
+      isWalkUpEnabled() === (walkUpMode() === "all"));
+    check("calling with null is safe",
+      isWalkUpEnabled(null) === (walkUpMode() === "all"));
+
+    check("no vendor name, id or email is hard-coded into the gate",
+      !/brisnit|Britts|Makulay|dropqteam|showcase@/i.test(w));
+
+    // The pilot must not weaken payment safety.
+    const NO_STRIPE_CANARY = {
+      // Must own `stocked` (sellerId "s1"), or ownership fails first and we'd
+      // be asserting the wrong refusal reason.
+      id: "s1", internalKind: "canary",
+      stripeChargesEnabled: false, stripeAccountId: null, disabledAt: null,
+    };
+    const r = canStartInPersonSale(NO_STRIPE_CANARY, stocked);
+    check("an INTERNAL vendor without Stripe still cannot sell",
+      !r.ok && r.reason === "vendor_not_sellable");
+    check("classification never appears in the sellability rule",
+      !/internalKind/.test(readFileSync("lib/payments.ts", "utf8")));
+
+    // Every gated surface must resolve a seller, not call the gate bare.
+    for (const [f, needle] of [
+      ["lib/actions/walkup.ts", "isWalkUpEnabled(seller)"],
+      ["app/dashboard/drops/[id]/page.tsx", "isWalkUpEnabled(seller)"],
+      ["lib/actions/pay.ts", "isWalkUpEnabled(existing.seller)"],
+      ["app/pay/[token]/page.tsx", "isWalkUpEnabled(sale.seller)"],
+      ["app/api/walkup/[id]/status/route.ts", "isWalkUpEnabled(seller)"],
+    ]) {
+      check(`${f} passes a seller to the gate`, readFileSync(f, "utf8").includes(needle));
+    }
+    // Public paths must 404 identically whether the token exists or not.
+    const payPage = readFileSync("app/pay/[token]/page.tsx", "utf8");
+    check("/pay rejects mode=off BEFORE any lookup (no token probing)",
+      payPage.indexOf('walkUpMode() === "off"') < payPage.indexOf("findUnique"));
+    check("/pay returns the same notFound() for an ineligible seller",
+      /if \(!isWalkUpEnabled\(sale\.seller\)\) notFound\(\)/.test(payPage));
+  }
+
+  /* ---- Seller.internalKind classification against real production data ---- */
+  {
+    const sellers = await prisma.seller.findMany({
+      select: { storeName: true, internalKind: true },
+    });
+    const internal = sellers.filter((s) => s.internalKind);
+    const real = sellers.filter((s) => !s.internalKind);
+    check("exactly four sellers are classified internal",
+      internal.length === 4, internal.map((s) => `${s.storeName}=${s.internalKind}`).join(", "));
+    check("classifications use the documented vocabulary",
+      internal.every((s) => ["founder", "canary", "staff", "demo"].includes(s.internalKind ?? "")));
+    check("exactly one canary exists",
+      internal.filter((s) => s.internalKind === "canary").length === 1);
+    // The Clovery and Paraiso are the only sellers with paid orders.
+    check("vendors with real paid orders are NOT classified internal",
+      real.some((s) => s.storeName === "The Clovery") &&
+      real.some((s) => s.storeName === "Paraiso Delicacies"));
+    check("classification is nullable and reversible (real vendors remain null)",
+      real.length === 5);
+    console.log("[selftest] classification:",
+      sellers.map((s) => `${s.storeName}=${s.internalKind ?? "real"}`).join(", "));
+  }
+
   // -- feature flag --
   // Asserting "the flag is off HERE" would be asserting the environment, not
   // behaviour — the same mistake the Phase A suite made with `live === 0`.
@@ -526,10 +612,10 @@ export async function GET() {
   {
     const w = readFileSync("lib/walkup.ts", "utf8");
     check("D flag is server-side, NOT NEXT_PUBLIC",
-      /process\.env\.WALKUP_ENABLED === "true"/.test(w) && !/NEXT_PUBLIC_WALKUP/.test(w));
+      /process\.env\.WALKUP_ENABLED/.test(w) && !/NEXT_PUBLIC_WALKUP/.test(w));
     const act = readFileSync("lib/actions/walkup.ts", "utf8");
     check("D the server action re-checks the flag itself",
-      /if \(!isWalkUpEnabled\(\)\)/.test(act));
+      /if \(!isWalkUpEnabled\(seller\)\)/.test(act));
     check("D the action checks the flag BEFORE creating anything",
       act.indexOf("isWalkUpEnabled()") < act.indexOf("walkUpSale.create"));
     const page = readFileSync("app/dashboard/drops/[id]/page.tsx", "utf8");
@@ -670,7 +756,7 @@ export async function GET() {
     check("E never reads customerId from the request",
       !/formData\.get\("customerId/.test(pay));
     check("E checks the feature flag on the public path",
-      /if \(!isWalkUpEnabled\(\)\)/.test(pay));
+      /walkUpMode\(\) === "off"/.test(pay) && /isWalkUpEnabled\(existing\.seller\)/.test(pay));
     check("E uses the existing upsertCustomer, not a parallel identity path",
       /upsertCustomer\(\{ email, name: firstName, phone \}\)/.test(pay));
     check("E attributes acquisition as in_person, never qr",
@@ -680,7 +766,7 @@ export async function GET() {
 
     const page = readFileSync("app/pay/[token]/page.tsx", "utf8");
     check("E /pay 404s when the flag is off",
-      /if \(!isWalkUpEnabled\(\)\) notFound\(\)/.test(page));
+      /walkUpMode\(\) === "off"\) notFound\(\)/.test(page));
     check("E expired and canceled tokens create nothing",
       /state === "expired"/.test(page) && /state === "canceled"/.test(page) &&
       !/order\.create/.test(page));
@@ -696,7 +782,8 @@ export async function GET() {
       /ps === "paid" \? "paid"/.test(status));
     check("E refunded/oversold is a distinct vendor state",
       /"refunded"/.test(status));
-    check("E status endpoint honours the flag", /isWalkUpEnabled\(\)/.test(status));
+    check("E status endpoint honours the flag",
+      /walkUpMode\(\) === "off"/.test(status) && /isWalkUpEnabled\(seller\)/.test(status));
   }
 
   /* ------- Phase E: relationship timing (the Isabelle defect) ------------ */

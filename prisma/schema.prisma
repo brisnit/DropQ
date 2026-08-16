@@ -58,6 +58,19 @@ model Seller {
   referralCodeUsed String?   // the raw code entered at signup
   referredAt       DateTime? // when attribution was set
 
+  /// Marks a DropQ-controlled account: founder, canary/smoke-test, staff or the
+  /// marketing demo store. NULL means real external commerce.
+  ///
+  /// Business KPIs (GMV, active vendors, conversion, retention) must exclude
+  /// these; operational and financial views must NOT — a test order still has
+  /// to be fulfilled, and a real Stripe charge is real money on a real
+  /// connected account. Child rows are never flagged individually: Drops,
+  /// Orders, WalkUpSales, PointsLedger and CustomerVendor all inherit through
+  /// sellerId. See docs/TEST-DATA-AND-METRICS.md.
+  ///
+  /// Also the Walk-Up pilot cohort — see walkUpMode() in lib/walkup.ts.
+  internalKind String?
+
   // Stripe Connect (payouts)
   stripeAccountId      String? @unique
   stripeChargesEnabled Boolean @default(false)

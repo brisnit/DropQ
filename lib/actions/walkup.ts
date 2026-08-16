@@ -37,9 +37,10 @@ export async function startWalkUpSaleAction(formData: FormData) {
   const dropId = String(formData.get("dropId") ?? "");
   if (!dropId) redirect("/dashboard/drops");
 
-  // The flag is checked HERE, not only in the UI. Server-side availability has
-  // to stay authoritative even if the client is modified.
-  if (!isWalkUpEnabled()) fail(dropId, "unavailable");
+  // Checked HERE, not only in the UI. In "internal" mode the seller decides
+  // eligibility, so the gate needs them — availability must stay authoritative
+  // even if the client is modified.
+  if (!isWalkUpEnabled(seller)) fail(dropId, "unavailable");
 
   const drop = await prisma.drop.findUnique({
     where: { id: dropId },
