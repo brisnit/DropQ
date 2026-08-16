@@ -23,9 +23,12 @@ import { notifyVendorSellingPaused } from "@/lib/vendor-alerts";
  * fallback. Try each configured secret; the first that verifies wins.
  */
 function webhookSecrets(): { label: string; secret: string }[] {
+  // Trimmed: a secret pasted into a prompt can pick up a trailing newline or a
+  // stray space, which fails verification in a way that looks identical to a
+  // wrong secret.
   return [
-    { label: "account", secret: process.env.STRIPE_WEBHOOK_SECRET ?? "" },
-    { label: "connect", secret: process.env.STRIPE_WEBHOOK_SECRET_CONNECT ?? "" },
+    { label: "account", secret: (process.env.STRIPE_WEBHOOK_SECRET ?? "").trim() },
+    { label: "connect", secret: (process.env.STRIPE_WEBHOOK_SECRET_CONNECT ?? "").trim() },
   ].filter((s) => s.secret.length > 0);
 }
 
