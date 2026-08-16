@@ -353,3 +353,105 @@ columns and one shared predicate module.
 | PostHog and Postgres disagree | PostHog never decides — `is_internal` is pushed from Postgres at identify time |
 | Internal activity is *hidden* rather than *labelled*, making debugging harder | operational and financial audiences exclude nothing, by design (§4) |
 | A canary vendor's data is later needed as real (e.g. Britts Bunnies genuinely starts selling) | `internalKind` is nullable and reversible; nothing is deleted, so clearing the field restores them to real commerce |
+
+---
+
+## 12. Activation minimum — SHIPPED 2026-08-16
+
+`Seller.internalKind String?` (migration `20260816001642_add_seller_internal_kind`)
+and a three-state `WALKUP_ENABLED`. **Deployed with the gate OFF.**
+
+### 12.1 The four classified sellers
+
+| Store | Email | `internalKind` | Why |
+|---|---|---|---|
+| Britts Bunnies | brisnit@gmail.com | **`canary`** | primary production smoke-test vendor |
+| Casa Makulay | effthreedee@gmail.com | **`founder`** | other founder; historical activity was testing |
+| DropQ Admin | dropqteam@gmail.com | **`staff`** | internal operations account |
+| Marble & Crumb | showcase@dropq.example | **`demo`** | marketing showcase |
+
+**Real vendors: 5 of 9** — The Clovery, Paraiso Delicacies, California Vintage
+Sales, Elias test, Grandies. The two with paid orders are untouched, pinned by
+test.
+
+Applied by `prisma/classify-internal-sellers.mjs` (dry-run by default,
+`--commit` to write, idempotent). Content hashes confirm **only `Seller`
+changed**.
+
+⚠️ **"Elias test" was NOT classified.** The name suggests a test account but it
+was not one of the four identified, so it remains real commerce. Worth a
+decision — it has 1 closed drop, 0 orders and no Stripe.
+
+### 12.2 The gate
+
+```
+unset     → off for everyone
+internal  → only sellers with internalKind != null   ← the pilot
+true      → every eligible vendor
+```
+
+No vendor name, id or email appears in the feature logic — asserted by test.
+**Availability is not permission**: `canStartInPersonSale()` still requires
+Stripe charge-readiness, `lib/payments.ts` never reads `internalKind`, and a
+test proves an internal vendor without Stripe still cannot sell.
+
+Verified against production data: `internal` shows Walk-Up to the classified
+founder and hides it from The Clovery; `unset` hides it from both; `true` shows
+both. 181 assertions green in **all three modes**.
+
+---
+
+## 13. 🔴 Correction: `WALKUP_ENABLED` is NOT an instant kill switch
+
+An earlier activation plan called removing the env var an "instant kill switch"
+while also saying a redeploy was needed. **Both cannot be true. The correct
+answer is that a redeploy IS required**, and the earlier wording was wrong.
+
+### 13.1 What was verified
+
+- The compiled server bundle contains **`process.env.WALKUP_ENABLED` literally**,
+  not an inlined value — confirmed by grepping `.next/server`. So the *code*
+  reads it per request.
+- Next.js only inlines `NEXT_PUBLIC_*` at build time; server vars are runtime
+  reads (`node_modules/next/dist/docs/01-app/02-guides/environment-variables.md`).
+- **But Vercel binds environment variables to a deployment.** Changing one in the
+  dashboard does not reach already-running functions. A new deployment is
+  required for the change to take effect.
+
+### 13.2 Precise answers
+
+| Question | Answer |
+|---|---|
+| Does changing the env var affect the running deployment? | **No.** |
+| Is a redeploy required? | **Yes** — `vercel env rm/add` then redeploy. |
+| Already-open `/pay/{token}` pages? | The page is already rendered client-side; **submitting** hits the server action, which re-reads the flag on the *new* deployment and refuses. No Order is created. |
+| Already-created pending Order? | **Untouched.** It keeps its Stripe session and can still be paid — the gate never blocks `finalizePaidOrder`. It settles normally or expires via `reconcilePendingOrders`. |
+| Stripe payment succeeds *while* Walk-Up is being disabled? | **It completes normally.** The webhook path has no walk-up gate, so the order is finalized, stock claimed, DropPoints awarded and the receipt sent. This is deliberate: money that moved must always produce a correct order. |
+| Actual rollback procedure? | See below. |
+
+### 13.3 The genuinely instant kill switch
+
+In `internal` mode the fastest reversal is **not** the env var — it is the
+classification:
+
+```sql
+UPDATE "Seller" SET "internalKind" = NULL WHERE "internalKind" = 'canary';
+```
+
+Read per request, effective **immediately, with no deploy**. That is a real
+instant kill switch for the pilot cohort, and it is a side benefit of gating on
+data rather than on an env var.
+
+### 13.4 Operational rollback, in order of speed
+
+1. **Instant (no deploy)** — clear `internalKind` on the canary. Walk-Up
+   disappears for them; `/pay` 404s for their tokens.
+2. **Instant, vendor-side** — the vendor taps **Cancel sale**, setting
+   `canceledAt`. That token can no longer convert.
+3. **~1–2 min (redeploy)** — set `WALKUP_ENABLED` unset and redeploy. Kills it
+   globally.
+4. **Code revert** — `git revert` + push. Only needed for an actual defect.
+
+**In-flight money is never rolled back by any of these.** A completed Stripe
+charge always finalizes into a correct order; reversing it is a refund, which is
+Phase F and today means the Stripe dashboard.

@@ -512,6 +512,41 @@ that reintroduces the spam.**
 vendor. Verified by test only. The first real firing logs
 `[stripe] charges disabled — vendor=…` in Vercel.
 
+### Internal/test classification — ✅ SHIPPED
+
+`Seller.internalKind String?` (null = real commerce). Four classified:
+**Britts Bunnies `canary`**, Casa Makulay `founder`, DropQ Admin `staff`,
+Marble & Crumb `demo`. 5 of 9 vendors remain real.
+
+Child rows are **never flagged** — Drops, Orders, WalkUpSales, PointsLedger and
+CustomerVendor inherit through `sellerId`. Classification, not destruction:
+operational and financial views must keep showing internal activity.
+`prisma/classify-internal-sellers.mjs`, dry-run by default. Full rationale:
+`docs/TEST-DATA-AND-METRICS.md`.
+
+⚠️ "Elias test" is NOT classified — the name suggests otherwise. Undecided.
+
+### `WALKUP_ENABLED` is three-state, and NOT an instant kill switch
+
+```
+unset | "internal" (classified vendors only) | "true" (everyone)
+```
+
+The pilot cohort is whoever `internalKind` says it is — **no vendor name, id or
+email in the feature logic**, asserted by test. Availability ≠ permission:
+`canStartInPersonSale()` still requires Stripe, and `lib/payments.ts` never
+reads `internalKind`.
+
+⚠️ **A redeploy IS required to change the env var.** Verified: the server bundle
+holds `process.env.WALKUP_ENABLED` literally (runtime read), but Vercel binds
+env vars to a deployment, so a dashboard change does not reach running
+functions. An earlier plan wrongly called this instant.
+
+**The genuinely instant kill switch is the classification** — clearing
+`internalKind` on the canary is read per request and takes effect with no
+deploy. A completed Stripe charge always finalizes regardless; reversing it is a
+refund (Phase F).
+
 ### Phase E — ✅ SHIPPED, still INERT. Walk-up is feature-complete.
 
 `/pay/{token}` converts a quoted cart into a real pending Order and hands it to
