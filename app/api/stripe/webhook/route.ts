@@ -51,11 +51,13 @@ export async function POST(req: NextRequest) {
     }
   }
   if (!event) {
-    console.error(
-      `[stripe] signature verification failed against ${secrets.length} secret(s): ` +
-        secrets.map((s) => s.label).join(", ")
-    );
-    return new Response("Invalid signature", { status: 400 });
+    // Names the secrets that were TRIED — never their values. Stripe shows the
+    // response body on each delivery attempt, and platform logs don't surface
+    // console output, so this is the only way to tell "the connect secret isn't
+    // loaded" apart from "it's loaded but wrong" without guessing.
+    const tried = secrets.map((s) => s.label).join(", ");
+    console.error(`[stripe] signature verification failed; tried: ${tried}`);
+    return new Response(`Invalid signature (tried: ${tried})`, { status: 400 });
   }
   // Label only — never the secret itself. Makes it visible in the logs which
   // destination an event came from.

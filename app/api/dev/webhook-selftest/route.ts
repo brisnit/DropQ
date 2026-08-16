@@ -75,7 +75,7 @@ export async function GET() {
       headers,
     });
     const res = await stripeWebhook(req);
-    return res.status;
+    return { status: res.status, body: await res.text() };
   };
 
   try {
@@ -83,29 +83,33 @@ export async function GET() {
     process.env.STRIPE_WEBHOOK_SECRET_CONNECT = CONNECT_SECRET;
 
     const acct = await post(ACCOUNT_SECRET);
-    check("account-signed event verifies (existing destination still works)", acct === 200, `status=${acct}`);
+    check("account-signed event verifies (existing destination still works)", acct.status === 200, `status=${acct.status}`);
 
     const conn = await post(CONNECT_SECRET);
-    check("connect-signed event verifies (the production failure)", conn === 200, `status=${conn}`);
+    check("connect-signed event verifies (the production failure)", conn.status === 200, `status=${conn.status}`);
 
     const foreign = await post(FOREIGN_SECRET);
-    check("event signed by neither secret is rejected", foreign === 400, `status=${foreign}`);
+    check("event signed by neither secret is rejected", foreign.status === 400, `status=${foreign.status}`);
+    check("rejection names which secrets were tried (and no values)",
+      foreign.body.includes("tried: account, connect") && !foreign.body.includes("whsec_"), foreign.body);
 
     const unsigned = await post(null);
-    check("event with no stripe-signature header is rejected", unsigned === 400, `status=${unsigned}`);
+    check("event with no stripe-signature header is rejected", unsigned.status === 400, `status=${unsigned.status}`);
 
     // Order matters: the account secret must not be shadowed by the connect one.
     delete process.env.STRIPE_WEBHOOK_SECRET_CONNECT;
     const acctOnly = await post(ACCOUNT_SECRET);
-    check("account secret still works when no connect secret is configured", acctOnly === 200, `status=${acctOnly}`);
+    check("account secret still works when no connect secret is configured", acctOnly.status === 200, `status=${acctOnly.status}`);
     const connWithoutVar = await post(CONNECT_SECRET);
     check("connect-signed event fails when the connect secret is absent",
-      connWithoutVar === 400, `status=${connWithoutVar} (this is the pre-fix production behaviour)`);
+      connWithoutVar.status === 400, `status=${connWithoutVar.status} (this is the pre-fix production behaviour)`);
+    check("...and the body says only \"account\" was tried — the diagnostic we need",
+      connWithoutVar.body.includes("tried: account") && !connWithoutVar.body.includes("connect"), connWithoutVar.body);
 
     process.env.STRIPE_WEBHOOK_SECRET_CONNECT = CONNECT_SECRET;
     delete process.env.STRIPE_WEBHOOK_SECRET;
     const connOnly = await post(CONNECT_SECRET);
-    check("connect secret works even if the account secret is unset", connOnly === 200, `status=${connOnly}`);
+    check("connect secret works even if the account secret is unset", connOnly.status === 200, `status=${connOnly.status}`);
   } catch (e) {
     check("selftest ran without an unexpected exception", false,
       e instanceof Error ? `${e.name}: ${e.message}`.slice(0, 200) : String(e));
