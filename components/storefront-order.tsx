@@ -211,8 +211,11 @@ export function StorefrontOrder({
         <input key={p.id} type="hidden" name={`qty_${p.id}`} value={qty[p.id] ?? 0} />
       ))}
 
-      {/* Menu */}
-      <div className="space-y-3">
+      {/* Menu.
+          `min-w-0` matters: a grid item defaults to `min-width: auto`, so without
+          it this column refuses to shrink below its cards' min-content width and
+          pushes them past the viewport on narrow phones. */}
+      <div className="space-y-3 min-w-0">
         {products.map((p) => {
           const n = qty[p.id] ?? 0;
           const remaining = remainingOf(p.id);
@@ -220,7 +223,12 @@ export function StorefrontOrder({
           return (
             <div
               key={p.id}
-              className={`bg-paper border rounded-card p-3 sm:p-4 flex items-center gap-4 ${
+              /* Two columns on phones (image · details) with the quantity control
+                 dropping to its own row underneath, three on tablet and up — the
+                 original single-row arrangement. As a flex row the control and
+                 image were both `shrink-0`, so at 320px the details column was
+                 squeezed to ~77px and the description wrapped almost per word. */
+              className={`bg-paper border rounded-card p-3 sm:p-4 grid grid-cols-[auto_1fr] sm:grid-cols-[auto_1fr_auto] gap-x-3 sm:gap-x-4 gap-y-3 items-center ${
                 soldOut ? "border-line opacity-60" : "border-line"
               }`}
             >
@@ -247,7 +255,7 @@ export function StorefrontOrder({
                   {p.emoji}
                 </span>
               )}
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 break-words">
                 <p className="font-medium">{p.name}</p>
                 {p.description && <p className="text-sm text-muted">{p.description}</p>}
                 {(p.productType || p.condition || p.rarity) && (
@@ -267,7 +275,7 @@ export function StorefrontOrder({
                 </p>
               </div>
               {soldOut ? (
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted shrink-0">
+                <span className="col-start-2 sm:col-start-3 justify-self-start text-xs font-semibold uppercase tracking-wide text-muted">
                   Sold out
                 </span>
               ) : n === 0 ? (
@@ -275,12 +283,12 @@ export function StorefrontOrder({
                   type="button"
                   onClick={() => setItem(p.id, 1, remaining)}
                   style={{ color: cta, borderColor: cta }}
-                  className="shrink-0 text-sm font-semibold border rounded-pill px-4 py-1.5 hover:bg-cream transition"
+                  className="col-start-2 sm:col-start-3 justify-self-start text-sm font-semibold border rounded-pill px-4 py-1.5 hover:bg-cream transition"
                 >
                   Add
                 </button>
               ) : (
-                <div className="shrink-0 flex items-center gap-3 border border-line-strong rounded-pill px-1.5 py-1">
+                <div className="col-start-2 sm:col-start-3 justify-self-start flex items-center gap-3 border border-line-strong rounded-pill px-1.5 py-1">
                   <button
                     type="button"
                     onClick={() => setItem(p.id, n - 1, remaining)}
@@ -307,7 +315,7 @@ export function StorefrontOrder({
       </div>
 
       {/* Checkout panel */}
-      <div className="lg:sticky lg:top-6 bg-paper border border-line rounded-card p-5 space-y-4">
+      <div className="lg:sticky lg:top-6 min-w-0 bg-paper border border-line rounded-card p-5 space-y-4">
         <h3 className="font-semibold">Your order</h3>
 
         {lines.length === 0 ? (
