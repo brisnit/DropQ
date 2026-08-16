@@ -7,22 +7,59 @@ import { prisma } from "@/lib/db";
 import { notifyAdminsOfDispute } from "@/lib/disputes";
 import { notifyVendorSellingPaused } from "@/lib/vendor-alerts";
 
+/**
+ * This one URL receives events from TWO Stripe destinations, and each signs
+ * with its own secret:
+ *
+ *   account  — DropQ's own platform events (customer.subscription.*)
+ *   connect  — events raised on connected accounts. Because we take direct
+ *              charges, `checkout.session.completed` arrives here, as do
+ *              `charge.dispute.*` and `account.updated`.
+ *
+ * Verifying against a single secret meant the other destination returned 400
+ * forever. In production that was the Connect destination at a 100% failure
+ * rate, silently — the customer's `/order/[id]` redirect was finalizing orders,
+ * so nothing looked broken until a walk-up sale needed the webhook as its
+ * fallback. Try each configured secret; the first that verifies wins.
+ */
+function webhookSecrets(): { label: string; secret: string }[] {
+  return [
+    { label: "account", secret: process.env.STRIPE_WEBHOOK_SECRET ?? "" },
+    { label: "connect", secret: process.env.STRIPE_WEBHOOK_SECRET_CONNECT ?? "" },
+  ].filter((s) => s.secret.length > 0);
+}
+
 export async function POST(req: NextRequest) {
   const stripe = getStripe();
-  const secret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!stripe || !secret) {
+  const secrets = webhookSecrets();
+  if (!stripe || secrets.length === 0) {
     return new Response("Stripe not configured", { status: 400 });
   }
 
   const sig = req.headers.get("stripe-signature");
   const body = await req.text(); // raw body required for signature verification
 
-  let event: Stripe.Event;
-  try {
-    event = stripe.webhooks.constructEvent(body, sig ?? "", secret);
-  } catch {
+  let event: Stripe.Event | null = null;
+  let verifiedBy = "";
+  for (const { label, secret } of secrets) {
+    try {
+      event = stripe.webhooks.constructEvent(body, sig ?? "", secret);
+      verifiedBy = label;
+      break;
+    } catch {
+      // Wrong destination for this secret — try the next one.
+    }
+  }
+  if (!event) {
+    console.error(
+      `[stripe] signature verification failed against ${secrets.length} secret(s): ` +
+        secrets.map((s) => s.label).join(", ")
+    );
     return new Response("Invalid signature", { status: 400 });
   }
+  // Label only — never the secret itself. Makes it visible in the logs which
+  // destination an event came from.
+  console.log(`[stripe] ${event.type} verified via ${verifiedBy} secret`);
 
   switch (event.type) {
     case "checkout.session.completed": {

@@ -235,6 +235,8 @@ export async function GET() {
       ["DropPoints", "awardPointsForOrder(orderId)"],
       ["commission", "createCommissionForOrder(result.order)"],
       ["confirmation email", "orderReceivedEmail({"],
+      // A webhook replay on an already-paid order must not re-count a purchase.
+      ["purchase relationship", "recordRelationship({"],
     ] as const) {
       const at = idx(marker);
       const gate = src.lastIndexOf('result.state === "ok"', at);
