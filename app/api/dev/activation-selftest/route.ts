@@ -372,7 +372,11 @@ export async function GET() {
     const find = (n: string) => rows.find((r) => r.storeName === n);
     const counted = rows.filter((r) => r.outreachable);
 
-    check("V.Admin loader returns every seller", rows.length >= 9, `${rows.length}`);
+    // Compare against the table, not a hard-coded count — the latter asserts
+    // the environment and breaks whenever a vendor is added or removed.
+    const sellerCount = await prisma.seller.count();
+    check("V.Admin loader returns every seller",
+      rows.length === sellerCount, `loader=${rows.length} table=${sellerCount}`);
     check("V.Admin Grandies is flagged needs_help",
       find("Grandies")?.attention === "needs_help", find("Grandies")?.attention);
     check("V.Admin The Clovery (selling) is not flagged",

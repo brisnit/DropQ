@@ -593,8 +593,11 @@ export async function GET() {
     check("vendors with real paid orders are NOT classified internal",
       real.some((s) => s.storeName === "The Clovery") &&
       real.some((s) => s.storeName === "Paraiso Delicacies"));
-    check("classification is nullable and reversible (real vendors remain null)",
-      real.length === 5);
+    // NOT `real.length === N` — that asserts the environment, not behaviour,
+    // and breaks the moment a vendor is added or removed (it did, when the
+    // Elias test account was deleted). Assert the invariant instead.
+    check("classification is nullable — real vendors carry null, not a sentinel",
+      real.length > 0 && real.every((s) => s.internalKind === null));
     console.log("[selftest] classification:",
       sellers.map((s) => `${s.storeName}=${s.internalKind ?? "real"}`).join(", "));
   }
