@@ -2828,3 +2828,83 @@ it depends entirely on the Casa Makulay decision above.
 
 **Both need their own decision.** The script will report them on every audit run
 and will never write them without an explicit `--only`.
+
+## 26. First production pilot attempt, 2026-08-16 — Walk-Up NOT exercised
+
+The controlled $1.00 test ran and the money moved, but it went through the
+**normal online storefront checkout**, not Walk-Up. Recording it because the
+run still produced the single most valuable piece of evidence we needed, and
+because the near-miss is worth not repeating.
+
+### 26.1 What actually happened
+
+The canary drop was published `draft → live` to make it purchasable, and the
+purchase was then made from the public storefront rather than from the vendor's
+`+ New in-person sale` → QR flow. Walk-Up requires neither publishing nor an
+open drop; the draft state was deliberate.
+
+| Signal | Observed | Walk-Up would have produced |
+|---|---|---|
+| `Order.source` | `online` | `in_person` |
+| `Customer.signupSource` | `storefront` | `in_person` |
+| `WalkUpSale` rows | **0** | exactly 1 |
+| `Order.note` | `"Thanks"` | no note field exists on the pay form |
+| Drop status | published to `live` | stays `draft` |
+
+The `WalkUpSale` count is conclusive on its own: the row is written *before* the
+QR renders and is never deleted — cancel only sets `canceledAt`. Zero rows means
+`startWalkUpSaleAction` never ran.
+
+Order `cmsv4il3c0002k104w2bpid4d`, $1.00, `feeCents: 2`, live PaymentIntent
+`pi_3U4ssHJpdt2PiS0z0YjD7sTP` on the Britts Bunnies connected account. Real
+money, correctly recorded, left intact. The drop has since been closed and
+`Chocolate Chips` stands at sold 1 / 49 remaining.
+
+### 26.2 ✅ The relationship defect is closed — positive proof
+
+This is the part worth keeping. `recordRelationship` lives inside
+`finalizePaidOrder`, which **both** payment paths share, so the online run
+exercised exactly the code Walk-Up depends on. A deliberate pause on the Stripe
+screen opened a ~176-second window, sampled every 2s:
+
+```
+01:25:52.584   Order created · paymentStatus=pending · Stripe session opened
+               ↓ ~176s — NO CustomerVendor row exists anywhere in this window
+01:28:48.878   payment OrderEvent — finalizePaidOrder wins the claim
+01:28:48.905   PointsLedger +1                            (+27ms)
+01:28:48.915   Customer.firstPurchaseAt                   (+37ms)
+01:28:48.923   CustomerVendor created, orderCount=1        (+45ms)
+```
+
+Under the pre-Phase-E behaviour the relationship would have been written at
+01:25:52 — at checkout, for a payment that had not happened. It was not.
+**DropQ's own finalization work is ~45ms**, so it is not a latency contributor.
+
+### 26.3 What this run could NOT measure
+
+Perceived payment latency. `WalkUpStatus` and its 3s poll never rendered, so the
+delay observed was the online success-page redirect. **Do not draw conclusions
+about the polling interval from this run** — that measurement still needs a real
+Walk-Up sale. Splitting Stripe-confirm from webhook-delivery additionally needs
+live Stripe API access, which the local environment does not have.
+
+### 26.4 Constraint for the retry
+
+The drop must stay **draft**. The only valid path is vendor dashboard →
+`+ New in-person sale` → add 1 × Chocolate Chips → Start sale → QR →
+`/pay/{token}` → first name + email → Pay $1.00 → vendor status
+`Waiting → Customer is paying → ✓ Paid`.
+
+### 26.5 Mobile layout bug found during the run
+
+Real, customer-facing, and unrelated to Walk-Up — see the `storefront-order.tsx`
+commit. The product card was a flex row whose image and quantity control were
+both `shrink-0`, so the details column absorbed every pixel: 77px at 320px, with
+the card pushed ~13px past the viewport and clipped (nothing scrolls, which is
+why it read as "skewed"). Both grid items in the form also lacked `min-w-0`, so
+`min-width: auto` carried the overflow out to the page edge. Now a grid: two
+columns on phones with the control on its own row, three from `sm` up. Details
+column 77px → 178px; desktop verified pixel-identical at 640/1024/1280.
+
+`/pay/[token]` was audited at 320/375/390/430 and is already clean — no overflow
+even with a 74-character line item. Left unchanged.
