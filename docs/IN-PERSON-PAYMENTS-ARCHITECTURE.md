@@ -3224,12 +3224,29 @@ up. Details column 77px → 178px. Desktop verified pixel-identical at
 **Confirmed on a real phone in production** during a canary run: no overflow, no
 clipping, no skew.
 
-⚠️ **`/pay/{token}` has NOT been visually verified on a phone.** It was measured
-in headless Chrome at 320/375/390/430 and is clean — no overflow even with a
-74-character line item — and the founder completed a real payment on it without
-reporting a problem, but nobody has deliberately inspected its layout on a
-device. Its two inputs shrink to 113px each at 320px: tight but functional, and
-**deliberately left unchanged** rather than churn the UI before a canary.
+✅ **`/pay/{token}` verified on a real phone, 2026-08-17.** The founder held the
+page open for 34.7s during the second walk-up canary and inspected it
+deliberately: **no horizontal overflow, no clipping, no content off-screen, no
+unusable fields.** Quote: *"Once loaded, the payment page looked good and worked
+perfectly."* This closes the last open mobile item. Its two inputs shrink to
+113px each at 320px — tight but confirmed usable in the field, and **left
+unchanged**.
+
+### Stripe Express Checkout renders progressively — not a defect
+
+On that run the Stripe hosted page briefly showed small payment icons in a row
+before the larger Apple Pay / Link / Klarna buttons appeared.
+
+**DropQ does not control this.** `buildCheckoutSessionParams` sends no
+`payment_method_types`, no `ui_mode` and no express-checkout configuration —
+only `mode`, `line_items`, `payment_intent_data`, `metadata`, `expires_at` and
+the URLs. Which wallets appear, and when, is decided entirely by Stripe's hosted
+Checkout resolving eligibility client-side (device and browser wallet support,
+Link session, Klarna eligibility by amount and region). The two-stage paint is
+that progressive enhancement.
+
+**Recorded as normal payment-UI loading behaviour, non-blocking.** Do not change
+Stripe or payment UI code to chase it.
 
 ## 28.8 ✅ RESOLVED — acquisition attribution via stale `dq_touch`
 
@@ -3321,3 +3338,83 @@ production symptom.
 
 **Not blockers:** the 3s poll (§28.2), the two aborted polls (§28.2), the 113px
 inputs (§28.7).
+
+---
+
+## 28.11 Second walk-up canary, 2026-08-17 — payment PASS, attribution still unproven
+
+A second real $1.00 walk-up sale ran end to end. Every payment invariant passed
+again, which is a genuine second confirmation of §28.1. **The attribution
+objective was not met**, for a reason worth recording.
+
+| | |
+|---|---|
+| WalkUpSale | `cmsxnaw5o0001la04hfhz215f` |
+| Order | `cmsxo3vg00003la04dqv5i7mo` — **`source: in_person`** |
+| Stripe | `cs_live_a1LqS5ofQtBFCEaT4bw3…` · `pi_3U5WrvJpdt2PiS0z0O3hli54` |
+| Money | 100¢, **`feeCents` 2** |
+| Product | Chocolate Chips sold **1 → 2** |
+| OrderEvents | `created/in_person`, `payment/paid` |
+| CustomerVendor | **updated** `orderCount 1 → 2`, `$2.00` — after payment only |
+| Deltas | order +1, orderItem +1, orderEvent +2, pointsLedger +1, walkUpSale +1, **customer +0**, **customerVendor +0**, drop +0, seller +0 |
+
+### Timing — webhook won again
+
+```
+20:09:15.940  GET  /pay/{token}          customer scans
+20:09:50.680  POST /pay/{token} → 303    identity submitted (+34.7s — the mobile inspection)
+20:09:50.832  Order pending · sale claimed · Stripe session
+              ⋮ 63s on Stripe's hosted page
+20:10:53.817  POST /api/stripe/webhook   ★ WEBHOOK WINS
+20:10:53.938  Order paid                 +121ms
+20:10:53.969  PointsLedger +1            +31ms
+20:10:53.987  CustomerVendor updated     +49ms
+20:10:56.300  status endpoint → paid     vendor sees ✓ Paid
+20:10:56.953  redirect lands             3.1s late
+```
+
+**Payment → vendor ✓ Paid: 2.48s** (2.36s polling, ~170ms DropQ). Consistent
+with the 2.84s in §28.2. The webhook beat the redirect by 3.1s for the second
+time — §28.4 continues to pay off.
+
+### ⚠️ Why attribution was NOT validated
+
+The email used was **`hello@artifactdigital.co`** — one character from
+`…digital.com`, and already a customer since 2026-08-16. `upsertCustomer`
+matched the existing row (**customer count +0**), so `applyFirstTouch` hit the
+already-attributed guard and returned. The customer still reads
+`signupSource: storefront`, `firstVendorId: Marble & Crumb`,
+`firstTouchAt: 2026-08-14`.
+
+**This is the guard behaving correctly** — an independent production
+confirmation of test T3 (§28.8): an existing customer's acquisition survives a
+walk-up sale, exactly as first-touch requires. But it means the *new*-customer
+half of the fix — `in_person` + the walk-up vendor + the walk-up drop, defeating
+a stale `dq_touch` — **has still never been observed in production.** It is
+covered by T1/T2 against fixtures, including a negative control that reproduces
+the production symptom byte-for-byte.
+
+Whether the stale Marble & Crumb cookie was present on the device is
+**unknowable from this run**: the code path that reads it was never reached.
+
+**To validate it, a future canary must use an email that has never existed in
+`Customer`.** Check first:
+`SELECT email FROM "Customer"` — reusing any listed address makes the run prove
+nothing about attribution.
+
+### ⚠️ Canary Test 2 was published to `live`
+
+The drop was `draft` when the run was armed and is **`live`** afterwards — live
+drops 1, publicly listed and orderable at $1.00. Walk-Up never requires or
+performs publishing, so this was a manual action during the run. No stray orders
+resulted (the only new order is the canary). **It should be returned to `closed`
+via the vendor's own Close drop control.**
+
+### Aborted polls, continued
+
+Three status polls logged `responseStatusCode: 0` (20:09:05, 20:10:17,
+20:10:50), and the webhook POST logged `0` as well despite unambiguously
+finalizing the order 121ms later. Consistent with §28.2's non-blocking
+assessment; the `0` is a Vercel log artifact for connections the client dropped,
+not a server error. Still non-blocking, now also observed on a POST.
+
