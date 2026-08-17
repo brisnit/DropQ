@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import { formatMoney } from "@/lib/format";
 import { startWalkUpSaleAction } from "@/lib/actions/walkup";
@@ -79,17 +80,17 @@ export function WalkUpCart({
                   aria-label={`Remove one ${p.name}`}
                   onClick={() => set(p.id, n - 1, p.remaining)}
                   disabled={n === 0}
-                  className="w-10 h-10 rounded-xl border border-line-strong bg-paper text-lg disabled:opacity-40 active:scale-95 transition"
+                  className="w-12 h-12 rounded-xl border border-line-strong bg-paper text-2xl leading-none disabled:opacity-40 active:scale-95 transition"
                 >
                   −
                 </button>
-                <span className="w-7 text-center tabular-nums font-semibold">{n}</span>
+                <span className="w-8 text-center tabular-nums font-semibold text-lg">{n}</span>
                 <button
                   type="button"
                   aria-label={`Add one ${p.name}`}
                   onClick={() => set(p.id, n + 1, p.remaining)}
                   disabled={out || n >= p.remaining}
-                  className="w-10 h-10 rounded-xl border border-line-strong bg-paper text-lg disabled:opacity-40 active:scale-95 transition"
+                  className="w-12 h-12 rounded-xl border border-line-strong bg-paper text-2xl leading-none disabled:opacity-40 active:scale-95 transition"
                 >
                   +
                 </button>
@@ -121,28 +122,26 @@ export function WalkUpCart({
   );
 }
 
-/** Wraps the cart so the vendor opens it deliberately rather than always seeing it. */
-export function WalkUpSaleStarter({
+/**
+ * The cart as it appears on the focused sale route. Identical controls; Cancel
+ * leaves the flow rather than collapsing a panel, because on that route there
+ * is nothing to collapse back into.
+ */
+export function WalkUpCartScreen({
   dropId,
   products,
+  cancelHref,
 }: {
   dropId: string;
   products: WalkUpProduct[];
+  cancelHref: string;
 }) {
-  const [open, setOpen] = useState(false);
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="text-sm font-semibold px-4 py-2.5 rounded-xl bg-ink text-cream hover:bg-ink-soft transition"
-      >
-        + New in-person sale
-      </button>
-    );
-  }
-  return <WalkUpCart dropId={dropId} products={products} onCancel={() => setOpen(false)} />;
+  const router = useRouter();
+  return (
+    <div className="bg-paper border border-line rounded-card p-4 sm:p-5">
+      <WalkUpCart dropId={dropId} products={products} onCancel={() => router.push(cancelHref)} />
+    </div>
+  );
 }
 
 /* --------------------------- Live status (Phase E) ------------------------- */
@@ -178,9 +177,18 @@ const LABEL: Record<StatusPayload["state"], { text: string; cls: string }> = {
 export function WalkUpStatus({
   saleId,
   initialState,
+  totalCents,
+  itemCount,
+  dropHref,
+  newSaleHref,
 }: {
   saleId: string;
   initialState: StatusPayload["state"];
+  /** Supplied by the focused sale route so Paid can render a full success panel. */
+  totalCents?: number;
+  itemCount?: number;
+  dropHref?: string;
+  newSaleHref?: string;
 }) {
   const [status, setStatus] = useState<StatusPayload["state"]>(initialState);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -209,6 +217,49 @@ export function WalkUpStatus({
   }, [saleId]);
 
   const l = LABEL[status];
+
+  // Paid is the moment the vendor hands over goods, so it gets a full panel
+  // rather than a chip they have to hunt for.
+  if (status === "paid" && dropHref) {
+    return (
+      <div className="rounded-card border-2 border-sage bg-sage-tint/60 p-5 sm:p-6 text-center">
+        <p className="text-4xl" aria-hidden>✓</p>
+        <p className="font-display text-2xl font-semibold mt-1">Paid</p>
+        {totalCents != null && (
+          <p className="font-display text-3xl font-semibold tabular-nums mt-2">
+            {formatMoney(totalCents)}
+          </p>
+        )}
+        {itemCount != null && (
+          <p className="text-sm text-muted mt-1">
+            {itemCount} item{itemCount === 1 ? "" : "s"} · hand over the order
+          </p>
+        )}
+        <div className="flex flex-col sm:flex-row gap-2 justify-center mt-5">
+          <a
+            href={dropHref}
+            className="text-sm font-semibold px-5 py-3 rounded-xl bg-ink text-cream hover:bg-ink-soft transition"
+          >
+            Done
+          </a>
+          {newSaleHref && (
+            <a
+              href={newSaleHref}
+              className="text-sm font-semibold px-5 py-3 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
+            >
+              New in-person sale
+            </a>
+          )}
+        </div>
+        {orderId && (
+          <a href="/dashboard/orders" className="block text-sm font-medium underline mt-4">
+            See the order
+          </a>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2 mt-3">
       <span className={`inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-pill ${l.cls}`}>

@@ -858,6 +858,9 @@ export async function GET() {
       const consumers = hits.filter((h) => !h.endsWith("lib/payments.ts")).sort();
       return JSON.stringify(consumers) === JSON.stringify([
         "app/dashboard/drops/[id]/page.tsx",
+        // The focused sale route gates on the same predicate rather than
+        // trusting that the drop page only linked here when eligible.
+        "app/dashboard/drops/[id]/sale/page.tsx",
         "lib/actions/walkup.ts",
       ]);
     })());

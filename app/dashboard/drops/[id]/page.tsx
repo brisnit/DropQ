@@ -26,9 +26,7 @@ import { BackLink } from "@/components/back-link";
 import { StripeRequiredBanner } from "@/components/stripe-required-banner";
 import { loadActivationState, publishGate } from "@/lib/activation";
 import { canStartInPersonSale } from "@/lib/payments";
-import { isWalkUpEnabled, walkUpSaleState, walkUpTotalCents, payUrlFor, WALKUP_TTL_MINUTES, type WalkUpLine } from "@/lib/walkup";
-import { cancelWalkUpSaleAction } from "@/lib/actions/walkup";
-import { WalkUpSaleStarter, WalkUpStatus } from "@/components/walkup-sale";
+import { isWalkUpEnabled } from "@/lib/walkup";
 import { DropCommunicationSection } from "@/components/drop-communication";
 import { MessageCustomerButton } from "@/components/message-customer-button";
 import { dropCommunicationSummary } from "@/lib/messaging";
@@ -38,13 +36,11 @@ export default async function DropDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ stripe_required?: string; walkup?: string; walkup_error?: string }>;
+  searchParams: Promise<{ stripe_required?: string }>;
 }) {
   const { id } = await params;
   const {
     stripe_required: stripeRequired,
-    walkup: walkUpId,
-    walkup_error: walkUpError,
   } = await searchParams;
   const seller = await requireSeller();
 
@@ -70,17 +66,11 @@ export default async function DropDetailPage({
   // when it's off, so the page renders exactly as it did before Phase D.
   const walkUpOn = isWalkUpEnabled(seller);
   const walkUpEligible = walkUpOn ? canStartInPersonSale(seller, drop) : null;
-  // Falls back to the newest still-open sale when `?walkup=` is missing. Without
-  // it a refresh or a tap of Back made the payment QR vanish while the sale was
-  // still live — leaving the Share QR as the only code on screen, which is a
-  // good way to get the wrong one scanned.
-  const walkUpSale = !walkUpOn
+  // Only whether one is open, for the button label — the sale itself is
+  // rendered by the focused route.
+  const openWalkUpSale = !walkUpOn
     ? null
-    : ((walkUpId &&
-        (await prisma.walkUpSale.findFirst({
-          where: { id: walkUpId, sellerId: seller.id, dropId: drop.id },
-        }))) ||
-      (await prisma.walkUpSale.findFirst({
+    : await prisma.walkUpSale.findFirst({
         where: {
           sellerId: seller.id,
           dropId: drop.id,
@@ -88,18 +78,13 @@ export default async function DropDetailPage({
           canceledAt: null,
           expiresAt: { gt: new Date() },
         },
-        orderBy: { createdAt: "desc" },
-      })));
+        select: { id: true },
+      });
 
   const h = await headers();
   const host = h.get("host") ?? "localhost:3001";
   const proto = h.get("x-forwarded-proto") ?? "http";
   const shareUrl = `${proto}://${host}/s/${seller.slug}/${drop.id}`;
-  const walkUpQr = walkUpSale
-    ? await QRCode.toDataURL(payUrlFor(walkUpSale.token, `${proto}://${host}`), {
-        width: 440, margin: 1, color: { dark: "#1b1726", light: "#ffffff" },
-      })
-    : null;
   const qrDataUrl = await QRCode.toDataURL(shareUrl, {
     width: 360,
     margin: 1,
@@ -311,7 +296,10 @@ export default async function DropDetailPage({
         </div>
       )}
 
-      {/* In-person sale (Phase D). Absent entirely unless WALKUP_ENABLED. */}
+      {/* In-person sale. The whole transaction now lives on its own focused
+          route — a vendor mid-sale should not be reading stats, share links and
+          a danger zone. This is only the doorway; see
+          app/dashboard/drops/[id]/sale/page.tsx. */}
       {walkUpOn && (
         <div className="bg-paper border border-line rounded-card p-5 mb-8">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -321,26 +309,17 @@ export default async function DropDetailPage({
                 Ring up a customer standing with you. They pay by card on their own phone.
               </p>
             </div>
-            {!walkUpSale && walkUpEligible?.ok && (
-              <WalkUpSaleStarter
-                dropId={drop.id}
-                products={drop.products.map((p) => ({
-                  id: p.id,
-                  name: p.name,
-                  priceCents: p.priceCents,
-                  remaining: Math.max(0, p.inventory - p.sold),
-                }))}
-              />
-            )}
+            {walkUpEligible?.ok ? (
+              <Link
+                href={`/dashboard/drops/${drop.id}/sale`}
+                className="shrink-0 text-sm font-semibold px-4 py-2.5 rounded-xl bg-ink text-cream hover:bg-ink-soft transition"
+              >
+                {openWalkUpSale ? "Resume in-person sale" : "+ New in-person sale"}
+              </Link>
+            ) : null}
           </div>
 
-          {walkUpError && (
-            <p className="mt-3 text-sm text-brand-dark bg-brand-tint rounded-lg px-3 py-2">
-              Couldn&apos;t start that sale ({walkUpError}). Nothing was created — try again.
-            </p>
-          )}
-
-          {!walkUpSale && walkUpEligible && !walkUpEligible.ok && (
+          {walkUpEligible && !walkUpEligible.ok && (
             <p className="mt-3 text-sm text-muted">
               {walkUpEligible.reason === "vendor_not_sellable"
                 ? "Connect Stripe before taking in-person payments."
@@ -349,94 +328,6 @@ export default async function DropDetailPage({
                   : "This drop isn't available for in-person sales."}
             </p>
           )}
-
-          {walkUpSale && (() => {
-            const state = walkUpSaleState(walkUpSale);
-            const lines = walkUpSale.lines as unknown as WalkUpLine[];
-            const total = walkUpTotalCents(lines);
-            return (
-              <div className="mt-4 border-t border-line pt-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-semibold">
-                      {formatMoney(total)}{" "}
-                      <span className="font-normal text-muted">
-                        · {lines.reduce((n, l) => n + l.quantity, 0)} item(s) ·{" "}
-                        {state === "open" ? "awaiting payment" : state}
-                      </span>
-                    </p>
-                    <ul className="text-sm text-ink-soft mt-1">
-                      {lines.map((l) => (
-                        <li key={l.productId}>
-                          <span className="text-muted">{l.quantity}×</span> {l.name} ·{" "}
-                          {formatMoney(l.priceCents)}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  {state === "open" && (
-                    <form action={cancelWalkUpSaleAction} className="shrink-0">
-                      <input type="hidden" name="saleId" value={walkUpSale.id} />
-                      <Button type="submit" variant="secondary">Cancel sale</Button>
-                    </form>
-                  )}
-                </div>
-
-                {/* Phase E: /pay/{token} is live, so the QR is real. Large on
-                    purpose — it gets scanned across a table. */}
-                {/* This QR and the "Share drop" QR further down do completely
-                    different jobs, and a vendor mid-sale has confused them. So
-                    it is titled, tinted, and states the amount next to the code
-                    — the share QR stays plain and is labelled as a share link. */}
-                {state === "open" && (
-                  <div className="mt-4 rounded-card border-2 border-sage bg-sage-tint/40 p-4">
-                    <p className="text-xs uppercase tracking-wider font-semibold text-sage">
-                      💳 Customer payment QR · in-person sale
-                    </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-5">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={walkUpQr!}
-                        alt={`Payment QR — customer scans to pay ${formatMoney(total)}`}
-                        width={220}
-                        height={220}
-                        className="w-[220px] h-[220px] rounded-xl border-2 border-sage bg-white p-2"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="font-display text-xl font-semibold">
-                          Have the customer scan this to pay {formatMoney(total)}
-                        </p>
-                        <p className="text-sm text-muted mt-1">
-                          {lines.reduce((n, l) => n + l.quantity, 0)} item(s) · pays this sale only
-                        </p>
-                        <p className="font-mono text-xs break-all mt-2 text-muted">
-                          {payUrlFor(walkUpSale.token, shareUrl.split("/s/")[0])}
-                        </p>
-                        <div className="mt-2">
-                          <ShareButton
-                            url={payUrlFor(walkUpSale.token, shareUrl.split("/s/")[0])}
-                            title={`Pay ${seller.storeName}`}
-                          />
-                        </div>
-                        <p className="text-xs text-muted mt-2">
-                          Expires {WALKUP_TTL_MINUTES} minutes after it was created.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <WalkUpStatus
-                  saleId={walkUpSale.id}
-                  initialState={
-                    state === "open" ? "waiting"
-                    : state === "canceled" ? "canceled"
-                    : state === "expired" ? "expired"
-                    : "customer_paying"
-                  }
-                />
-              </div>
-            );
-          })()}
         </div>
       )}
 

@@ -29,7 +29,7 @@ import {
 
 /** Refuse loudly rather than half-creating something. */
 function fail(dropId: string, reason: string): never {
-  redirect(`/dashboard/drops/${dropId}?walkup_error=${encodeURIComponent(reason)}`);
+  redirect(`/dashboard/drops/${dropId}/sale?walkup_error=${encodeURIComponent(reason)}`);
 }
 
 export async function startWalkUpSaleAction(formData: FormData) {
@@ -74,8 +74,9 @@ export async function startWalkUpSaleAction(formData: FormData) {
     select: { id: true },
   });
 
+  // Into the focused sale screen, not back to the drop page.
   revalidatePath(`/dashboard/drops/${dropId}`);
-  redirect(`/dashboard/drops/${dropId}?walkup=${sale.id}`);
+  redirect(`/dashboard/drops/${dropId}/sale?walkup=${sale.id}`);
 }
 
 /**
@@ -105,6 +106,7 @@ export async function cancelWalkUpSaleAction(formData: FormData) {
     });
   }
 
+  revalidatePath(`/dashboard/drops/${sale.dropId}/sale`);
   revalidatePath(`/dashboard/drops/${sale.dropId}`);
   redirect(`/dashboard/drops/${sale.dropId}`);
 }
