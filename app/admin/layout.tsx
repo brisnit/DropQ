@@ -30,7 +30,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               My dashboard →
             </Link>
             <form action={logoutAction}>
-              <button className="text-sm text-cream/70 hover:text-cream whitespace-nowrap min-h-[40px] px-2">
+              <button className="text-sm text-cream/70 hover:text-cream whitespace-nowrap min-h-11 px-2">
                 Log out
               </button>
             </form>

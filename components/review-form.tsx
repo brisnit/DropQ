@@ -28,7 +28,7 @@ function StarInput({
             onClick={() => setValue(i)}
             onMouseEnter={() => setHover(i)}
             aria-label={`${i} star${i > 1 ? "s" : ""}`}
-            className={`text-2xl leading-none transition ${
+            className={`inline-flex items-center justify-center min-w-11 min-h-11 text-2xl leading-none transition ${
               (hover || value) >= i ? "text-quad" : "text-line-strong"
             }`}
           >

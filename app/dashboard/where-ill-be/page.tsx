@@ -118,7 +118,7 @@ export default async function WhereIllBePage() {
 
                   <form action={cancelAppearanceAction} className="shrink-0">
                     <input type="hidden" name="appearanceId" value={a.id} />
-                    <button className="inline-flex items-center min-h-[40px] px-4 rounded-pill border border-line-strong text-sm font-medium text-ink-soft hover:border-ink/30 transition">
+                    <button className="inline-flex items-center min-h-11 px-4 rounded-pill border border-line-strong text-sm font-medium text-ink-soft hover:border-ink/30 transition">
                       Cancel
                     </button>
                   </form>

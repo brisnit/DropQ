@@ -103,7 +103,7 @@ export function DiscoverabilityForm({ data }: { data: DiscoverabilityData }) {
             <div className="flex gap-2 flex-wrap">
               {RADII.map((r) => (
                 <button type="button" key={r} onClick={() => setRadius(r)}
-                  className={`text-sm font-medium px-3.5 py-1.5 rounded-pill border transition ${radius === r ? "bg-ink text-cream border-ink" : "border-line-strong text-ink-soft hover:border-ink/30"}`}>
+                  className={`text-sm font-medium inline-flex items-center min-h-11 px-3.5 py-1.5 rounded-pill border transition ${radius === r ? "bg-ink text-cream border-ink" : "border-line-strong text-ink-soft hover:border-ink/30"}`}>
                   {r} mi
                 </button>
               ))}

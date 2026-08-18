@@ -85,7 +85,7 @@ export default async function SavedPage() {
                 <form action={toggleSavedDropAction} className="px-3.5 pb-3.5 mt-auto">
                   <input type="hidden" name="dropId" value={d.id} />
                   <input type="hidden" name="returnTo" value="/my/saved" />
-                  <button className="w-full min-h-[40px] rounded-pill border border-line-strong text-sm font-medium text-ink-soft hover:border-ink/30 transition">
+                  <button className="w-full min-h-11 rounded-pill border border-line-strong text-sm font-medium text-ink-soft hover:border-ink/30 transition">
                     ★ Saved
                   </button>
                 </form>
@@ -107,7 +107,7 @@ export default async function SavedPage() {
                 <form action={toggleVendorFollowAction}>
                   <input type="hidden" name="sellerId" value={v.sellerId} />
                   <input type="hidden" name="returnTo" value="/my/saved" />
-                  <button className="w-full min-h-[40px] rounded-pill border border-line-strong text-sm font-medium text-ink-soft hover:border-ink/30 transition">
+                  <button className="w-full min-h-11 rounded-pill border border-line-strong text-sm font-medium text-ink-soft hover:border-ink/30 transition">
                     Following
                   </button>
                 </form>
@@ -146,7 +146,7 @@ export default async function SavedPage() {
                 </Link>
                 <form action={toggleMarketFollowAction} className="shrink-0">
                   <input type="hidden" name="marketId" value={m.id} />
-                  <button className="min-h-[40px] px-4 rounded-pill border border-line-strong text-sm font-medium text-ink-soft hover:border-ink/30 transition">
+                  <button className="min-h-11 px-4 rounded-pill border border-line-strong text-sm font-medium text-ink-soft hover:border-ink/30 transition">
                     Following
                   </button>
                 </form>
@@ -185,7 +185,7 @@ export default async function SavedPage() {
                 </Link>
                 <form action={toggleLocationFollowAction} className="shrink-0">
                   <input type="hidden" name="locationId" value={l.id} />
-                  <button className="min-h-[40px] px-4 rounded-pill border border-line-strong text-sm font-medium text-ink-soft hover:border-ink/30 transition">
+                  <button className="min-h-11 px-4 rounded-pill border border-line-strong text-sm font-medium text-ink-soft hover:border-ink/30 transition">
                     Following
                   </button>
                 </form>

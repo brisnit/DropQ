@@ -104,7 +104,7 @@ export default async function AdminClientPage({
           <Link
             href={`/s/${seller.slug}`}
             target="_blank"
-            className="text-sm font-medium px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
+            className="text-sm font-medium inline-flex items-center justify-center min-h-11 px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
           >
             View storefront ↗
           </Link>
@@ -159,13 +159,13 @@ export default async function AdminClientPage({
               href={`mailto:${seller.email}?subject=${encodeURIComponent(
                 "Getting your DropQ store ready to sell"
               )}`}
-              className="text-sm font-medium px-3.5 py-2 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition"
+              className="inline-flex items-center justify-center min-h-11 text-sm font-medium px-3.5 py-2 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition"
             >
               Email vendor
             </a>
             <Link
               href="/admin/activation"
-              className="text-sm font-medium px-3.5 py-2 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition whitespace-nowrap"
+              className="inline-flex items-center justify-center min-h-11 text-sm font-medium px-3.5 py-2 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition whitespace-nowrap"
             >
               All activation →
             </Link>
@@ -316,7 +316,7 @@ export default async function AdminClientPage({
                     ? `Remove admin access from ${seller.email}?`
                     : `Give ${seller.email} admin access to all of DropQ? They'll be able to see and change every vendor, order, and payout.`
                 }
-                className="text-sm font-semibold px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
+                className="text-sm font-semibold inline-flex items-center justify-center min-h-11 px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
               >
                 {seller.isAdmin ? "Revoke admin" : "Make admin"}
               </ConfirmSubmit>
@@ -341,7 +341,7 @@ export default async function AdminClientPage({
               ) : (
                 <ConfirmSubmit
                   message={`Suspend ${seller.storeName}? They'll be logged out and their storefront goes offline until you reinstate them.`}
-                  className="text-sm font-semibold px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-brand hover:text-brand transition"
+                  className="text-sm font-semibold inline-flex items-center justify-center min-h-11 px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-brand hover:text-brand transition"
                 >
                   Suspend access
                 </ConfirmSubmit>

@@ -53,7 +53,7 @@ export default async function OrdersPage({
           <Link
             key={f}
             href={f === "all" ? "/dashboard/orders" : `/dashboard/orders?status=${f}`}
-            className={`px-3.5 py-1.5 rounded-pill text-sm font-medium transition ${
+            className={`inline-flex items-center min-h-11 px-3.5 py-1.5 rounded-pill text-sm font-medium transition ${
               filter === f
                 ? "bg-ink text-cream"
                 : "bg-paper border border-line text-ink-soft hover:border-ink/25"

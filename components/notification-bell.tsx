@@ -84,7 +84,7 @@ export function NotificationBell({
         onClick={() => setOpen((v) => !v)}
         aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
         aria-expanded={open}
-        className="relative w-10 h-10 rounded-xl inline-flex items-center justify-center text-ink hover:bg-line/60 transition"
+        className="relative w-11 h-11 rounded-xl inline-flex items-center justify-center text-ink hover:bg-line/60 transition"
       >
         {/* Outline bell, stroked in currentColor — an emoji rendered gold and
             sat outside the design system's palette. */}

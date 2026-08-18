@@ -205,7 +205,11 @@ export function StorefrontOrder({
         </span>
       </div>
     )}
-    <form action={formAction} className="grid lg:grid-cols-[1fr_360px] gap-8 items-start">
+    {/* `grid-cols-1` is not cosmetic. Declaring only `lg:grid-cols-*` leaves
+        mobile on an IMPLICIT `auto` track, which sizes to content and can grow
+        past the container; `grid-cols-1` is `minmax(0,1fr)`, which pins the
+        track to the container and lets children shrink. */}
+    <form action={formAction} className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-8 items-start">
       <input type="hidden" name="dropId" value={dropId} />
       {products.map((p) => (
         <input key={p.id} type="hidden" name={`qty_${p.id}`} value={qty[p.id] ?? 0} />
@@ -288,11 +292,11 @@ export function StorefrontOrder({
                   Add
                 </button>
               ) : (
-                <div className="col-start-2 sm:col-start-3 justify-self-start flex items-center gap-3 border border-line-strong rounded-pill px-1.5 py-1">
+                <div className="col-start-2 sm:col-start-3 justify-self-start flex items-center gap-1 border border-line-strong rounded-pill px-1 py-0.5">
                   <button
                     type="button"
                     onClick={() => setItem(p.id, n - 1, remaining)}
-                    className="w-7 h-7 rounded-full hover:bg-line grid place-items-center text-lg"
+                    className="w-11 h-11 rounded-full hover:bg-line grid place-items-center text-lg"
                     aria-label="Decrease"
                   >
                     −
@@ -302,7 +306,7 @@ export function StorefrontOrder({
                     type="button"
                     onClick={() => setItem(p.id, n + 1, remaining)}
                     disabled={n >= remaining}
-                    className="w-7 h-7 rounded-full hover:bg-line grid place-items-center text-lg disabled:opacity-30"
+                    className="w-11 h-11 rounded-full hover:bg-line grid place-items-center text-lg disabled:opacity-30"
                     aria-label="Increase"
                   >
                     +

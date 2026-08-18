@@ -185,7 +185,7 @@ export function StoreSettingsForm({
             <div className="text-sm">
               <p className="text-muted">PNG or JPG, up to 8MB.</p>
               {shownLogo && (
-                <button type="button" onClick={removeLogo} className="mt-1 text-muted hover:text-brand">
+                <button type="button" onClick={removeLogo} className="mt-1 inline-flex items-center min-h-11 text-muted hover:text-brand">
                   Remove logo
                 </button>
               )}
@@ -224,7 +224,7 @@ export function StoreSettingsForm({
               Best size <b>1600×400px</b> (4:1, landscape). JPG, PNG, WebP or AVIF, up to 8MB.
             </p>
             {shownHeader && (
-              <button type="button" onClick={removeHeader} className="text-muted hover:text-brand shrink-0">
+              <button type="button" onClick={removeHeader} className="inline-flex items-center min-h-11 text-muted hover:text-brand shrink-0">
                 Remove
               </button>
             )}

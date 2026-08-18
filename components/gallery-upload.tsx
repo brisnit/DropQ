@@ -10,7 +10,7 @@ function UploadButton({ count }: { count: number }) {
     <button
       type="submit"
       disabled={pending || count === 0}
-      className="inline-flex items-center justify-center font-medium rounded-xl text-[0.95rem] px-5 py-2.5 bg-brand text-white hover:bg-brand-dark disabled:opacity-50 transition"
+      className="inline-flex items-center justify-center min-h-11 font-medium rounded-xl text-[0.95rem] px-5 py-2.5 bg-brand text-white hover:bg-brand-dark disabled:opacity-50 transition"
     >
       {pending
         ? "Uploading…"

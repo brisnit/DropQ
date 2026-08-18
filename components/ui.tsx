@@ -25,8 +25,14 @@ const SIZES: Record<Size, string> = {
   lg: "text-base px-7 py-3.5 rounded-pill gap-2.5",
 };
 
+// `whitespace-nowrap`: a CTA label that breaks across two lines reads as a
+// layout bug, and "Log in" / "Start selling" were doing exactly that at 320px.
+// Adapt padding, gaps or copy instead of letting a call to action wrap.
+//
+// `min-h-11`: 44px, the minimum comfortable touch target. `sm` buttons were
+// 36px tall. This raises the floor without re-tuning every padding value.
 const base =
-  "inline-flex items-center justify-center font-medium transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-cream disabled:opacity-50 disabled:pointer-events-none cursor-pointer";
+  "inline-flex items-center justify-center whitespace-nowrap min-h-11 font-medium transition-all duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-cream disabled:opacity-50 disabled:pointer-events-none cursor-pointer";
 
 export function Button({
   variant = "primary",

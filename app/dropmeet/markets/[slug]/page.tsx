@@ -112,7 +112,7 @@ export default async function MarketPage({ params }: Params) {
         <div className="absolute top-3 left-3">
           <Link
             href="/dropmeet"
-            className="inline-flex items-center gap-1.5 min-h-[40px] px-3.5 rounded-pill bg-paper/95 backdrop-blur border border-line text-sm font-semibold shadow-[var(--shadow-soft)]"
+            className="inline-flex items-center gap-1.5 min-h-11 px-3.5 rounded-pill bg-paper/95 backdrop-blur border border-line text-sm font-semibold shadow-[var(--shadow-soft)]"
           >
             ← DropMeet
           </Link>

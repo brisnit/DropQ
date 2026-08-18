@@ -45,7 +45,9 @@ export function Logo({
         priority
         // Artwork is dark olive + red, so on dark surfaces render it as a
         // clean white silhouette instead of an invisible olive.
-        className={`h-7 sm:h-8 w-auto ${light ? "brightness-0 invert" : ""}`}
+        // h-6 below sm: at 320px the logo and the header CTAs were competing
+        // for the same ~280px and the CTA labels lost.
+        className={`h-6 sm:h-8 w-auto ${light ? "brightness-0 invert" : ""}`}
       />
     </Link>
   );

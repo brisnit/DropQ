@@ -92,7 +92,13 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className={`max-w-6xl mx-auto px-5 ${className}`}>
+    // `w-full` is load-bearing. These are flex items of `main.flex flex-col`,
+    // and `mx-auto` sets an auto cross-axis margin, which DISABLES the default
+    // `align-self: stretch`. The section then shrink-to-fits its max-content —
+    // 370px against a 320px viewport, clipped rather than scrollable. An
+    // explicit width restores stretch; `min-w-0` cannot help, because the item
+    // was never being stretched in the first place.
+    <section id={id} className={`w-full max-w-6xl mx-auto px-5 min-w-0 ${className}`}>
       {children}
     </section>
   );
@@ -186,12 +192,15 @@ export default function Home() {
       <SiteNav />
 
       {/* HERO */}
-      <Section className="pt-16 pb-20 sm:pt-24 grid lg:grid-cols-2 gap-14 items-center">
-        <div className="animate-in">
+      <Section className="pt-16 pb-20 sm:pt-24 grid grid-cols-1 lg:grid-cols-2 gap-14 items-center">
+        {/* min-w-0: grid items default to min-width:auto, so the hero column
+            sized to the headline's min-content and ran 50px past a 320px
+            viewport — clipped, not scrollable. */}
+        <div className="animate-in min-w-0">
           <p className="text-lg sm:text-xl font-semibold text-brand mb-5">
             Queue the hype
           </p>
-          <h1 className="font-display text-[2.6rem] sm:text-6xl leading-[1.02] font-semibold tracking-tight">
+          <h1 className="font-display text-[clamp(1.9rem,8.2vw,2.6rem)] sm:text-6xl leading-[1.02] font-semibold tracking-tight">
             Organized Drops.
             <br />
             <span className="text-brand">Happy Customers.</span>
@@ -229,7 +238,7 @@ export default function Home() {
             your language.
           </p>
         </Reveal>
-        <div className="grid sm:grid-cols-3 gap-4 sm:gap-5 mt-20">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 mt-20">
           {SELL_CATEGORIES.map((c, i) => (
             <Reveal key={c.label} delay={i * 80}>
               <Link
@@ -295,7 +304,7 @@ export default function Home() {
             thing falls apart at the worst possible moment.
           </p>
         </Reveal>
-        <div className="grid sm:grid-cols-3 gap-4 mt-10">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-10">
           {[
             ["😵‍💫", "Overselling & refunds", "No real inventory means promising stock you can't deliver."],
             ["💥", "Crashed links", "A story from a big account, and your ordering page buckles."],
@@ -323,7 +332,7 @@ export default function Home() {
               From idea to sold-out in one afternoon.
             </h2>
           </Reveal>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-12">
             {STEPS.map((s, i) => (
               <Reveal key={s.n} delay={i * 90} className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -343,7 +352,7 @@ export default function Home() {
       </div>
 
       {/* DROPS EXPLAINED */}
-      <Section id="drops" className="py-20 sm:py-28 grid lg:grid-cols-2 gap-14 items-center">
+      <Section id="drops" className="py-20 sm:py-28 grid grid-cols-1 lg:grid-cols-2 gap-14 items-center">
         <Reveal>
           <Eyebrow>What's a drop?</Eyebrow>
           <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mt-3">
@@ -410,7 +419,7 @@ export default function Home() {
               One platform. The whole business.
             </h2>
           </Reveal>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mt-12">
             {FEATURES.map((f, i) => {
               const acc = FEATURE_ACCENTS[i % FEATURE_ACCENTS.length];
               return (
@@ -438,7 +447,7 @@ export default function Home() {
       {/* DROPMEET — the community/discovery layer */}
       <div className="bg-tertiary-tint/50 border-b border-line">
         <Section id="dropmeet" className="py-20 sm:py-28">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             <Reveal>
               <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-tertiary">
                 <span className="w-1.5 h-1.5 rounded-full bg-tertiary" aria-hidden />
@@ -551,7 +560,7 @@ export default function Home() {
               2% transaction fee at every tier. Cancel anytime.
             </p>
           </Reveal>
-          <div className="grid sm:grid-cols-3 gap-5 mt-12">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-12">
             {[
               ["Starter", "$0", "/mo", "Try DropQ", ["3 drops to start", "Online ordering", "Pickup & delivery", "Customer list", "QR codes", "2% transaction fee"], false, false],
               ["Growth", "$20", "/mo", "Run Drops", ["Unlimited drops", "Customer signups (SMS + email)", "Sales analytics", "Repeat-customer tracking", "Shareable drop links", "2% transaction fee"], true, false],

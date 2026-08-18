@@ -62,13 +62,13 @@ function DropMeetHeader() {
         <nav className="flex items-center gap-1">
           <Link
             href="/discover"
-            className="min-h-[40px] px-3 inline-flex items-center rounded-xl text-sm font-medium text-ink-soft hover:bg-line/60 transition"
+            className="min-h-11 px-3 inline-flex items-center rounded-xl text-sm font-medium text-ink-soft hover:bg-line/60 transition"
           >
             Vendors
           </Link>
           <Link
             href="/messages"
-            className="min-h-[40px] px-3 inline-flex items-center rounded-xl text-sm font-medium text-ink-soft hover:bg-line/60 transition"
+            className="min-h-11 px-3 inline-flex items-center rounded-xl text-sm font-medium text-ink-soft hover:bg-line/60 transition"
           >
             Messages
           </Link>

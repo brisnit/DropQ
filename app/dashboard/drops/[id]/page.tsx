@@ -137,7 +137,7 @@ export default async function DropDetailPage({
           <p className="text-sm text-ink-soft max-w-xl">{gate.reason}</p>
           <Link
             href={gate.href}
-            className="shrink-0 text-sm font-medium px-3.5 py-2 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition"
+            className="shrink-0 inline-flex items-center justify-center min-h-11 text-sm font-medium px-3.5 py-2 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition"
           >
             {gate.cta} →
           </Link>
@@ -170,7 +170,7 @@ export default async function DropDetailPage({
             (gate ? (
               <Link
                 href={gate.href}
-                className="text-sm font-medium px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition whitespace-nowrap"
+                className="text-sm font-medium inline-flex items-center justify-center min-h-11 px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition whitespace-nowrap"
               >
                 {gate.cta} to publish →
               </Link>
@@ -192,7 +192,7 @@ export default async function DropDetailPage({
             (gate ? (
               <Link
                 href={gate.href}
-                className="text-sm font-medium px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition whitespace-nowrap"
+                className="text-sm font-medium inline-flex items-center justify-center min-h-11 px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition whitespace-nowrap"
               >
                 {gate.cta} to reopen →
               </Link>
@@ -205,7 +205,7 @@ export default async function DropDetailPage({
             ))}
           <Link
             href={`/dashboard/drops/${drop.id}/edit`}
-            className="text-sm font-medium px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
+            className="text-sm font-medium inline-flex items-center justify-center min-h-11 px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
           >
             ✏️ Edit drop
           </Link>
@@ -213,7 +213,7 @@ export default async function DropDetailPage({
             <input type="hidden" name="dropId" value={drop.id} />
             <button
               type="submit"
-              className="text-sm font-medium px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
+              className="text-sm font-medium inline-flex items-center justify-center min-h-11 px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
               title="Copy this drop's items and pickup details into a new draft"
             >
               🔁 Relaunch
@@ -222,7 +222,7 @@ export default async function DropDetailPage({
           <Link
             href={`/s/${seller.slug}/${drop.id}`}
             target="_blank"
-            className="text-sm font-medium px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
+            className="text-sm font-medium inline-flex items-center justify-center min-h-11 px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
           >
             View ↗
           </Link>
@@ -238,7 +238,7 @@ export default async function DropDetailPage({
         const pickupWin = formatPickupWindow(drop, tz);
         const pickupWhere = pickupLocation(drop);
         return (
-          <div className="grid sm:grid-cols-2 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
             <div className="bg-paper border border-line rounded-card p-5">
               <p className="text-xs uppercase tracking-wide text-muted">Order window</p>
               {drop.opensAt && drop.closesAt ? (
@@ -315,7 +315,7 @@ export default async function DropDetailPage({
             {walkUpEligible?.ok ? (
               <Link
                 href={`/dashboard/drops/${drop.id}/sale`}
-                className="shrink-0 text-sm font-semibold px-4 py-2.5 rounded-xl bg-ink text-cream hover:bg-ink-soft transition"
+                className="shrink-0 inline-flex items-center justify-center min-h-11 text-sm font-semibold px-4 py-2.5 rounded-xl bg-ink text-cream hover:bg-ink-soft transition"
               >
                 {openWalkUpSale ? "Resume in-person sale" : "+ New in-person sale"}
               </Link>
@@ -335,7 +335,7 @@ export default async function DropDetailPage({
       )}
 
       {/* Share + QR (always visible) */}
-      <div className="grid md:grid-cols-[1fr_auto] gap-4 mb-8 items-stretch">
+      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 mb-8 items-stretch">
         <div className="bg-ink text-cream rounded-card p-5 flex flex-col justify-between gap-4">
           <div className="min-w-0">
             {/* Was "Live order link — show this QR on-site", which reads as an
@@ -350,7 +350,7 @@ export default async function DropDetailPage({
             url={shareUrl}
             title={drop.title}
             label="Copy link"
-            className="self-start text-sm font-semibold text-ink bg-cream hover:bg-white px-4 py-2.5 rounded-lg transition"
+            className="self-start inline-flex items-center justify-center min-h-11 text-sm font-semibold text-ink bg-cream hover:bg-white px-4 py-2.5 rounded-lg transition"
           />
         </div>
 
@@ -371,7 +371,7 @@ export default async function DropDetailPage({
           <a
             href={qrDataUrl}
             download={`dropq-${seller.slug}-${drop.id}.png`}
-            className="text-sm font-medium px-3.5 py-2 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition"
+            className="inline-flex items-center justify-center min-h-11 text-sm font-medium px-3.5 py-2 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition"
           >
             ↓ Download QR
           </a>
@@ -399,7 +399,7 @@ export default async function DropDetailPage({
           the column a min-content width of the whole string. That pushed these
           cards ~400px past a phone viewport — clipped rather than scrollable,
           so page-level overflow checks never saw it. */}
-      <div className="grid lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Items */}
         <div className="lg:col-span-2 min-w-0">
           <h2 className="font-semibold mb-3">{v.catalog} ({drop.products.length})</h2>
@@ -522,7 +522,7 @@ export default async function DropDetailPage({
           <input type="hidden" name="dropId" value={drop.id} />
           <ConfirmSubmit
             message="Delete this drop and all its orders? This can't be undone."
-            className="text-sm text-muted hover:text-brand transition"
+            className="inline-flex items-center min-h-11 text-sm text-muted hover:text-brand transition"
           >
             Delete drop
           </ConfirmSubmit>

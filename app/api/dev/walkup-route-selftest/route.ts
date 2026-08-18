@@ -235,6 +235,37 @@ export async function GET(req: Request) {
     check("payment QR is width-capped rather than rendered at intrinsic size",
       /max-w-\[260px\]/.test(saleSrc));
 
+
+    // ---- Responsive system defaults ---------------------------------------
+    // Cheap always-on guards. Real geometry is measured by
+    // scripts/cta-audit.mjs; these stop the defaults being deleted.
+    const ui = readFileSync("components/ui.tsx", "utf8");
+    check("shared button base keeps CTA labels on one line",
+      /const base =[\s\S]{0,400}whitespace-nowrap/.test(ui));
+    check("shared button base enforces a 44px touch target",
+      /const base =[\s\S]{0,400}min-h-11/.test(ui));
+
+    const nav = readFileSync("components/site-nav.tsx", "utf8");
+    check("header CTA group cannot be squeezed below its labels",
+      /shrink-0/.test(nav));
+    check("header logs-in link is a text link on mobile, pill from sm up",
+      /sm:rounded-pill/.test(nav));
+
+    // Declaring only `lg:grid-cols-*` leaves mobile on an implicit `auto`
+    // track that sizes to content and overflows. Every grid that is a grid at
+    // mobile needs an explicit base column.
+    for (const f of [
+      "app/page.tsx",
+      "components/site-footer.tsx",
+      "components/storefront-order.tsx",
+      "app/dashboard/drops/[id]/page.tsx",
+    ]) {
+      const src = readFileSync(f, "utf8");
+      const bad = (src.match(/className=[^\n]*?\bgrid [^\n]*?(sm|md|lg|xl):grid-cols/g) ?? [])
+        .filter((m) => !/\bgrid-cols-(\d|\[)/.test(m));
+      check(`${f}: every mobile grid declares a base column`, bad.length === 0,
+        bad.join(" | ").slice(0, 140));
+    }
   } catch (e) {
     check("selftest ran without an unexpected exception", false,
       e instanceof Error ? `${e.name}: ${e.message}`.slice(0, 200) : String(e));

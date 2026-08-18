@@ -24,7 +24,7 @@ export function MessageCustomerButton({
   const className =
     variant === "full"
       ? "inline-flex items-center justify-center gap-1.5 w-full min-h-[44px] px-4 rounded-xl bg-ink text-cream text-sm font-semibold transition active:scale-[0.98] hover:bg-ink-soft"
-      : "inline-flex items-center gap-1.5 min-h-[38px] px-3 rounded-pill border border-line-strong bg-paper text-sm font-medium text-ink-soft hover:border-ink/30 hover:text-ink transition";
+      : "inline-flex items-center gap-1.5 min-h-11 px-3 rounded-pill border border-line-strong bg-paper text-sm font-medium text-ink-soft hover:border-ink/30 hover:text-ink transition";
 
   return (
     <form action={action} className={variant === "full" ? "w-full" : undefined}>

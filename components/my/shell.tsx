@@ -39,7 +39,7 @@ export function MyShell({
               markAllAction={markAllNotificationsReadAction}
             />
             <form action={customerLogoutAction}>
-              <button className="min-h-[40px] px-3 rounded-xl text-sm font-medium text-ink-soft hover:bg-line/60 transition">
+              <button className="min-h-11 px-3 rounded-xl text-sm font-medium text-ink-soft hover:bg-line/60 transition">
                 Sign out
               </button>
             </form>

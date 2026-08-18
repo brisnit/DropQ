@@ -267,7 +267,7 @@ export function DropMeetExplorer({
               </button>
               <Link
                 href="/dropmeet/add"
-                className="shrink-0 inline-flex items-center justify-center min-h-[40px] px-4 rounded-pill bg-ink text-cream text-sm font-semibold transition active:scale-[0.98]"
+                className="shrink-0 inline-flex items-center justify-center min-h-11 px-4 rounded-pill bg-ink text-cream text-sm font-semibold transition active:scale-[0.98]"
               >
                 Add a place
               </Link>
@@ -326,7 +326,7 @@ function FilterRow({
             type="button"
             onClick={() => toggleFilter(f.key)}
             aria-pressed={on}
-            className={`shrink-0 min-h-[40px] px-3.5 rounded-pill text-sm font-medium whitespace-nowrap border transition ${
+            className={`shrink-0 min-h-11 px-3.5 rounded-pill text-sm font-medium whitespace-nowrap border transition ${
               on
                 ? "bg-ink text-cream border-ink"
                 : elevated
