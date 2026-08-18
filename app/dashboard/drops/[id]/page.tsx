@@ -162,7 +162,10 @@ export default async function DropDetailPage({
           {drop.pickupInfo && <p className="text-muted mt-1">{drop.fulfillment} · {drop.pickupInfo}</p>}
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Wraps: four actions side by side are ~338px, wider than a 320px
+            phone's content box, and they were being clipped rather than
+            scrolled. */}
+        <div className="flex flex-wrap items-center gap-2">
           {drop.status === "draft" &&
             (gate ? (
               <Link
@@ -391,9 +394,14 @@ export default async function DropDetailPage({
         </div>
       </div>
 
+      {/* `min-w-0` on every child: a grid item defaults to `min-width: auto`, and
+          `truncate` sets `white-space: nowrap`, so one long product name gives
+          the column a min-content width of the whole string. That pushed these
+          cards ~400px past a phone viewport — clipped rather than scrollable,
+          so page-level overflow checks never saw it. */}
       <div className="grid lg:grid-cols-5 gap-6">
         {/* Items */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 min-w-0">
           <h2 className="font-semibold mb-3">{v.catalog} ({drop.products.length})</h2>
           <div className="bg-paper border border-line rounded-card divide-y divide-line">
             {drop.products.map((p) => {
@@ -434,12 +442,12 @@ export default async function DropDetailPage({
         </div>
 
         {/* Customer Communication — launchpad into Messages for this drop */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3 min-w-0">
           <DropCommunicationSection dropId={drop.id} data={communication} />
         </div>
 
         {/* Orders — live polling feed for live drops, static list otherwise */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-3 min-w-0">
           {isLiveDrop ? (
             <LiveOrders dropId={drop.id} initialOrders={liveOrders} />
           ) : (

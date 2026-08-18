@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { newWalkUpToken, walkUpExpiry } from "@/lib/walkup";
@@ -204,6 +205,36 @@ export async function GET(req: Request) {
     const afterCancel = await get(saleHref, vendor.id);
     check("after Cancel the route returns to the cart",
       afterCancel.body.includes("New in-person sale") && !afterCancel.body.includes("Customer payment QR"));
+
+    // ---- Per-element containment ----------------------------------------
+    // Page-level `scrollWidth === clientWidth` is NOT sufficient: the drop
+    // page overflowed by 415px while reporting no page overflow, because the
+    // body clips rather than scrolls. So assert on the markup that produces
+    // that class of bug — an unconstrained grid child plus `truncate`, whose
+    // `white-space: nowrap` gives the column a min-content width of the whole
+    // string. Real bounding boxes are measured by the headless-Chrome audit;
+    // this is the cheap always-on guard.
+    const dropSrc = readFileSync("app/dashboard/drops/[id]/page.tsx", "utf8");
+    for (const cls of ["lg:col-span-2", "lg:col-span-3"]) {
+      const re = new RegExp(`className="[^"]*\\b${cls.replace(":", ":")}\\b[^"]*"`, "g");
+      const all = dropSrc.match(re) ?? [];
+      check(`every .${cls} grid child carries min-w-0`,
+        all.length > 0 && all.every((m) => m.includes("min-w-0")),
+        all.join(" | ").slice(0, 160));
+    }
+    check("drop page header actions wrap on narrow screens",
+      /className="flex flex-wrap items-center gap-2"/.test(dropSrc));
+
+    const saleSrc = readFileSync("app/dashboard/drops/[id]/sale/page.tsx", "utf8");
+    check("sale route constrains its own column and can shrink",
+      /max-w-2xl/.test(saleSrc) && /min-w-0/.test(saleSrc));
+    check("sale route lets the pay URL break instead of widening its parent",
+      /break-all/.test(saleSrc));
+    check("sale route line items can shrink and wrap long product names",
+      /min-w-0 break-words/.test(saleSrc));
+    check("payment QR is width-capped rather than rendered at intrinsic size",
+      /max-w-\[260px\]/.test(saleSrc));
+
   } catch (e) {
     check("selftest ran without an unexpected exception", false,
       e instanceof Error ? `${e.name}: ${e.message}`.slice(0, 200) : String(e));
