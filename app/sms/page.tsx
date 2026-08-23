@@ -106,10 +106,45 @@ export default function SmsPage() {
             </label>
           </div>
 
-          <p className="text-xs text-muted mt-3">
-            The checkboxes above are a copy of the live consent UI, shown here for reference. They
-            are disabled on this page — opting in happens at checkout or in your account settings.
-          </p>
+          {/* Real screenshots of the two places consent is actually collected.
+              Both sit behind an account or an active order, so a carrier
+              reviewer cannot reach them directly — A2P error 30896 asks for
+              screenshots in exactly this case. The replicas above show the
+              wording; these show it in situ. */}
+          <div className="mt-8 space-y-6">
+            <figure>
+              <figcaption className="text-xs font-semibold uppercase tracking-wider text-muted">
+                1 · At checkout, on a vendor&apos;s drop page
+              </figcaption>
+              <p className="text-sm text-muted mt-1">
+                The mobile number field is optional and the consent box is unchecked. Entering a
+                number does not opt you in — the box has to be ticked.
+              </p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/sms/optin-checkout.png"
+                alt="DropQ checkout showing an optional mobile number field and an unchecked SMS consent checkbox with the full disclosure"
+                className="mt-3 w-full rounded-card border border-line"
+              />
+            </figure>
+
+            <figure>
+              <figcaption className="text-xs font-semibold uppercase tracking-wider text-muted">
+                2 · In account settings, under Text messages
+              </figcaption>
+              <p className="text-sm text-muted mt-1">
+                Both consent boxes are separate and unchecked. Saving a mobile number on the
+                profile above them changes nothing on its own. (Number masked for privacy.)
+              </p>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/sms/optin-account-settings.png"
+                alt="DropQ account settings showing two separate unchecked SMS consent checkboxes with full disclosures"
+                className="mt-3 w-full rounded-card border border-line"
+              />
+            </figure>
+          </div>
+
         </section>
 
         <section className="mt-10">

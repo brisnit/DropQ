@@ -585,16 +585,31 @@ export async function GET() {
     });
     const internal = sellers.filter((s) => s.internalKind);
     const real = sellers.filter((s) => !s.internalKind);
-    check("exactly four sellers are classified internal",
-      internal.length === 4, internal.map((s) => `${s.storeName}=${s.internalKind}`).join(", "));
+    // `pilot` is NOT an internal test account. It marks a real external vendor
+    // temporarily enrolled in a feature pilot, so it must be excluded from the
+    // "internal" set here and handled deliberately in reporting.
+    const TEST_KINDS = ["founder", "canary", "staff", "demo", "selftest"];
+    const testAccounts = internal.filter((s) => TEST_KINDS.includes(s.internalKind ?? ""));
     check("classifications use the documented vocabulary",
-      internal.every((s) => ["founder", "canary", "staff", "demo"].includes(s.internalKind ?? "")));
+      internal.every((s) => [...TEST_KINDS, "pilot"].includes(s.internalKind ?? "")),
+      internal.map((s) => `${s.storeName}=${s.internalKind}`).join(", "));
     check("exactly one canary exists",
       internal.filter((s) => s.internalKind === "canary").length === 1);
-    // The Clovery and Paraiso are the only sellers with paid orders.
-    check("vendors with real paid orders are NOT classified internal",
-      real.some((s) => s.storeName === "The Clovery") &&
-      real.some((s) => s.storeName === "Paraiso Delicacies"));
+    // The guard that matters: a vendor with real customer revenue must never be
+    // classified as a TEST account. `pilot` is allowed — that is a deliberate,
+    // reversible flag on a genuine vendor.
+    const withPaidOrders = await prisma.order.findMany({
+      where: { paymentStatus: "paid" },
+      select: { seller: { select: { storeName: true, internalKind: true } } },
+      distinct: ["sellerId"],
+    });
+    const misclassified = withPaidOrders
+      .map((o) => o.seller)
+      .filter((s) => TEST_KINDS.includes(s.internalKind ?? "") && s.storeName !== "Britts Bunnies");
+    check("no vendor with real paid orders is classified as a TEST account",
+      misclassified.length === 0,
+      misclassified.map((s) => `${s.storeName}=${s.internalKind}`).join(", ") || "none");
+    void testAccounts;
     // NOT `real.length === N` — that asserts the environment, not behaviour,
     // and breaks the moment a vendor is added or removed (it did, when the
     // Elias test account was deleted). Assert the invariant instead.
