@@ -243,6 +243,24 @@ export async function GET() {
       check(`finalize: ${what} only fires on the winning claim`,
         at > -1 && gate > -1 && at - gate < 400, `${marker} at=${at} gate=${gate}`);
     }
+    // The confirmation SMS gets its own check rather than joining the loop
+    // above: it sits after the entire email block, so it is ~1.6k chars from
+    // its gate and the loop's 400-char proximity rule would reject it. What
+    // matters is that it is inside the winning-claim branch at all — a webhook
+    // replay must never text a buyer twice.
+    {
+      const at = src.indexOf("body: smsText,");
+      const gate = src.lastIndexOf('result.state === "ok"', at);
+      const between = at > -1 && gate > -1 ? src.slice(gate, at) : "";
+      check("finalize: the confirmation SMS only fires on the winning claim",
+        at > -1 && gate > -1 && !/\n  \}\n/.test(between),
+        `at=${at} gate=${gate}`);
+      check("finalize: the confirmation SMS is consent-gated",
+        /sendGatedSms\(\{[\s\S]{0,120}kind: "transactional"[\s\S]{0,200}body: smsText/.test(src));
+      check("finalize: a texting failure cannot break payment",
+        /Order confirmation SMS failed/.test(src));
+    }
+
     check("finalize: DropPoints failure cannot break payment",
       /awardPointsForOrder\(orderId\)\.catch\(/.test(src));
     check("finalize: oversold refund passes refund_application_fee",

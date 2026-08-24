@@ -7,7 +7,8 @@ import { sendSms } from "@/lib/notifications";
 import { sendGatedSms } from "@/lib/sms-gate";
 import { createCommissionForOrder } from "@/lib/commission";
 import { recordRelationship } from "@/lib/attribution";
-import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
+import { formatPickupWindow, pickupLocation, pickupSummary } from "@/lib/pickup";
+import { dropMapsUrl } from "@/lib/maps";
 
 // Header-free base URL — finalizePaidOrder runs from webhooks and cron sweeps
 // that have no request context, so we can't rely on headers().
@@ -49,6 +50,8 @@ export async function finalizePaidOrder(
             pickupInfo: true, fulfillment: true,
             pickupStartAt: true, pickupEndAt: true,
             pickupLocationName: true, pickupAddress: true, pickupNotes: true,
+            // For the directions link in the confirmation SMS.
+            pickupLat: true, pickupLng: true,
           },
         },
       },
@@ -151,6 +154,32 @@ export async function finalizePaidOrder(
       );
     } catch (e) {
       console.error("Order confirmation email failed:", e);
+    }
+
+    // Confirmation text. This lived only in `placeOrderAction`, which a paid
+    // order never reaches — it redirects to Stripe and comes back through
+    // here — so buyers got the email and no text at all. Same block as the
+    // email, so the atomic paid-claim guarantees exactly one send and the
+    // webhook/redirect race cannot double-text. Consent-gated like every
+    // other transactional send; never throws, because a texting failure must
+    // not cost a buyer their order.
+    try {
+      const pickupLine = pickupSummary(o.drop, o.seller.timezone);
+      const mapsUrl = dropMapsUrl(o.drop);
+      const smsText =
+        `${o.seller.storeName}: Got your order! 🎉 We'll text you when it's ready.` +
+        (pickupLine ? ` ${pickupLine}.` : "") +
+        (mapsUrl ? ` Directions: ${mapsUrl}` : "") +
+        ` ${orderBaseUrl()}/order/${o.id}`;
+      await sendGatedSms({
+        kind: "transactional",
+        body: smsText,
+        customerId: o.customerId,
+        email: o.buyerEmail,
+        to: o.buyerPhone,
+      });
+    } catch (e) {
+      console.error("Order confirmation SMS failed:", e);
     }
   }
 
