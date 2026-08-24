@@ -74,15 +74,14 @@ export async function updateNotificationsAction(
     return { error: "Add a mobile number above before turning on text messages." };
   }
 
-  try {
-    await recordSmsConsent({
-      customerId: customer.id,
-      transactional: smsTransactional,
-      marketing: smsMarketing,
-      source: "account_settings",
-      disclosureVersion: DISCLOSURE_VERSION,
-    });
-  } catch {
+  const saved = await recordSmsConsent({
+    customerId: customer.id,
+    transactional: smsTransactional,
+    marketing: smsMarketing,
+    source: "account_settings",
+    disclosureVersion: DISCLOSURE_VERSION,
+  });
+  if (!saved) {
     return { error: "Couldn't save your preferences. Please try again." };
   }
 

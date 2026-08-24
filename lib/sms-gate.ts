@@ -69,7 +69,7 @@ export async function recordSmsConsent(input: {
   marketing?: boolean;
   source: string;
   disclosureVersion: string;
-}): Promise<void> {
+}): Promise<boolean> {
   const now = new Date();
   const data: Record<string, unknown> = { smsConsentDisclosureVersion: input.disclosureVersion };
 
@@ -89,7 +89,15 @@ export async function recordSmsConsent(input: {
     data.smsOptOutSource = null;
   }
 
-  await prisma.customer.update({ where: { id: input.customerId }, data }).catch((e) =>
-    console.error("recordSmsConsent failed:", e)
-  );
+  // Returns whether the write landed rather than throwing. Checkout calls this
+  // mid-order and must never fail a purchase over consent bookkeeping — but
+  // account settings needs to know, because swallowing the error there showed
+  // the customer "Saved" while nothing was written.
+  try {
+    await prisma.customer.update({ where: { id: input.customerId }, data });
+    return true;
+  } catch (e) {
+    console.error("recordSmsConsent failed:", e);
+    return false;
+  }
 }
