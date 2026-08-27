@@ -65,8 +65,21 @@ for(const el of document.querySelectorAll("button, a")){
   const r=el.getBoundingClientRect();
   // Group rect tops within 6px: an emoji or icon sits on a slightly different
   // baseline than its label and would otherwise read as a second line.
-  const rng=document.createRange(); rng.selectNodeContents(el);
-  const tops=[...rng.getClientRects()].filter(x=>x.height>0).map(x=>x.top).sort((a,b)=>a-b);
+  // Measure TEXT only. An empty decorative box — a today dot, a status pip —
+  // contributes a client rect at its own offset and would read as a second
+  // line of label, which it is not. Out-of-flow descendants are skipped for
+  // the same reason: they are positioned, not wrapped.
+  const positioned = el => { let n=el; while(n&&n!==document.body){
+    const p=getComputedStyle(n).position; if(p==="absolute"||p==="fixed") return true; n=n.parentElement;} return false; };
+  const tops=[];
+  const walker=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);
+  for(let n=walker.nextNode(); n; n=walker.nextNode()){
+    if(!n.nodeValue.trim()) continue;
+    if(n.parentElement!==el && positioned(n.parentElement)) continue;
+    const rng=document.createRange(); rng.selectNodeContents(n);
+    for(const x of rng.getClientRects()) if(x.height>0) tops.push(x.top);
+  }
+  tops.sort((a,b)=>a-b);
   let lines=0,last=-1e9;
   for(const t of tops){ if(t-last>6){lines++;last=t;} }
   const cs=getComputedStyle(el);

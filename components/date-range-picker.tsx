@@ -117,6 +117,30 @@ function dayValue(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
+/**
+ * Today's calendar date in `timeZone` — the vendor's STORE zone, not the
+ * browser's. Every other date in this picker is already interpreted in the
+ * store zone, so deriving "today" from the device would mark the wrong cell
+ * for a vendor travelling or set to a different zone than their store. It also
+ * keeps the server and client render in agreement, since both resolve the same
+ * IANA zone rather than two different machine clocks.
+ */
+function todayInZone(timeZone?: string): Date {
+  const now = new Date();
+  if (!timeZone) return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const map: Record<string, number> = {};
+  const dtf = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  for (const p of dtf.formatToParts(now)) {
+    if (p.type !== "literal") map[p.type] = Number(p.value);
+  }
+  return new Date(map.year, map.month - 1, map.day);
+}
+
 function ClockIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0 text-brand">
@@ -146,7 +170,7 @@ export function DateRangePicker({
   const initStart = useMemo(() => parseDefault(defaultStart, timeZone), [defaultStart, timeZone]);
   const initEnd = useMemo(() => parseDefault(defaultEnd, timeZone), [defaultEnd, timeZone]);
 
-  const today = useMemo(() => new Date(), []);
+  const today = useMemo(() => todayInZone(timeZone), [timeZone]);
   const [startDate, setStartDate] = useState<Date | null>(initStart.date);
   const [endDate, setEndDate] = useState<Date | null>(initEnd.date);
   const [startTime, setStartTime] = useState(initStart.time || "09:00");
@@ -221,6 +245,8 @@ export function DateRangePicker({
 
   const sv = startDate ? dayValue(startDate) : null;
   const ev = endDate ? dayValue(endDate) : null;
+  const tv = dayValue(today);
+  const todayInView = today.getFullYear() === viewYear && today.getMonth() === viewMonth;
 
   return (
     <div className="bg-paper border border-line rounded-card p-5 sm:p-6 shadow-[var(--shadow-soft)]">
@@ -280,6 +306,7 @@ export function DateRangePicker({
           const dv = dayValue(new Date(viewYear, viewMonth, day));
           const isStart = sv !== null && dv === sv;
           const isEnd = ev !== null && dv === ev;
+          const isToday = dv === tv;
           const inRange = sv !== null && ev !== null && dv > sv && dv < ev;
           const col = idx % 7;
           const banded = isStart || isEnd || inRange;
@@ -298,22 +325,57 @@ export function DateRangePicker({
                 roundR ? "rounded-r-full" : "",
               ].join(" ")}
             >
+              {/* Three states that must stay distinguishable, including when two
+                  of them land on the same day:
+                    selected  — solid brand fill (always the strongest)
+                    today     — brand ring + brand text, plus a dot
+                    both      — the fill wins, and the dot turns white so the
+                                day still reads as today rather than the ring
+                                being painted over
+                  The dot carries the meaning on its own, so the state does not
+                  depend on colour alone. */}
               <button
                 type="button"
                 onClick={() => pickDay(day)}
+                aria-current={isToday ? "date" : undefined}
+                aria-label={`${WEEKDAYS_LONG[(firstWeekday + day - 1) % 7]}, ${MONTHS[viewMonth]} ${day}, ${viewYear}${isToday ? " (today)" : ""}`}
                 className={[
-                  "w-9 h-9 rounded-full text-sm transition grid place-items-center",
+                  "relative w-9 h-9 rounded-full text-sm transition grid place-items-center",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-1 focus-visible:ring-offset-paper",
                   isStart || isEnd
                     ? "bg-brand text-white font-semibold"
-                    : "text-ink hover:bg-brand-tint",
+                    : isToday
+                      // Deliberately NOT `text-brand`: coral on paper is
+                      // 2.92:1, under AA for 14px bold. The ring and the dot
+                      // carry "today" instead, in brand-dark (3.69:1, over the
+                      // 3:1 that non-text indicators need), and the number
+                      // stays ink.
+                      ? "text-ink font-semibold ring-1 ring-brand-dark hover:bg-brand-tint"
+                      : "text-ink hover:bg-brand-tint",
                 ].join(" ")}
               >
                 {day}
+                {isToday && (
+                  <span
+                    aria-hidden
+                    className={[
+                      "absolute bottom-1 w-1 h-1 rounded-full",
+                      isStart || isEnd ? "bg-white" : "bg-brand-dark",
+                    ].join(" ")}
+                  />
+                )}
               </button>
             </div>
           );
         })}
       </div>
+
+      {todayInView && (
+        <p className="flex items-center gap-1.5 mt-2 text-xs text-muted">
+          <span aria-hidden className="w-1.5 h-1.5 rounded-full bg-brand-dark" />
+          Today
+        </p>
+      )}
 
       {/* FROM / TO summary */}
       <div className="mt-6 pt-5 border-t border-line space-y-5">
