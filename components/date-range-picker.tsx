@@ -249,14 +249,14 @@ export function DateRangePicker({
   const todayInView = today.getFullYear() === viewYear && today.getMonth() === viewMonth;
 
   return (
-    <div className="bg-paper border border-line rounded-card p-5 sm:p-6 shadow-[var(--shadow-soft)]">
+    <div className="rounded-card sm:bg-paper sm:border sm:border-line sm:p-6 sm:shadow-[var(--shadow-soft)]">
       {/* Month / year header */}
-      <div className="flex items-center justify-between gap-2 mb-5">
+      <div className="flex items-center justify-between gap-2 -mx-3 sm:mx-0 mb-5">
         <button
           type="button"
           onClick={() => shiftMonth(-1)}
           aria-label="Previous month"
-          className="w-9 h-9 grid place-items-center rounded-full text-brand hover:bg-brand-tint transition text-xl"
+          className="w-11 h-11 shrink-0 grid place-items-center rounded-full text-brand hover:bg-brand-tint transition text-xl"
         >
           ‹
         </button>
@@ -286,21 +286,21 @@ export function DateRangePicker({
           type="button"
           onClick={() => shiftMonth(1)}
           aria-label="Next month"
-          className="w-9 h-9 grid place-items-center rounded-full text-brand hover:bg-brand-tint transition text-xl"
+          className="w-11 h-11 shrink-0 grid place-items-center rounded-full text-brand hover:bg-brand-tint transition text-xl"
         >
           ›
         </button>
       </div>
 
       {/* Weekday labels */}
-      <div className="grid grid-cols-7 text-center text-xs font-semibold text-muted mb-1">
+      <div className="grid grid-cols-7 -mx-3 sm:mx-0 text-center text-xs font-semibold text-muted mb-1">
         {WEEKDAYS_SHORT.map((w) => (
           <div key={w} className="py-1">{w}</div>
         ))}
       </div>
 
       {/* Day grid */}
-      <div className="grid grid-cols-7">
+      <div className="grid grid-cols-7 -mx-3 sm:mx-0">
         {cells.map((day, idx) => {
           if (day === null) return <div key={`b${idx}`} className="h-11" />;
           const dv = dayValue(new Date(viewYear, viewMonth, day));
@@ -339,31 +339,35 @@ export function DateRangePicker({
                 onClick={() => pickDay(day)}
                 aria-current={isToday ? "date" : undefined}
                 aria-label={`${WEEKDAYS_LONG[(firstWeekday + day - 1) % 7]}, ${MONTHS[viewMonth]} ${day}, ${viewYear}${isToday ? " (today)" : ""}`}
-                className={[
-                  "relative w-9 h-9 rounded-full text-sm transition grid place-items-center",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/60 focus-visible:ring-offset-1 focus-visible:ring-offset-paper",
-                  isStart || isEnd
-                    ? "bg-brand text-white font-semibold"
-                    : isToday
-                      // Deliberately NOT `text-brand`: coral on paper is
-                      // 2.92:1, under AA for 14px bold. The ring and the dot
-                      // carry "today" instead, in brand-dark (3.69:1, over the
-                      // 3:1 that non-text indicators need), and the number
-                      // stays ink.
-                      ? "text-ink font-semibold ring-1 ring-brand-dark hover:bg-brand-tint"
-                      : "text-ink hover:bg-brand-tint",
-                ].join(" ")}
+                className="group w-full h-full grid place-items-center focus-visible:outline-none"
               >
-                {day}
-                {isToday && (
-                  <span
-                    aria-hidden
-                    className={[
-                      "absolute bottom-1 w-1 h-1 rounded-full",
-                      isStart || isEnd ? "bg-white" : "bg-brand-dark",
-                    ].join(" ")}
-                  />
-                )}
+                <span
+                  className={[
+                    "relative w-9 h-9 rounded-full text-sm transition grid place-items-center",
+                    "group-focus-visible:ring-2 group-focus-visible:ring-brand/60 group-focus-visible:ring-offset-1 group-focus-visible:ring-offset-paper",
+                    isStart || isEnd
+                      ? "bg-brand text-white font-semibold"
+                      : isToday
+                        // Deliberately NOT `text-brand`: coral on paper is
+                        // 2.92:1, under AA for 14px bold. The ring and the dot
+                        // carry "today" instead, in brand-dark (3.69:1, over
+                        // the 3:1 that non-text indicators need), and the
+                        // number stays ink.
+                        ? "text-ink font-semibold ring-1 ring-brand-dark group-hover:bg-brand-tint"
+                        : "text-ink group-hover:bg-brand-tint",
+                  ].join(" ")}
+                >
+                  {day}
+                  {isToday && (
+                    <span
+                      aria-hidden
+                      className={[
+                        "absolute bottom-1 w-1 h-1 rounded-full",
+                        isStart || isEnd ? "bg-white" : "bg-brand-dark",
+                      ].join(" ")}
+                    />
+                  )}
+                </span>
               </button>
             </div>
           );

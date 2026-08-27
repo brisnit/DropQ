@@ -189,6 +189,7 @@ export async function GET(req: Request) {
 
     // ---- 3. Source guards --------------------------------------------------
     const src = readFileSync("components/date-range-picker.tsx", "utf8");
+    const editorSrc0 = readFileSync("components/drop-editor.tsx", "utf8");
     check("today is derived in the seller's timezone, not the rendering clock's",
       /function todayInZone/.test(src) && /todayInZone\(timeZone\)/.test(src)
         && !/const today = useMemo\(\(\) => new Date\(\), \[\]\)/.test(src));
@@ -202,8 +203,53 @@ export async function GET(req: Request) {
       /aria-hidden\s*\n?\s*className=\{\[\s*\n?\s*"absolute bottom-1/.test(src)
         || /isToday && \(\s*<span\s*\n\s*aria-hidden/.test(src));
 
-    const editorSrc = readFileSync("components/drop-editor.tsx", "utf8");
-    const pickers = editorSrc.match(/<DateRangePicker[\s\S]*?\/>/g) ?? [];
+    // ---- 4. Mobile hit area ------------------------------------------------
+    // Geometry is measured by scripts/calendar-audit.mjs; these are the cheap
+    // always-on guards that stop the structure producing it being undone. The
+    // split matters: the BUTTON is the tap target and fills its 44px-tall
+    // track, the inner SPAN is the 36px circle that carries the visual state.
+    // Collapsing them back into one element silently returns the target to
+    // 36px — which is exactly how it looked correct for so long.
+    const dayBtn = todayCells(edit.body)[0] ?? "";
+    // The button's OWN class attribute — the first one in the match. The inner
+    // circle legitimately carries w-9 h-9; the button must not.
+    const btnClass = dayBtn.match(/^<button[^>]*\sclass="([^"]*)"/)?.[1] ?? "";
+    check("the day button fills its cell rather than being a 36px circle",
+      /\bw-full h-full\b/.test(btnClass) && !/\bw-9\b/.test(btnClass), btnClass.slice(0, 160));
+    check("the 36px circle survives as an inner span",
+      /<span[^>]*class="[^"]*\bw-9 h-9 rounded-full\b/.test(dayBtn));
+    check("focus is still visible now that the ring lives on the inner circle",
+      /group-focus-visible:ring-2/.test(dayBtn));
+    check("the cell row is 44px tall", /\bh-11\b/.test(src));
+    check("the month arrows are a 44px target too",
+      (src.match(/w-11 h-11 shrink-0 grid place-items-center rounded-full text-brand/g) ?? []).length === 2);
+    check("the calendar reclaims mobile padding but is unchanged from sm up",
+      (src.match(/-mx-3 sm:mx-0/g) ?? []).length === 3,
+      `occurrences=${(src.match(/-mx-3 sm:mx-0/g) ?? []).length}`);
+    check("the picker drops its nested card chrome only below sm",
+      /sm:bg-paper sm:border sm:border-line sm:p-6/.test(src) && !/\bp-5 sm:p-6\b/.test(src));
+    check("drop-editor section cards give the calendar room on mobile",
+      (editorSrc0.match(/rounded-card p-4 sm:p-6/g) ?? []).length === 4
+        && !/rounded-card p-6[^a-z-]/.test(editorSrc0));
+
+    // ---- 5. The emoji popover cannot leave the viewport --------------------
+    // It is absolutely positioned, so overflowing the viewport does NOT
+    // overflow the document — nothing scrolls, the swatches are just gone.
+    // Anchoring to the full-width row instead of the narrow <details> trigger
+    // is what bounds it, at every width rather than one breakpoint.
+    for (const f of ["components/drop-editor.tsx", "components/product-library.tsx"]) {
+      const es = readFileSync(f, "utf8");
+      check(`${f}: the emoji popover is anchored to the full-width row`,
+        /<div className="relative flex flex-wrap items-center gap-2">/.test(es));
+      check(`${f}: the <details> trigger is no longer the positioning parent`,
+        !/<details className="relative">/.test(es));
+      check(`${f}: the popover is left-aligned and capped to that row`,
+        /absolute z-10 top-full left-0 mt-1 w-56 max-w-full/.test(es));
+      check(`${f}: emoji buttons can compress instead of forcing the grid wide`,
+        /rounded-lg p-0\.5 sm:p-1 min-w-0/.test(es));
+    }
+
+    const pickers = editorSrc0.match(/<DateRangePicker[\s\S]*?\/>/g) ?? [];
     check("every Drop date picker is passed the store timezone",
       pickers.length === 2 && pickers.every((p) => /timeZone=\{timeZone\}/.test(p)),
       `pickers=${pickers.length}`);

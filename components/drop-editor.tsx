@@ -367,7 +367,7 @@ export function DropEditor({
       {dropId && <input type="hidden" name="dropId" value={dropId} />}
       <input type="hidden" name="mode" value={dropMode} />
       {/* Drop details */}
-      <div className="bg-paper border border-line rounded-card p-6 space-y-5">
+      <div className="bg-paper border border-line rounded-card p-4 sm:p-6 space-y-5">
         <h2 className="font-semibold text-lg">{live ? "Live drop details" : "Drop details"}</h2>
         {live && (
           <p className="text-sm rounded-xl bg-ink text-white px-4 py-3">
@@ -433,7 +433,7 @@ export function DropEditor({
 
       {/* Pickup window + location (preorder drops) */}
       {!live && (
-        <div className="bg-paper border border-line rounded-card p-6 space-y-5">
+        <div className="bg-paper border border-line rounded-card p-4 sm:p-6 space-y-5">
           <div>
             <h2 className="font-semibold text-lg">Pickup</h2>
             <p className="text-sm text-muted mt-0.5">
@@ -501,7 +501,7 @@ export function DropEditor({
 
       {/* How-to-find-you for live / on-site drops (no pickup window shown) */}
       {live && (
-        <div className="bg-paper border border-line rounded-card p-6">
+        <div className="bg-paper border border-line rounded-card p-4 sm:p-6">
           <Field
             label="How to find you"
             hint="What customers should look for when they arrive at your spot."
@@ -516,7 +516,7 @@ export function DropEditor({
       )}
 
       {/* Items */}
-      <div className="bg-paper border border-line rounded-card p-6">
+      <div className="bg-paper border border-line rounded-card p-4 sm:p-6">
         <div className="flex items-center justify-between mb-1">
           <h2 className="font-semibold text-lg">{v.itemsLabel}</h2>
           <span className="text-sm text-muted">
@@ -587,7 +587,7 @@ export function DropEditor({
             return (
               <div key={row.key} className="rounded-xl border border-line p-4 bg-cream/40 space-y-4">
                 {/* Photo gallery — first photo is the cover; up to {MAX} per item */}
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="relative flex flex-wrap items-center gap-2">
                   {row.images.map((url, idx) => (
                     <div
                       key={url}
@@ -635,11 +635,11 @@ export function DropEditor({
                   )}
                   {/* Emoji fallback (used when the item has no photos) */}
                   {row.images.length === 0 && (
-                    <details className="relative">
+                    <details>
                       <summary className="list-none cursor-pointer text-xs text-muted hover:text-ink select-none flex items-center gap-1">
                         <span className="text-xl">{row.emoji}</span> Icon ▾
                       </summary>
-                      <div className="absolute z-10 mt-1 w-56 grid grid-cols-8 gap-1 bg-paper border border-line rounded-xl p-2 shadow-[var(--shadow-lift)]">
+                      <div className="absolute z-10 top-full left-0 mt-1 w-56 max-w-full grid grid-cols-8 gap-1 bg-paper border border-line rounded-xl p-2 shadow-[var(--shadow-lift)]">
                         {emojiChoices.map((e) => (
                           <button
                             key={e}
@@ -648,7 +648,7 @@ export function DropEditor({
                               update(row.key, { emoji: e });
                               (ev.currentTarget.closest("details") as HTMLDetailsElement).open = false;
                             }}
-                            className="text-xl hover:bg-line rounded-lg p-1"
+                            className="text-xl hover:bg-line rounded-lg p-0.5 sm:p-1 min-w-0"
                           >
                             {e}
                           </button>

@@ -86,7 +86,7 @@ function ProductForm({
       ))}
 
       {/* Photos + emoji */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="relative flex flex-wrap items-center gap-2">
         {images.map((url, idx) => (
           <div key={url} className="relative w-16 h-16 rounded-xl overflow-hidden border border-line-strong group bg-paper">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -122,11 +122,11 @@ function ProductForm({
             />
           </label>
         )}
-        <details className="relative">
+        <details>
           <summary className="list-none cursor-pointer text-xs text-muted hover:text-ink select-none flex items-center gap-1">
             <span className="text-xl">{emoji}</span> Icon ▾
           </summary>
-          <div className="absolute z-10 mt-1 w-56 grid grid-cols-8 gap-1 bg-paper border border-line rounded-xl p-2 shadow-[var(--shadow-lift)]">
+          <div className="absolute z-10 top-full left-0 mt-1 w-56 max-w-full grid grid-cols-8 gap-1 bg-paper border border-line rounded-xl p-2 shadow-[var(--shadow-lift)]">
             {EMOJIS.map((e) => (
               <button
                 key={e}
@@ -135,7 +135,7 @@ function ProductForm({
                   setEmoji(e);
                   (ev.currentTarget.closest("details") as HTMLDetailsElement).open = false;
                 }}
-                className="text-xl hover:bg-line rounded-lg p-1"
+                className="text-xl hover:bg-line rounded-lg p-0.5 sm:p-1 min-w-0"
               >
                 {e}
               </button>
