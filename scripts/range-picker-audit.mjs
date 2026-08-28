@@ -146,6 +146,27 @@ for (let p = 0; p < PICKERS.length; p++) {
       && day(r.start)===day(r.end) && day(r.start).endsWith("-22"),
     JSON.stringify({...r, sd:day(r.start), ed:day(r.end)}));
 
+  // --- G: a past day must be inert ---------------------------------------
+  // Ghosting is only half of it. If the button still fires, a vendor can
+  // schedule a drop that opened last week and nothing on the page objects.
+  await reset();
+  const pastDay = Number(todayNum) > 3 ? Number(todayNum) - 3 : null;
+  if (pastDay) {
+    const wasDisabled = await ev(`(()=>{const b=[...${GRIDS}[${p}].querySelectorAll('button')]
+      .find(x=>x.textContent.trim().replace(/\\D/g,'')==='${pastDay}'); return b ? b.disabled : null;})()`);
+    await clickDay(p, pastDay); await sleep(450);
+    r = await read(p);
+    console.log(`  G click a PAST day (${pastDay})               start=${day(r.start)} end=${day(r.end)} selected=[${r.selected}] disabledAttr=${wasDisabled}`);
+    record(`${L}: a past day is disabled`, wasDisabled === true, `disabled=${wasDisabled}`);
+    record(`${L}: clicking a past day selects nothing`,
+      r.start === "" && r.end === "" && r.selected.length === 0, JSON.stringify(r));
+    // And today, one boundary step away, must still work.
+    await clickDay(p, todayNum); await sleep(450);
+    r = await read(p);
+    record(`${L}: today is still selectable next to the disabled range`,
+      r.selected.includes(String(todayNum)), JSON.stringify(r));
+  }
+
   // --- F: the same-tick double click (what the screenshot script did) ----
   await reset();
   await ev(`(()=>{const g=${GRIDS}[${p}]; const bs=[...g.querySelectorAll('button')];

@@ -307,6 +307,14 @@ export function DateRangePicker({
           const isStart = sv !== null && dv === sv;
           const isEnd = ev !== null && dv === ev;
           const isToday = dv === tv;
+          // Past relative to the STORE's today, not the browser's — same rule
+          // the today marker uses, so the two can never disagree about where
+          // "now" is. A day already chosen as the start or end stays live and
+          // fully drawn: 14 of 17 existing drops opened before today, and
+          // editing one must still show its own dates rather than ghosting
+          // them out from under the vendor.
+          const isPast = dv < tv;
+          const disabled = isPast && !isStart && !isEnd;
           const inRange = sv !== null && ev !== null && dv > sv && dv < ev;
           const col = idx % 7;
           const banded = isStart || isEnd || inRange;
@@ -337,15 +345,24 @@ export function DateRangePicker({
               <button
                 type="button"
                 onClick={() => pickDay(day)}
+                disabled={disabled}
                 aria-current={isToday ? "date" : undefined}
-                aria-label={`${WEEKDAYS_LONG[(firstWeekday + day - 1) % 7]}, ${MONTHS[viewMonth]} ${day}, ${viewYear}${isToday ? " (today)" : ""}`}
-                className="group w-full h-full grid place-items-center focus-visible:outline-none"
+                aria-label={`${WEEKDAYS_LONG[(firstWeekday + day - 1) % 7]}, ${MONTHS[viewMonth]} ${day}, ${viewYear}${isToday ? " (today)" : ""}${disabled ? " (past — unavailable)" : ""}`}
+                className={[
+                  "group w-full h-full grid place-items-center focus-visible:outline-none",
+                  disabled ? "cursor-not-allowed" : "",
+                ].join(" ")}
               >
                 <span
                   className={[
                     "relative w-9 h-9 rounded-full text-sm transition grid place-items-center",
                     "group-focus-visible:ring-2 group-focus-visible:ring-brand/60 group-focus-visible:ring-offset-1 group-focus-visible:ring-offset-paper",
-                    isStart || isEnd
+                    disabled
+                      // Ghosted, not hidden: the vendor still needs the grid to
+                      // read as a calendar. Disabled controls are exempt from
+                      // the contrast minimum, but this stays legible.
+                      ? "text-ink/25"
+                      : isStart || isEnd
                       ? "bg-brand text-white font-semibold"
                       : isToday
                         // Deliberately NOT `text-brand`: coral on paper is

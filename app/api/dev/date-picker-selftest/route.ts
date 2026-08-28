@@ -203,6 +203,51 @@ export async function GET(req: Request) {
       /aria-hidden\s*\n?\s*className=\{\[\s*\n?\s*"absolute bottom-1/.test(src)
         || /isToday && \(\s*<span\s*\n\s*aria-hidden/.test(src));
 
+    // ---- 3b. Past dates are ghosted and unselectable ----------------------
+    // Scheduling a drop to open before today is meaningless, but 14 of the 17
+    // drops in the database opened before today, so a day that is ALREADY the
+    // start or end must stay live and fully drawn — otherwise editing an
+    // existing drop ghosts out its own dates.
+    const pastCells = (html: string) =>
+      html.match(/<button[^>]*\bdisabled=""[^>]*>[\s\S]{0,600}?<\/button>/g) ?? [];
+    const newPage = await get("/dashboard/drops/new", created.east!);
+    const past = pastCells(newPage.body);
+    check("past days are disabled on a fresh drop", past.length > 0, `disabled cells=${past.length}`);
+    check("past days are ghosted rather than hidden",
+      past.every((c) => /text-ink\/25/.test(c)), past[0]?.slice(0, 160));
+    check("past days say so to a screen reader",
+      past.every((c) => /\(past — unavailable\)/.test(c)));
+    check("past days show a not-allowed cursor", past.every((c) => /cursor-not-allowed/.test(c)));
+    check("today itself is never treated as past",
+      !past.some((c) => /aria-current="date"/.test(c)));
+    // Nothing after today may be disabled — an off-by-one here would silently
+    // block the vendor from scheduling tomorrow.
+    const disabledDays = past.map((c) => Number(c.match(/>(\d+)</)?.[1] ?? 0)).filter(Boolean);
+    const todayDay = dateInZone("Pacific/Kiritimati").day;
+    check("no day on or after today is disabled",
+      disabledDays.every((d) => d < todayDay),
+      `disabled=[${disabledDays.join(",")}] today=${todayDay}`);
+
+    // The edit page for a drop whose window is in the past: its own dates must
+    // still render as selected, not ghosted.
+    const pastDrop = await prisma.drop.create({
+      data: {
+        sellerId: created.east!, title: "Past Window Selftest Drop", status: "draft",
+        mode: "preorder", fulfillment: "pickup",
+        opensAt: new Date(Date.now() - 30 * 86400_000),
+        closesAt: new Date(Date.now() - 25 * 86400_000),
+      },
+      select: { id: true },
+    });
+    created.pastDrop = pastDrop.id;
+    const pastEdit = await get(`/dashboard/drops/${pastDrop.id}/edit`, created.east!);
+    check("a drop with a past window still renders its edit page", pastEdit.status === 200);
+    const stillSelected = pastEdit.body.match(/<button(?![^>]*\bdisabled)[^>]*>[\s\S]{0,400}?bg-brand text-white[\s\S]{0,300}?<\/button>/g) ?? [];
+    check("a past date that IS the selection stays live and filled, not ghosted",
+      stillSelected.length >= 1, `live selected cells=${stillSelected.length}`);
+    check("the past selection is not marked unavailable",
+      !stillSelected.some((c) => /past — unavailable/.test(c)));
+
     // ---- 4. Mobile hit area ------------------------------------------------
     // Geometry is measured by scripts/calendar-audit.mjs; these are the cheap
     // always-on guards that stop the structure producing it being undone. The
@@ -259,6 +304,7 @@ export async function GET(req: Request) {
   } finally {
     const attempt = async (fn: () => Promise<unknown>) => { try { await fn(); } catch { /* baseline catches it */ } };
     if (created.drop) await attempt(() => prisma.drop.delete({ where: { id: created.drop } }));
+    if (created.pastDrop) await attempt(() => prisma.drop.delete({ where: { id: created.pastDrop } }));
     for (const id of [created.east, created.west].filter(Boolean) as string[]) {
       await attempt(() => prisma.seller.delete({ where: { id } }));
     }
