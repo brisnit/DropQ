@@ -36,7 +36,7 @@ function Cta({ planId, seller }: { planId: Plan; seller: SellerLite }) {
       );
     return (
       <form action={createGrowthCheckoutAction}>
-        <Button size="lg" className="w-full">Upgrade to Growth — $20/mo</Button>
+        <Button size="lg" className="w-full">Upgrade to Basic — $8/mo</Button>
       </form>
     );
   }

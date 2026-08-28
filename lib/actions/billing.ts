@@ -17,7 +17,7 @@ async function baseUrl(): Promise<string> {
 }
 
 /**
- * Start a Stripe Checkout subscription for the Growth plan ($20/mo). Charged to
+ * Start a Stripe Checkout subscription for the paid "Basic" plan ($8/mo). Charged to
  * the vendor on the DropQ platform account (separate from Connect payouts).
  * redirect() stays OUTSIDE the try (it throws NEXT_REDIRECT by design).
  */

@@ -43,8 +43,8 @@ function addMonths(d: Date, n: number): Date {
 }
 
 /**
- * Reward the referrer with 1 free month of Growth. Paying (Stripe) vendors get a
- * billing credit; everyone else gets bonus Growth-level access in the database.
+ * Reward the referrer with 1 free month of the paid plan. Paying (Stripe) vendors
+ * get a billing credit; everyone else gets bonus paid-level access in the database.
  * `referralId` keys the Stripe credit so it can never be applied twice.
  */
 async function grantReferralReward(referrerId: string, referralId: string): Promise<void> {
@@ -61,7 +61,7 @@ async function grantReferralReward(referrerId: string, referralId: string): Prom
           {
             amount: -GROWTH_PRICE_CENTS, // negative = credit toward future invoices
             currency: "usd",
-            description: "DropQ referral reward — 1 month of Growth",
+            description: "DropQ referral reward — 1 month of Basic",
           },
           { idempotencyKey: `referral-credit-${referralId}` }
         );

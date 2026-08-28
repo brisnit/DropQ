@@ -72,7 +72,7 @@ export default async function DropsPage() {
             )}
           </span>
           <Link href="/dashboard/billing" className="text-brand font-medium hover:underline">
-            Upgrade to Growth →
+            Upgrade to Basic →
           </Link>
         </div>
       )}

@@ -94,7 +94,7 @@ export async function payWalkUpSaleAction(
   }
 
   const itemsCents = walkUpTotalCents(lines);
-  const feeCents = calcFeeCents(itemsCents);
+  const feeCents = calcFeeCents(itemsCents, existing.seller);
   const passFee = existing.seller.feeMode === "pass";
   const totalCents = passFee ? itemsCents + feeCents : itemsCents;
 

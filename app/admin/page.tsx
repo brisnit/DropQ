@@ -247,8 +247,8 @@ export default async function AdminHome({
 
       {/* Plans overview */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <Stat label="Starter" value={String(planCount.starter)} sub={`${starterNearLimit.length} near limit`} />
-        <Stat label="Growth" value={String(planCount.growth)} sub={`${growthSubs.length} paying`} />
+        <Stat label="Free" value={String(planCount.starter)} sub={`${starterNearLimit.length} near limit`} />
+        <Stat label="Basic" value={String(planCount.growth)} sub={`${growthSubs.length} paying`} />
         <Stat label="Partner" value={String(planCount.partner)} sub="Early Partner Program" />
         <Stat label="Pro waitlist" value={String(proWaitlist.length)} sub="Coming soon" />
       </div>
@@ -275,7 +275,7 @@ export default async function AdminHome({
 
         {/* Starters approaching the limit */}
         <div className="bg-paper border border-line rounded-card p-5">
-          <h2 className="font-semibold mb-3">Starters near limit <span className="text-muted font-normal">({starterNearLimit.length})</span></h2>
+          <h2 className="font-semibold mb-3">Free accounts near limit <span className="text-muted font-normal">({starterNearLimit.length})</span></h2>
           {starterNearLimit.length === 0 ? (
             <p className="text-sm text-muted">None approaching the {STARTER_DROP_LIMIT}-drop limit.</p>
           ) : (

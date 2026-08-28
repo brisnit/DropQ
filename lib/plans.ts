@@ -14,8 +14,23 @@ export const PARTNER_FREE_MONTHS = 12;
 /** Starter lifetime drop allowance. */
 export const STARTER_DROP_LIMIT = 3;
 
-/** Growth subscription price (USD cents / month). */
-export const GROWTH_PRICE_CENTS = 2000;
+/** Paid ("Basic") subscription price (USD cents / month). */
+export const GROWTH_PRICE_CENTS = 800;
+
+/** Pro price. Displayed only — Pro is not purchasable yet (see PRICING). */
+export const PRO_PRICE_CENTS = 1400;
+
+/**
+ * Pro's reduced platform fee. Everyone else pays DROPQ_FEE_PERCENT (2 by
+ * default). Applied as a ceiling rather than a fixed rate, so dropping the
+ * global fee below 1.5 never quietly RAISES what a Pro seller pays.
+ */
+export const PRO_FEE_PERCENT = 1.5;
+
+/** The fee percent a plan pays, given the platform default. */
+export function feePercentForPlan(plan: Plan, defaultPercent: number): number {
+  return plan === "pro" ? Math.min(PRO_FEE_PERCENT, defaultPercent) : defaultPercent;
+}
 
 /** Stripe Price lookup key so we never hard-depend on a dashboard-created ID. */
 export const GROWTH_PRICE_LOOKUP_KEY = "dropq_growth_monthly";
@@ -74,7 +89,8 @@ export function hasGrowthFeatures(seller: SellerPlanFields): boolean {
 }
 
 export function planLabel(plan: Plan): string {
-  return { starter: "Starter", growth: "Growth", partner: "Partner", pro: "Pro" }[plan];
+  // Display names only. The stored values stay starter/growth/partner/pro.
+  return { starter: "Free", growth: "Basic", partner: "Partner", pro: "Pro" }[plan];
 }
 
 export function partnerExpiryFrom(start: Date): Date {
@@ -104,7 +120,7 @@ export type PlanCard = {
 export const PRICING: PlanCard[] = [
   {
     id: "starter",
-    name: "Starter",
+    name: "Free",
     positioning: "Try DropQ",
     price: "$0",
     cadence: "/mo",
@@ -121,14 +137,14 @@ export const PRICING: PlanCard[] = [
   },
   {
     id: "growth",
-    name: "Growth",
+    name: "Basic",
     positioning: "Run Drops",
-    price: "$20",
+    price: "$8",
     cadence: "/mo",
     blurb: "The ideal plan for businesses actively selling through DropQ.",
     badge: "Most Popular",
     highlighted: true,
-    cta: "Upgrade to Growth",
+    cta: "Upgrade to Basic",
     features: [
       "Unlimited drops",
       "Online ordering",
@@ -148,27 +164,21 @@ export const PRICING: PlanCard[] = [
     id: "pro",
     name: "Pro",
     positioning: "Grow Customers",
-    price: "$99",
+    price: "$14",
     cadence: "/mo",
-    blurb: "Automated repeat-customer growth for power sellers.",
+    blurb: "For sellers leaning on repeat customers.",
     badge: "Coming Soon",
     comingSoon: true,
     cta: "Coming Soon",
     features: [
-      "Everything in Growth",
-      "Advanced analytics dashboard",
-      "Quarterly sales reporting",
-      "Customer lifetime value tracking",
-      "Automated 30-day reminders",
-      "Automated 90-day reminders",
-      "Geofencing notifications",
-      "Priority support",
-      "Multiple team members",
-      "Multiple locations",
-      "White-label customer experience",
-      "Customer & sales data exports",
-      "Early access features",
+      "Everything in Basic",
       "Reduced transaction fee (1.5%)",
+      "Advanced analytics dashboard",
+      "Customer lifetime value tracking",
+      "Automated repeat-customer reminders",
+      "Customer & sales data exports",
+      "Priority support",
+      "Early access features",
     ],
   },
 ];

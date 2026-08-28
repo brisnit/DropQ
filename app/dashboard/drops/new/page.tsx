@@ -27,10 +27,10 @@ export default async function NewDropPage({
         <div className="mt-3">
           <EmptyState
             emoji="🚀"
-            title="You've used all your Starter drops"
-            body={`Starter includes ${STARTER_DROP_LIMIT} drops total. Upgrade to Growth for unlimited drops, analytics, and the full selling toolkit — $20/mo.`}
+            title="You've used all your free drops"
+            body={`Free includes ${STARTER_DROP_LIMIT} drops total. Upgrade to Basic for unlimited drops, analytics, and the full selling toolkit — $8/mo.`}
             ctaHref="/dashboard/billing"
-            ctaLabel="Upgrade to Growth"
+            ctaLabel="Upgrade to Basic"
           />
         </div>
       </Section>

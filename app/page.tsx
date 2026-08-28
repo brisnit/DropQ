@@ -556,15 +556,15 @@ export default function Home() {
               Start free. Pay only when you sell.
             </h2>
             <p className="text-lg text-cream/70 mt-4">
-              Try free on Starter, run unlimited drops on Growth, and keep a simple
+              Try free, run unlimited drops on Basic, and keep a simple
               2% transaction fee at every tier. Cancel anytime.
             </p>
           </Reveal>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-12">
             {[
-              ["Starter", "$0", "/mo", "Try DropQ", ["3 drops to start", "Online ordering", "Pickup & delivery", "Customer list", "QR codes", "2% transaction fee"], false, false],
-              ["Growth", "$20", "/mo", "Run Drops", ["Unlimited drops", "Customer signups (SMS + email)", "Sales analytics", "Repeat-customer tracking", "Shareable drop links", "2% transaction fee"], true, false],
-              ["Pro", "$99", "/mo", "Grow Customers", ["Everything in Growth", "Advanced analytics", "Automated reminders", "Multiple locations & team", "Reduced 1.5% fee"], false, true],
+              ["Free", "$0", "/mo", "Try DropQ", ["3 drops to start", "Online ordering", "Pickup & delivery", "Customer list", "QR codes", "2% transaction fee"], false, false],
+              ["Basic", "$8", "/mo", "Run Drops", ["Unlimited drops", "Customer signups (SMS + email)", "Sales analytics", "Repeat-customer tracking", "Shareable drop links", "2% transaction fee"], true, false],
+              ["Pro", "$14", "/mo", "Grow Customers", ["Everything in Basic", "Reduced 1.5% fee", "Advanced analytics", "Automated reminders", "Data exports"], false, true],
             ].map(([name, price, per, position, feats, featured, soon], i) => (
               <Reveal key={String(name)} delay={i * 90}>
               <div

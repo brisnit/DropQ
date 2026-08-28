@@ -186,10 +186,10 @@ export default async function OverviewPage() {
       {/* Referral program */}
       <div className="bg-ink text-cream rounded-card p-6 sm:p-7 mb-8">
         <p className="text-xs font-semibold uppercase tracking-wider text-grey">Refer &amp; earn</p>
-        <h2 className="font-display text-2xl font-semibold mt-1">Invite a vendor. Earn free Growth.</h2>
+        <h2 className="font-display text-2xl font-semibold mt-1">Invite a vendor. Earn a free month.</h2>
         <p className="text-cream/75 mt-1.5 max-w-xl text-sm">
           Know another vendor who could use DropQ? Share your referral link. When they
-          sign up and subscribe to Growth, you&apos;ll get one free month of Growth — on us.
+          sign up and subscribe to Basic, you&apos;ll get one free month of Basic — on us.
         </p>
         <div className="mt-4 flex flex-col sm:flex-row gap-2">
           <input
@@ -206,7 +206,7 @@ export default async function OverviewPage() {
           <span><b className="text-cream">{referrals.length}</b> signed up</span>
           <span><b className="text-cream">{rewardedCount}</b> reward{rewardedCount !== 1 ? "s" : ""} granted</span>
           {bonusUntil && (
-            <span>🎁 Free Growth active until <b className="text-cream">{bonusUntil}</b></span>
+            <span>🎁 Free Basic active until <b className="text-cream">{bonusUntil}</b></span>
           )}
         </div>
         {referralHistory.length > 0 && (

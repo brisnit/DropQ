@@ -1,6 +1,11 @@
 import "server-only";
 import Stripe from "stripe";
-import { GROWTH_PRICE_CENTS, GROWTH_PRICE_LOOKUP_KEY } from "@/lib/plans";
+import {
+  GROWTH_PRICE_CENTS,
+  GROWTH_PRICE_LOOKUP_KEY,
+  effectivePlan,
+  feePercentForPlan,
+} from "@/lib/plans";
 
 let _stripe: Stripe | null = null;
 
@@ -22,8 +27,27 @@ export function feePercent(): number {
   return isFinite(n) && n >= 0 ? n : 2;
 }
 
-export function calcFeeCents(totalCents: number): number {
-  return Math.round((totalCents * feePercent()) / 100);
+/** Plan fields needed to price a seller's transaction fee. */
+type FeeSeller = {
+  plan: string;
+  partnerExpiresAt: Date | null;
+  dropsCreated: number;
+  growthBonusUntil?: Date | null;
+};
+
+/**
+ * The platform fee for one transaction.
+ *
+ * Pass the seller to get their plan's rate — Pro pays a reduced 1.5%, which is
+ * advertised on the pricing page. Omitting the seller falls back to the
+ * platform default, which is correct for callers that genuinely have no seller
+ * (and is what every caller did before plans affected the fee).
+ */
+export function calcFeeCents(totalCents: number, seller?: FeeSeller): number {
+  const pct = seller
+    ? feePercentForPlan(effectivePlan(seller), feePercent())
+    : feePercent();
+  return Math.round((totalCents * pct) / 100);
 }
 
 /**
@@ -40,18 +64,39 @@ export async function ensureGrowthPriceId(stripe: Stripe): Promise<string> {
     active: true,
     limit: 1,
   });
-  if (existing.data[0]) return existing.data[0].id;
+  const found = existing.data[0];
 
-  const product = await stripe.products.create({
-    name: "DropQ Growth",
-    description: "DropQ Growth plan — unlimited drops and the full selling toolkit.",
-  });
+  // Stripe Prices are immutable, so changing the plan price means creating a
+  // NEW one. Returning whatever the lookup key points at would keep billing the
+  // old amount while the pricing page shows the new one — a silent mismatch
+  // that lands on a vendor's card, so the amount is verified, not assumed.
+  const matches =
+    found &&
+    found.unit_amount === GROWTH_PRICE_CENTS &&
+    found.currency === "usd" &&
+    found.recurring?.interval === "month";
+  if (matches) return found.id;
+
+  // Reuse the existing Product when there is one; only the Price is versioned.
+  const productId =
+    found && typeof found.product === "string"
+      ? found.product
+      : (
+          await stripe.products.create({
+            name: "DropQ Basic",
+            description: "DropQ Basic plan — unlimited drops and the full selling toolkit.",
+          })
+        ).id;
+
   const price = await stripe.prices.create({
-    product: product.id,
+    product: productId,
     unit_amount: GROWTH_PRICE_CENTS,
     currency: "usd",
     recurring: { interval: "month" },
     lookup_key: GROWTH_PRICE_LOOKUP_KEY,
+    // Moves the key off the stale Price so the next lookup finds this one.
+    // Existing subscriptions keep billing their original Price until migrated.
+    transfer_lookup_key: true,
   });
   return price.id;
 }

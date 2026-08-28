@@ -5,7 +5,7 @@ import { getCurrentSeller } from "@/lib/auth";
 
 export const metadata = {
   title: "Pricing — DropQ",
-  description: "Start free, run unlimited drops on Growth, and grow customers with Pro.",
+  description: "Start free, run unlimited drops on Basic, and grow customers with Pro.",
 };
 
 export default async function PricingPage() {

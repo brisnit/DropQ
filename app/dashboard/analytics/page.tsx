@@ -22,10 +22,10 @@ export default async function AnalyticsPage() {
         <PageHeader title="Analytics" subtitle="Sales insights for your drops." />
         <EmptyState
           emoji="📈"
-          title="Analytics is a Growth feature"
-          body="Upgrade to Growth ($20/mo) to unlock sales by drop, sales by product, repeat-customer tracking, and more."
+          title="Analytics is a Basic feature"
+          body="Upgrade to Basic ($8/mo) to unlock sales by drop, sales by product, repeat-customer tracking, and more."
           ctaHref="/dashboard/billing"
-          ctaLabel="Upgrade to Growth"
+          ctaLabel="Upgrade to Basic"
         />
       </Section>
     );

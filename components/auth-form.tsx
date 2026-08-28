@@ -33,8 +33,8 @@ export function AuthForm({
   const [plan, setPlan] = useState<"starter" | "growth">(defaultPlan);
 
   const PLAN_OPTIONS = [
-    { v: "starter" as const, name: "Starter", price: "Free", desc: "3 drops to start" },
-    { v: "growth" as const, name: "Growth", price: "$20/mo", desc: "Unlimited drops + analytics" },
+    { v: "starter" as const, name: "Free", price: "Free", desc: "3 drops to start" },
+    { v: "growth" as const, name: "Basic", price: "$8/mo", desc: "Unlimited drops + analytics" },
   ];
 
   return (
@@ -109,7 +109,7 @@ export function AuthForm({
       {isSignup && (
         <Field
           label="Invite code"
-          hint="Have an Early Partner code? Enter it — otherwise leave blank to start free on Starter."
+          hint="Have an Early Partner code? Enter it — otherwise leave blank to start free."
         >
           <Input name="inviteCode" placeholder="Optional" autoComplete="off" />
         </Field>

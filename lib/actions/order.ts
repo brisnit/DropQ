@@ -89,7 +89,7 @@ export async function placeOrderAction(
   if (lines.length === 0) return { error: "Add at least one item to your order." };
 
   const itemsCents = lines.reduce((s, l) => s + l.product.priceCents * l.qty, 0);
-  const feeCents = calcFeeCents(itemsCents);
+  const feeCents = calcFeeCents(itemsCents, drop.seller);
   const passFee = drop.seller.feeMode === "pass";
   // What the customer pays. In "pass" mode the DropQ fee is added on top.
   const totalCents = passFee ? itemsCents + feeCents : itemsCents;

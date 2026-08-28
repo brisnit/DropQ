@@ -232,8 +232,8 @@ export default async function AdminClientPage({
             <div>
               <label className="block text-xs font-medium text-muted mb-1">Set plan</label>
               <Select name="plan" defaultValue={seller.plan} className="w-40">
-                <option value="starter">Starter</option>
-                <option value="growth">Growth</option>
+                <option value="starter">Free</option>
+                <option value="growth">Basic</option>
                 <option value="partner">Partner (resets 12mo)</option>
                 <option value="pro">Pro</option>
               </Select>

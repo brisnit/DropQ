@@ -51,12 +51,12 @@ export default async function BillingPage({
 
       {sp.upgraded && (
         <p className="mb-5 text-sm bg-sage-tint text-sage rounded-lg px-3 py-2">
-          🎉 You&apos;re on Growth — unlimited drops are unlocked.
+          🎉 You&apos;re on Basic — unlimited drops are unlocked.
         </p>
       )}
       {sp.limit && plan === "starter" && (
         <p className="mb-5 text-sm bg-brand-tint text-brand-dark rounded-lg px-3 py-2">
-          You&apos;ve used all {STARTER_DROP_LIMIT} Starter drops. Upgrade to Growth for unlimited drops.
+          You&apos;ve used all {STARTER_DROP_LIMIT} free drops. Upgrade to Basic for unlimited drops.
         </p>
       )}
       {sp.canceled && (
@@ -92,13 +92,13 @@ export default async function BillingPage({
             <div className="flex items-center gap-2.5">
               <h2 className="font-display text-2xl font-semibold">{planLabel(plan)}</h2>
               <Badge className={planColor[plan]}>
-                {plan === "growth" ? (bonusOnly ? "Free bonus" : "$20/mo") : plan === "pro" ? "$99/mo" : "Free"}
+                {plan === "growth" ? (bonusOnly ? "Free bonus" : "$8/mo") : plan === "pro" ? "$14/mo" : "Free"}
               </Badge>
             </div>
             <p className="text-muted text-sm mt-1">
               {plan === "starter" && `${remaining} of ${STARTER_DROP_LIMIT} lifetime drops remaining.`}
               {plan === "growth" &&
-                (bonusOnly ? "Growth-level features from a referral bonus." : "Unlimited drops · billed monthly.")}
+                (bonusOnly ? "Basic features from a referral bonus." : "Unlimited drops · billed monthly.")}
               {plan === "partner" && "Early Partner — unlimited drops, free for your first year."}
             </p>
           </div>
@@ -106,7 +106,7 @@ export default async function BillingPage({
           <div className="flex gap-2">
             {(plan === "starter" || bonusOnly) && (
               <form action={createGrowthCheckoutAction}>
-                <Button>Upgrade to Growth — $20/mo</Button>
+                <Button>Upgrade to Basic — $8/mo</Button>
               </form>
             )}
             {plan === "growth" && seller.stripeCustomerId && (
@@ -120,7 +120,7 @@ export default async function BillingPage({
         {/* Referral bonus notice */}
         {bonusOnly && seller.growthBonusUntil && (
           <div className="mt-4 text-sm rounded-xl bg-sage-tint text-sage px-4 py-3">
-            🎁 Free Growth from referrals until <b>{formatDate(seller.growthBonusUntil)}</b>. Upgrade anytime to keep Growth after it ends.
+            🎁 Free Basic from referrals until <b>{formatDate(seller.growthBonusUntil)}</b>. Upgrade anytime to keep Basic after it ends.
           </div>
         )}
 
@@ -128,16 +128,16 @@ export default async function BillingPage({
         {seller.plan === "partner" && seller.partnerExpiresAt && (
           <div className="mt-4 text-sm rounded-xl bg-cream border border-line px-4 py-3">
             {isPartnerExpired(seller) ? (
-              <>Your Partner year ended on <b>{formatDate(seller.partnerExpiresAt)}</b>. You&apos;re now on Growth — add billing to keep selling without interruption.</>
+              <>Your Partner year ended on <b>{formatDate(seller.partnerExpiresAt)}</b>. You&apos;re now on Basic — add billing to keep selling without interruption.</>
             ) : (
-              <>Partner activated{seller.partnerActivatedAt ? ` ${formatDate(seller.partnerActivatedAt)}` : ""}. Free until <b>{formatDate(seller.partnerExpiresAt)}</b>, then automatically moves to Growth ($20/mo) unless changed.</>
+              <>Partner activated{seller.partnerActivatedAt ? ` ${formatDate(seller.partnerActivatedAt)}` : ""}. Free until <b>{formatDate(seller.partnerExpiresAt)}</b>, then automatically moves to Basic ($8/mo) unless changed.</>
             )}
           </div>
         )}
 
         {plan === "growth" && seller.subscriptionStatus === "past_due" && (
           <div className="mt-4 text-sm rounded-xl bg-brand-tint text-brand-dark px-4 py-3">
-            Your last payment failed. Update your card in the billing portal to keep Growth active.
+            Your last payment failed. Update your card in the billing portal to keep Basic active.
           </div>
         )}
       </div>
