@@ -7,6 +7,7 @@ import { vocab, showItemMeta, isFood } from "@/lib/category";
 import { uploadImage, ImageTooLargeError } from "@/lib/upload-client";
 import { DateRangePicker } from "@/components/date-range-picker";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
+import { firstScheduleError } from "@/lib/drop-schedule";
 
 const MAX_IMAGES_PER_PRODUCT = 6;
 
@@ -319,38 +320,36 @@ export function DropEditor({
   const validate = (e: React.FormEvent<HTMLFormElement>) => {
     if (!live) {
       const fd = new FormData(e.currentTarget);
-      const opens = String(fd.get("opensAt") ?? "");
-      const closes = String(fd.get("closesAt") ?? "");
+      const at = (k: string) => {
+        const v = String(fd.get(k) ?? "");
+        return v ? new Date(v) : null;
+      };
+      const opens = at("opensAt");
+      const closes = at("closesAt");
+
+      // A new preorder drop needs an order window at all. This is stricter than
+      // the shared relational rules, which permit a drop with neither date so
+      // that historical drops saved that way stay editable.
       if (!opens || !closes) {
         e.preventDefault();
         setError("Please set both an open and a close date/time.");
         return;
       }
-      if (closes <= opens) {
+
+      // Same rules the server enforces, so the message a vendor sees here is
+      // exactly what would otherwise be rejected on save. Editing a drop whose
+      // stored dates are already invalid surfaces the error here too — the
+      // picker re-emits what's stored, so nothing is silently corrected.
+      const scheduleError = firstScheduleError({
+        opensAt: opens,
+        closesAt: closes,
+        pickupStartAt: at("pickupStartAt"),
+        pickupEndAt: at("pickupEndAt"),
+      });
+      if (scheduleError) {
         e.preventDefault();
-        setError("Close date/time must be after the open date/time.");
+        setError(scheduleError);
         return;
-      }
-      // Pickup window is optional, but if set it must be consistent (ISO
-      // instants compare chronologically as strings).
-      const pStart = String(fd.get("pickupStartAt") ?? "");
-      const pEnd = String(fd.get("pickupEndAt") ?? "");
-      if ((pStart && !pEnd) || (!pStart && pEnd)) {
-        e.preventDefault();
-        setError("Set both a pickup start and end time, or leave both blank.");
-        return;
-      }
-      if (pStart && pEnd) {
-        if (pEnd <= pStart) {
-          e.preventDefault();
-          setError("Pickup end must be after pickup start.");
-          return;
-        }
-        if (pStart < closes) {
-          e.preventDefault();
-          setError("Pickup can't start before ordering closes.");
-          return;
-        }
       }
     }
     const hasItem = rows.some((r) => r.name.trim().length > 0);

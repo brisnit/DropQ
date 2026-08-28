@@ -25,6 +25,7 @@ import { geocode } from "@/lib/geofence";
 import { canCreateDrop } from "@/lib/plans";
 import { ORDER_STATUSES } from "@/lib/orders";
 import { resolveDropStatus } from "@/lib/payments";
+import { assertValidDropSchedule } from "@/lib/drop-schedule";
 import { SOCIALS, normalizeSocialUrl } from "@/lib/social";
 
 async function baseUrl(): Promise<string> {
@@ -388,6 +389,11 @@ export async function createDropAction(formData: FormData) {
     })
     .filter((p) => p.name.length > 0);
 
+  const pickup = parsePickup(formData);
+  // Server-side gate. The editor validates first and shows a friendly message;
+  // this is what holds if the client is bypassed.
+  assertValidDropSchedule({ opensAt, closesAt, ...pickup });
+
   const drop = await prisma.drop.create({
     data: {
       sellerId: seller.id,
@@ -399,7 +405,7 @@ export async function createDropAction(formData: FormData) {
       pickupInfo: String(formData.get("pickupInfo") ?? "").trim() || null,
       opensAt,
       closesAt,
-      ...parsePickup(formData),
+      ...pickup,
       products: { create: products },
     },
   });
@@ -435,6 +441,12 @@ export async function updateDropFullAction(formData: FormData) {
   const opensAt = formData.get("opensAt") ? new Date(String(formData.get("opensAt"))) : drop.opensAt;
   const closesAt = formData.get("closesAt") ? new Date(String(formData.get("closesAt"))) : drop.closesAt;
   const pickup = parsePickup(formData);
+
+  // Validate the RESOLVED values, not just what was submitted. opensAt/closesAt
+  // fall back to the stored dates when the form omits them, so an already-invalid
+  // historical drop must fail here rather than be silently re-persisted. The save
+  // is refused; nothing is rewritten and the vendor is required to correct it.
+  assertValidDropSchedule({ opensAt, closesAt, ...pickup });
 
   // Detect a pickup-detail change so we can notify customers who already ordered.
   const pickupChanged =
