@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { prisma } from "@/lib/db";
 import { isVendorSellable } from "@/lib/payments";
 import { isDemoStore } from "@/lib/demo";
@@ -84,7 +85,20 @@ export function stripeBlocksSelling(s: StripeActivationState): boolean {
 
 /* -------------------------------- Milestones ----------------------------- */
 
-export type MilestoneKey = "account" | "email" | "stripe" | "drop" | "publish";
+/**
+ * The five milestones.
+ *
+ * `email` was removed in Phase G.2 and `share` took its place. Email
+ * verification gates NOTHING — login, publishing and selling all work
+ * unverified — so presenting it as something standing between a vendor and
+ * their first sale overstated it. It keeps its own home: the dismissible
+ * VerifyBanner in the dashboard layout, which is an account-security task, not
+ * an activation step.
+ *
+ * Sharing replaced it because it is the one real step between publishing and a
+ * first order that the checklist previously left out.
+ */
+export type MilestoneKey = "account" | "stripe" | "drop" | "publish" | "share";
 
 export type Milestone = {
   key: MilestoneKey;
@@ -92,6 +106,15 @@ export type Milestone = {
   done: boolean;
   /** Only Stripe is an actual requirement for selling. */
   requiredToSell: boolean;
+  /**
+   * Where an incomplete milestone sends the vendor, and the words on the link.
+   *
+   * Lives here rather than in the card because the card is deliberately dumb —
+   * it renders what this module decides. A milestone that is already done has
+   * neither, so a completed row can never be a link to nowhere.
+   */
+  href?: string;
+  action?: string;
 };
 
 /**
@@ -106,6 +129,16 @@ export type ActivationFacts = {
   liveDrops: number;
   /** Orders with paymentStatus "paid". */
   paidOrders: number;
+  /**
+   * Has this vendor put a drop in front of customers?
+   *
+   * The one milestone that is not purely derived — but it is derived WHERE IT
+   * CAN BE. `VendorGuidance.sharedAt` records a copy-link / share / QR-download
+   * action, and a paid order is independent proof that somebody reached the
+   * drop. The loader ORs the two, so a vendor who was selling long before this
+   * was recorded never sees an unticked Share box.
+   */
+  hasShared: boolean;
 };
 
 /**
@@ -125,7 +158,8 @@ export type ActivationStage =
   | "complete"; // can sell and has sold — activation UI is done
 
 export type NextAction = {
-  key: MilestoneKey | "share";
+  // "share" is a real milestone now, so the union no longer needs to widen.
+  key: MilestoneKey;
   /** Short imperative for the button. */
   cta: string;
   /** One line explaining why this is next, in the vendor's own situation. */
@@ -156,6 +190,21 @@ export type ActivationSeller = SellerActivationFields & {
 };
 
 /**
+ * Where each outstanding milestone sends the vendor. Applied to incomplete rows
+ * only: a ticked row is a statement of fact, not a call to action.
+ */
+const MILESTONE_ACTIONS: Partial<Record<MilestoneKey, { href: string; action: string }>> = {
+  stripe: { href: "/dashboard/payments", action: "Connect" },
+  drop: { href: "/dashboard/drops/new", action: "Build it" },
+  publish: { href: "/dashboard/drops", action: "Publish" },
+  share: { href: "/dashboard/drops", action: "Share" },
+};
+
+function withActions(milestones: Milestone[]): Milestone[] {
+  return milestones.map((m) => (m.done ? m : { ...m, ...MILESTONE_ACTIONS[m.key] }));
+}
+
+/**
  * Derive the whole activation picture. Pure — same input, same output.
  */
 export function activationState(
@@ -173,11 +222,10 @@ export function activationState(
   // for a checkbox. See docs/VENDOR-ACTIVATION.md §3.4.
   const hasPublished = facts.liveDrops > 0 || hasEverSold;
 
-  const milestones: Milestone[] = [
+  const milestones: Milestone[] = withActions([
     // Signup captures store name, category and the Vendor Agreement, so this is
     // complete for every vendor that exists.
     { key: "account", label: "Create your account", done: true, requiredToSell: false },
-    { key: "email", label: "Verify your email", done: seller.emailVerified, requiredToSell: false },
     { key: "stripe", label: "Connect Stripe", done: readyToSell, requiredToSell: true },
     {
       key: "drop",
@@ -186,7 +234,15 @@ export function activationState(
       requiredToSell: false,
     },
     { key: "publish", label: "Publish your drop", done: hasPublished, requiredToSell: false },
-  ];
+    // Last, because it is the only one that needs a published drop to make any
+    // sense. A paid order counts as proof — see ActivationFacts.hasShared.
+    {
+      key: "share",
+      label: "Share your drop",
+      done: facts.hasShared || hasEverSold,
+      requiredToSell: false,
+    },
+  ]);
 
   const completed = milestones.filter((m) => m.done).length;
 
@@ -273,26 +329,21 @@ function nextAction(
     };
   }
 
-  if (facts.paidOrders === 0) {
+  if (!done("share")) {
     return {
       key: "share",
-      cta: "Share your drop link",
-      reason: "You're ready to sell. Share your link to get your first order.",
-      href: `/s/${seller.slug}`,
+      cta: "Share your drop",
+      reason: "You're ready to sell. Nobody can order until they have the link.",
+      // The drops list, not the public storefront: the copy-link button and the
+      // QR both live on the drop page, so this lands where the work is.
+      href: "/dashboard/drops",
     };
   }
 
-  // Email verification is real but never blocks selling, so it is the last
-  // thing we ask for and only once commerce is working.
-  if (!done("email")) {
-    return {
-      key: "email",
-      cta: "Verify your email",
-      reason: "Confirm your email address to secure your account.",
-      href: "/dashboard",
-    };
-  }
-
+  // Email verification used to be the last item here. It never blocked selling
+  // and is no longer a milestone (see MilestoneKey) — the VerifyBanner in the
+  // dashboard layout owns it, and a vendor who is selling with an unverified
+  // address now gets no next action from this module rather than a nag.
   return null;
 }
 
@@ -437,19 +488,51 @@ export function attentionRank(a: ActivationAttention): number {
 
 /* --------------------------------- Loader -------------------------------- */
 
-/** The counts `activationState` needs, for one seller. */
-export async function activationFacts(sellerId: string): Promise<ActivationFacts> {
-  const [dropsWithProducts, liveDrops, paidOrders] = await Promise.all([
+/**
+ * The counts `activationState` needs, for one seller.
+ *
+ * `cache()` de-duplicates within a single render pass. Phase G.3 mounts
+ * guidance in the dashboard LAYOUT while the overview PAGE already loads
+ * activation — without this, every overview render would run these four
+ * queries twice for the same seller and the same answer.
+ */
+export const activationFacts = cache(async function activationFacts(
+  sellerId: string
+): Promise<ActivationFacts> {
+  const [dropsWithProducts, liveDrops, paidOrders, guidance] = await Promise.all([
     prisma.drop.count({ where: { sellerId, products: { some: {} } } }),
     prisma.drop.count({ where: { sellerId, status: "live" } }),
     prisma.order.count({ where: { sellerId, paymentStatus: "paid" } }),
+    // The only stored input to activation. A seller with no guidance row yet
+    // reads as "not shared", which is correct — they haven't.
+    prisma.vendorGuidance.findUnique({
+      where: { sellerId },
+      select: { sharedAt: true },
+    }),
   ]);
-  return { dropsWithProducts, liveDrops, paidOrders };
-}
+  return {
+    dropsWithProducts,
+    liveDrops,
+    paidOrders,
+    hasShared: !!guidance?.sharedAt,
+  };
+});
 
 /** Convenience for a page that has the seller but not the counts. */
 export async function loadActivationState(seller: ActivationSeller & { id: string }) {
   return activationState(seller, await activationFacts(seller.id));
+}
+
+/**
+ * Is the activation card on screen? The inverse of `showsGenericNextStep`,
+ * named for what the caller actually wants to know.
+ *
+ * Exported so `GuidanceContext.activationCardVisible` has exactly one source —
+ * lib/guidance.ts cannot import this module's functions (it runs on the
+ * client), so the value has to be computed here and passed in.
+ */
+export function activationCardVisible(state: ActivationState): boolean {
+  return activationCardMode(state) !== "hidden";
 }
 
 export type VendorActivationRow = {
@@ -483,7 +566,7 @@ export async function loadVendorActivationRows(): Promise<VendorActivationRow[]>
     orderBy: { createdAt: "desc" },
   });
 
-  const [withProducts, byStatus, paid] = await Promise.all([
+  const [withProducts, byStatus, paid, shared] = await Promise.all([
     prisma.drop.groupBy({
       by: ["sellerId"], where: { products: { some: {} } }, _count: true,
     }),
@@ -491,7 +574,14 @@ export async function loadVendorActivationRows(): Promise<VendorActivationRow[]>
     prisma.order.groupBy({
       by: ["sellerId"], where: { paymentStatus: "paid" }, _count: true,
     }),
+    // Batched like the rest: one query for every seller's share stamp, not one
+    // per row. Keeps this loader O(1) queries as the vendor list grows.
+    prisma.vendorGuidance.findMany({
+      where: { sharedAt: { not: null } },
+      select: { sellerId: true },
+    }),
   ]);
+  const hasShared = new Set(shared.map((r) => r.sellerId));
 
   const nWithProducts = new Map(withProducts.map((r) => [r.sellerId, r._count]));
   const nPaid = new Map(paid.map((r) => [r.sellerId, r._count]));
@@ -509,6 +599,7 @@ export async function loadVendorActivationRows(): Promise<VendorActivationRow[]>
       dropsWithProducts: nWithProducts.get(s.id) ?? 0,
       liveDrops: nLive.get(s.id) ?? 0,
       paidOrders: nPaid.get(s.id) ?? 0,
+      hasShared: hasShared.has(s.id),
     };
     const state = activationState(s, facts);
     return {

@@ -52,7 +52,7 @@ export default async function DropsPage() {
           atLimit ? (
             <LinkButton href="/dashboard/billing">⭐ Upgrade for unlimited</LinkButton>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2" data-guidance-anchor="drops.modePick">
               <LinkButton href="/dashboard/drops/new" variant="secondary">
                 + Regular drop
               </LinkButton>
@@ -68,7 +68,14 @@ export default async function DropsPage() {
             {atLimit ? (
               <>You&apos;ve used all <b>{STARTER_DROP_LIMIT}</b> Starter drops.</>
             ) : (
-              <>Starter plan · <b>{remaining}</b> of {STARTER_DROP_LIMIT} lifetime drops remaining.</>
+              <>
+                {/* Explicit {" "}: JSX drops the leading space of a text node that
+                    follows an expression when the node wraps to the next line, which
+                    rendered this as "3lifetime". */}
+                Starter plan · <b>{remaining}</b> of {STARTER_DROP_LIMIT}{" "}
+                lifetime drops remaining. Deleting or relaunching a drop doesn&apos;t
+                give a slot back.
+              </>
             )}
           </span>
           <Link href="/dashboard/billing" className="text-brand font-medium hover:underline">
@@ -80,10 +87,13 @@ export default async function DropsPage() {
       {drops.length === 0 ? (
         <EmptyState
           emoji="🔥"
-          title="No drops yet"
-          body="A drop is a limited menu available for a set time. Build your first one in a couple of minutes."
+          title="Create your first drop"
+          body="A drop is what you're selling, when customers can order it, and where they collect it. It gets its own link and QR code — that link is what you share."
           ctaHref="/dashboard/drops/new"
-          ctaLabel="Create your first drop"
+          ctaLabel="Create a drop"
+          note="Two kinds: a regular drop takes orders ahead of time; a live selling drop is for selling in person right now."
+          secondaryHref="/help/drop-types"
+          secondaryLabel="Which kind?"
         />
       ) : (
         <div className="space-y-3">
@@ -149,7 +159,7 @@ export default async function DropsPage() {
                   <button
                     type="submit"
                     aria-label="Relaunch drop"
-                    title="Relaunch — copy into a new draft"
+                    title="Relaunch — copies this drop into a NEW draft. On the Free plan it counts as another of your 3 lifetime drops."
                     className="h-full px-3 rounded-card border border-line text-muted hover:text-ink hover:border-ink/30 transition grid place-items-center"
                   >
                     <span aria-hidden>🔁</span>

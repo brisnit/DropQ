@@ -8,6 +8,7 @@ import { uploadImage, ImageTooLargeError } from "@/lib/upload-client";
 import { DateRangePicker } from "@/components/date-range-picker";
 import { AddressAutocomplete } from "@/components/address-autocomplete";
 import { firstScheduleError } from "@/lib/drop-schedule";
+import { removalWarning } from "@/lib/drop-items";
 
 const MAX_IMAGES_PER_PRODUCT = 6;
 
@@ -45,6 +46,8 @@ export type DropDefaults = {
     productType?: string;
     condition?: string;
     rarity?: string;
+    /** Orders that reference this item. Drives the removal warning. */
+    orderCount?: number;
   }>;
 };
 
@@ -77,6 +80,8 @@ type Row = {
   rarity: string;
   images: string[]; // uploaded photo URLs (first is the cover); persisted as-is
   uploading: number; // count of in-flight uploads for this row
+  /** Orders referencing this item. 0 for anything added in this session. */
+  orderCount: number;
 };
 
 const FOOD_EMOJI = ["🍪", "🥐", "🍞", "🧁", "🎂", "🥧", "🍩", "🟤", "🍌", "🥗", "🍜", "🌮", "🍱", "🫙", "❤️", "🔥"];
@@ -95,6 +100,7 @@ const blankRow = (emoji: string): Row => ({
   rarity: "",
   images: [],
   uploading: 0,
+  orderCount: 0,
 });
 
 const rowFromSaved = (sp: SavedProduct, fallbackEmoji: string): Row => ({
@@ -110,6 +116,7 @@ const rowFromSaved = (sp: SavedProduct, fallbackEmoji: string): Row => ({
   rarity: sp.rarity,
   images: sp.images?.length ? sp.images : sp.imageUrl ? [sp.imageUrl] : [],
   uploading: 0,
+  orderCount: 0,
 });
 
 function SaveBar({
@@ -152,7 +159,10 @@ function SaveBar({
   }
 
   return (
-    <div className="sticky bottom-0 -mx-5 sm:-mx-8 px-5 sm:px-8 py-4 bg-cream/90 backdrop-blur border-t border-line flex items-center justify-between gap-3">
+    <div
+      data-guidance-anchor="editor.saveBar"
+      className="sticky bottom-0 -mx-5 sm:-mx-8 px-5 sm:px-8 py-4 bg-cream/90 backdrop-blur border-t border-line flex items-center justify-between gap-3"
+    >
       <p className="text-sm text-muted hidden sm:block">
         {mode === "create"
           ? live
@@ -230,6 +240,7 @@ export function DropEditor({
           rarity: p.rarity ?? "",
           images: p.images?.length ? p.images : p.imageUrl ? [p.imageUrl] : [],
           uploading: 0,
+          orderCount: p.orderCount ?? 0,
         }))
       : [blankRow(defaultEmoji), blankRow(defaultEmoji)];
 
@@ -262,8 +273,18 @@ export function DropEditor({
   const update = (key: number, patch: Partial<Row>) =>
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
 
-  const remove = (key: number) =>
+  // Removing an item customers have already bought is not the same action as
+  // removing a typo, so it doesn't happen on one unconfirmed click. The item is
+  // never destroyed — the server retires it (see lib/drop-items.ts) — but the
+  // vendor still needs to know it will leave their storefront.
+  const remove = (key: number) => {
+    const row = rows.find((r) => r.key === key);
+    if (row && row.orderCount > 0) {
+      const name = row.name.trim() || `this ${v.itemNoun}`;
+      if (!window.confirm(removalWarning(name, row.orderCount))) return;
+    }
     setRows((rs) => (rs.length <= 1 ? rs : rs.filter((r) => r.key !== key)));
+  };
 
   // Compress + upload each chosen file straight to Blob, appending URLs to the
   // row. Capped per product; oversized files are rejected with a message.
@@ -413,9 +434,21 @@ export function DropEditor({
         </div>
         {!live && (
           <div>
-            <p className="text-sm font-medium text-ink mb-1">Order window</p>
+            {/* Framed as step 1 of 2. The two windows are a sequence, and a
+                vendor who meets them as unrelated date fields learns the
+                relationship from a validation error instead.
+
+                The guidance anchor sits on this LABEL rather than the section:
+                with its calendar open the section is ~719px tall, which leaves
+                a coachmark nowhere to go but on top of the very control it is
+                describing. A small target points, and rings, precisely. */}
+            <p className="text-sm font-medium text-ink mb-1" data-guidance-anchor="editor.orderWindow">
+              <span className="text-muted font-normal">Step 1 of 2 · </span>
+              Customers can order
+            </p>
             <p className="text-sm text-muted mb-3">
-              When ordering opens and closes. Ordering locks automatically at the close time.
+              From when, until when. Ordering locks itself at the close time — you don&apos;t
+              have to be there.
             </p>
             <DateRangePicker
               defaultStart={defaults.opensAt}
@@ -436,13 +469,19 @@ export function DropEditor({
           <div>
             <h2 className="font-semibold text-lg">Pickup</h2>
             <p className="text-sm text-muted mt-0.5">
-              When and where customers pick up (or receive) their orders after ordering closes.
+              Ordering closes, you make everything, then customers collect. This is that
+              second window.
             </p>
           </div>
 
           <div>
-            <p className="text-sm font-medium text-ink mb-1">Pickup window</p>
-            <p className="text-sm text-muted mb-3">Must start on or after your order close time.</p>
+            <p className="text-sm font-medium text-ink mb-1" data-guidance-anchor="editor.pickupWindow">
+              <span className="text-muted font-normal">Step 2 of 2 · </span>
+              Customers pick up
+            </p>
+            <p className="text-sm text-muted mb-3">
+              Starts on or after ordering closes, so you have time to make the orders.
+            </p>
             <DateRangePicker
               defaultStart={defaults.pickupStartAt}
               defaultEnd={defaults.pickupEndAt}
@@ -543,6 +582,10 @@ export function DropEditor({
                   placeholder="Search your saved products…"
                   className="w-full bg-paper border border-line-strong rounded-lg px-3 py-2 text-sm mb-3 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                 />
+                <p className="text-xs text-muted px-1 pb-2 -mt-1">
+                  Adds the name, price and photos. You still set how many you&apos;re selling in
+                  this drop.
+                </p>
                 {libMatches.length === 0 ? (
                   <p className="text-sm text-muted px-1 py-2">No matching saved products.</p>
                 ) : (
@@ -693,13 +736,14 @@ export function DropEditor({
                           className="w-full bg-paper border border-line-strong rounded-lg pl-7 pr-3 py-2 text-ink placeholder:text-muted/70 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                         />
                       </div>
-                      <div className="relative flex-1">
+                      <div className="relative flex-1" {...(i === 0 ? { "data-guidance-anchor": "editor.inventory" } : {})}>
                         <input
                           name="p_inventory"
                           value={row.inventory}
                           onChange={(e) => update(row.key, { inventory: e.target.value })}
                           inputMode="numeric"
-                          placeholder="Qty available"
+                          aria-label="How many available in this drop"
+                          placeholder="How many for this drop?"
                           className="w-full bg-paper border border-line-strong rounded-lg px-3 py-2 text-ink placeholder:text-muted/70 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                         />
                       </div>
@@ -737,7 +781,11 @@ export function DropEditor({
                     type="button"
                     onClick={() => remove(row.key)}
                     className="text-muted hover:text-brand w-8 h-8 grid place-items-center rounded-lg hover:bg-line transition shrink-0"
-                    aria-label={`Remove ${v.itemNoun}`}
+                    aria-label={
+                      row.orderCount > 0
+                        ? `Remove ${v.itemNoun} (has ${row.orderCount} order${row.orderCount === 1 ? "" : "s"})`
+                        : `Remove ${v.itemNoun}`
+                    }
                   >
                     ✕
                   </button>

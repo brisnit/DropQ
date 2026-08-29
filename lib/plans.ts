@@ -127,7 +127,7 @@ export const PRICING: PlanCard[] = [
     blurb: "Perfect for trying DropQ before committing.",
     cta: "Start free",
     features: [
-      "3 drops total (lifetime)",
+      "3 drops total (lifetime — deleting or relaunching doesn't refund one)",
       "Online ordering",
       "Pickup & delivery",
       "Customer list",

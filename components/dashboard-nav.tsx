@@ -4,16 +4,18 @@ import { Fragment, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const NAV = [
+// `anchor` marks the items guidance can point at. Only these three: the tour is
+// orientation, not a tour of twelve nav items.
+const NAV: { href: string; label: string; exact?: boolean; anchor?: string }[] = [
   { href: "/dashboard", label: "Overview", exact: true },
-  { href: "/dashboard/drops", label: "Drops" },
+  { href: "/dashboard/drops", label: "Drops", anchor: "nav.drops" },
   { href: "/dashboard/products", label: "Products" },
-  { href: "/dashboard/orders", label: "Orders" },
+  { href: "/dashboard/orders", label: "Orders", anchor: "nav.orders" },
   { href: "/dashboard/messages", label: "Messages" },
   { href: "/dashboard/where-ill-be", label: "Where I'll Be" },
   { href: "/dashboard/customers", label: "Customers" },
   { href: "/dashboard/analytics", label: "Analytics" },
-  { href: "/dashboard/payments", label: "Payments" },
+  { href: "/dashboard/payments", label: "Payments", anchor: "nav.payments" },
   { href: "/dashboard/billing", label: "Plan" },
   { href: "/dashboard/store", label: "Store" },
   { href: "/dashboard/discoverability", label: "Discovery" },
@@ -64,6 +66,7 @@ export function DashboardNav({ unread = 0 }: { unread?: number }) {
           <Fragment key={item.href}>
             <Link
               href={item.href}
+              data-guidance-anchor={item.anchor}
               className={`flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition ${
                 active
                   ? "bg-ink text-cream"

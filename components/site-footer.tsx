@@ -27,7 +27,7 @@ const COLS = [
     links: [
       ["Success stories", "/#stories"],
       ["Resources", "/#"],
-      ["Help center", "/#"],
+      ["Help center", "/help"],
       ["About", "/#"],
     ],
   },

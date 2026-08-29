@@ -4,6 +4,7 @@ import { Fragment, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/lib/actions/auth";
+import { openHelp } from "@/components/help/help-button";
 
 const NAV = [
   { href: "/dashboard", label: "Overview", exact: true },
@@ -32,11 +33,14 @@ export function MobileNav({
   isRep,
   slug,
   unread = 0,
+  showHelp = false,
 }: {
   admin: boolean;
   isRep?: boolean;
   slug: string;
   unread?: number;
+  /** False for demo / internal accounts, which get no guidance surfaces. */
+  showHelp?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -123,6 +127,18 @@ export function MobileNav({
             )}
 
             <div className={DIVIDER} aria-hidden />
+
+            {/* The menu is the other door into Help on a phone. It opens the
+                one panel mounted in the header rather than a second copy. */}
+            {showHelp && (
+              <button
+                type="button"
+                onClick={() => { close(); openHelp(); }}
+                className="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium text-ink-soft hover:bg-line/70 transition"
+              >
+                Help
+              </button>
+            )}
 
             <Link href={`/s/${slug}`} target="_blank" onClick={close} className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-ink-soft hover:bg-line/70 transition">
               View Your Store <span aria-hidden>↗</span>

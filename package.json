@@ -16,7 +16,10 @@
     "db:backfill-points": "node --env-file=.env prisma/backfill-points.mjs",
     "twilio:audit": "node --env-file=.env.vercel.local scripts/twilio-audit.mjs",
     "test:phase-a": "node --env-file=.env scripts/phase-a-selftest.mjs",
-    "test:drop-schedule": "node --env-file=.env scripts/drop-schedule-selftest.mjs"
+    "test:drop-schedule": "node --env-file=.env scripts/drop-schedule-selftest.mjs",
+    "test:browser": "node tests/browser/run.mjs",
+    "test:browser:guidance": "node tests/browser/run.mjs guidance",
+    "test:browser:help": "node tests/browser/run.mjs help"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -37,6 +40,8 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "embedded-postgres": "^18.4.0-beta.17",
+    "playwright": "^1.62.1",
     "prisma": "^6.19.3",
     "tailwindcss": "^4",
     "typescript": "^5"

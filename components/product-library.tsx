@@ -214,8 +214,9 @@ export function ProductLibrary({ products }: { products: LibProduct[] }) {
       {products.length === 0 ? (
         <EmptyState
           emoji="📚"
-          title="No saved products yet"
-          body="Add products you sell often here, and reuse them across drops instead of recreating them each time. Items you create inside a drop are saved here automatically."
+          title="Your reusable products live here"
+          body="Save the things you sell often, then drop them into any future drop instead of typing them again. Anything you create inside a drop is saved here automatically."
+          note="Price and photos come from here; how many you're selling is set per drop, so this list never holds a stock count."
         />
       ) : (
         <div className="space-y-3">

@@ -134,3 +134,35 @@ input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; marg
 @media (prefers-reduced-motion: reduce) {
   .hero-video { display: none; }
 }
+
+/* ---------------------------------------------------------------------------
+   Vendor guidance (welcome, tour, coachmarks, tooltips).
+
+   Motion here is deliberately small — a 140ms fade and a 4px rise. Guidance
+   interrupts a vendor who is trying to get work done, so it should appear
+   without announcing itself. Everything collapses under reduced-motion.
+--------------------------------------------------------------------------- */
+@keyframes guidance-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes guidance-backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.guidance-enter { animation: guidance-in 0.14s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.guidance-backdrop { animation: guidance-backdrop-in 0.14s ease-out both; }
+
+/* The ring drawn around the element a coachmark or tour step is pointing at.
+   An outline rather than a box-shadow so it never affects layout, and offset
+   outward so it doesn't crop a focus ring underneath it. */
+.guidance-spotlight {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 3px;
+  border-radius: 0.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guidance-enter,
+  .guidance-backdrop { animation: none; }
+}

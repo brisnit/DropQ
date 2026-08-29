@@ -59,6 +59,18 @@ function MilestoneRow({ m, isNext }: { m: Milestone; isNext: boolean }) {
           Required to sell
         </span>
       )}
+      {/* Every outstanding row is directly actionable. `ml-auto` only when the
+          "Required to sell" pill isn't already holding that position, so the
+          two never fight over the right edge. */}
+      {!m.done && m.href && m.action && (
+        <Link
+          href={m.href}
+          className={`${m.requiredToSell ? "" : "ml-auto "}shrink-0 text-sm font-semibold text-brand hover:text-brand-dark hover:underline underline-offset-4 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50`}
+        >
+          {m.action} <span aria-hidden>&rarr;</span>
+          <span className="sr-only">: {m.label}</span>
+        </Link>
+      )}
     </li>
   );
 }
@@ -74,7 +86,10 @@ export function VendorActivationCard({ state }: { state: ActivationState }) {
   // message, one action.
   if (mode === "paused") {
     return (
-      <div className="mb-6 rounded-card bg-brand-tint border border-brand/40 p-5 sm:p-6">
+      <div
+        data-guidance-anchor="dash.checklist"
+        className="mb-6 rounded-card bg-brand-tint border border-brand/40 p-5 sm:p-6"
+      >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="font-display text-lg font-semibold text-ink">
@@ -106,8 +121,45 @@ export function VendorActivationCard({ state }: { state: ActivationState }) {
   // Substantially reduced: they can take money, so the checklist has done its
   // job and shouldn't keep occupying the top of the dashboard.
   if (mode === "compact") {
+    // First publish. `compact` already means "can sell, hasn't sold", so a
+    // published drop with nothing shared yet is exactly the moment between
+    // going live and telling anyone — the one worth marking.
+    //
+    // Derived, not stored: there is no "have we celebrated yet" flag, and it
+    // needs none. The state ends the moment they share or take an order, and
+    // re-entering it would mean they genuinely published something new.
+    const published = state.milestones.find((m) => m.key === "publish")?.done;
+    const shared = state.milestones.find((m) => m.key === "share")?.done;
+    if (published && !shared) {
+      return (
+        <div
+          data-guidance-anchor="dash.checklist"
+          className="mb-6 rounded-card bg-sage-tint/60 border border-sage/40 p-5 flex flex-wrap items-center justify-between gap-4"
+        >
+          <div className="min-w-0">
+            <p className="font-display text-lg font-semibold text-ink">
+              Your first drop is live 🎉
+            </p>
+            <p className="text-sm text-ink-soft mt-1 max-w-xl">
+              Now get the link in front of people — that&rsquo;s the only thing between
+              you and your first order.
+            </p>
+          </div>
+          <Link
+            href={next?.href ?? "/dashboard/drops"}
+            className="shrink-0 inline-flex items-center justify-center min-h-11 bg-ink text-cream font-semibold px-5 py-3 rounded-xl hover:bg-ink-soft transition"
+          >
+            {next?.cta ?? "Share your drop"} →
+          </Link>
+        </div>
+      );
+    }
+
     return (
-      <div className="mb-6 rounded-card bg-sage-tint/60 border border-sage/30 px-4 py-3 sm:px-5 flex flex-wrap items-center justify-between gap-3">
+      <div
+        data-guidance-anchor="dash.checklist"
+        className="mb-6 rounded-card bg-sage-tint/60 border border-sage/30 px-4 py-3 sm:px-5 flex flex-wrap items-center justify-between gap-3"
+      >
         <p className="text-sm text-ink flex items-center gap-2 min-w-0">
           <span
             aria-hidden
@@ -134,7 +186,10 @@ export function VendorActivationCard({ state }: { state: ActivationState }) {
   const pct = Math.round((state.completed / state.total) * 100);
 
   return (
-    <div className="mb-6 rounded-card bg-paper border border-line-strong p-5 sm:p-6 shadow-[var(--shadow-soft)]">
+    <div
+      data-guidance-anchor="dash.checklist"
+      className="mb-6 rounded-card bg-paper border border-line-strong p-5 sm:p-6 shadow-[var(--shadow-soft)]"
+    >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="font-display text-xl font-semibold">Get ready to sell</h2>
         <p className="text-sm text-muted tabular-nums">

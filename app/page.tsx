@@ -85,7 +85,12 @@ const FEATURES = [
   {
     tag: "Customer Growth",
     title: "Turn one-time buyers into regulars",
-    body: "Every order builds your customer list. Text your followers the second a drop goes live and bring them back week after week.",
+    // "Text your followers" promised something DropQ doesn't do: following is
+    // real in the schema but there is no vendor-facing follower list, count or
+    // message audience — broadcasts resolve from orders (lib/messaging.ts
+    // resolveAudience). Messaging past buyers about a new drop is real, so
+    // that is what this now says.
+    body: "Every order builds your customer list. Message your customers the moment a new drop is live and bring them back week after week.",
     emoji: "📣",
   },
   {

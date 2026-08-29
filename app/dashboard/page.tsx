@@ -10,7 +10,7 @@ import { LinkButton, Badge } from "@/components/ui";
 import { CopyLinkButton } from "@/components/copy-link-button";
 import { StripeRequiredBanner } from "@/components/stripe-required-banner";
 import { VendorActivationCard } from "@/components/vendor-activation-card";
-import { loadActivationState, showsGenericNextStep } from "@/lib/activation";
+import { activationFacts, loadActivationState, showsGenericNextStep } from "@/lib/activation";
 
 export const metadata = { title: "Overview — DropQ" };
 
@@ -72,10 +72,24 @@ export default async function OverviewPage() {
   // Stripe to start selling" above "Your drop is ready to publish".
   const activation = await loadActivationState(seller);
   const genericNextStep = showsGenericNextStep(activation);
+  // Cached within this render — the dashboard layout already loaded these.
+  const aFacts = await activationFacts(seller.id);
 
   // What should they do next? (Only shown once activation is out of the way.)
   let next: { tone: string; title: string; body: string; href: string; cta: string };
-  if (drops.length === 0) {
+  if (aFacts.paidOrders === 1) {
+    // The first sale REPLACES the next-step card rather than appearing beside
+    // it. Both used to point at Orders — "1 order to prepare" above "You got
+    // your first order" — which is the same instruction twice with the moment
+    // buried underneath. Derived, so it retires itself on the second order.
+    next = {
+      tone: "bg-sage text-white",
+      title: "You got your first order 🎉",
+      body: "Someone bought something you made. Prepare it, mark it off, and hand it over.",
+      href: "/dashboard/orders",
+      cta: "View order",
+    };
+  } else if (drops.length === 0) {
     next = {
       tone: "bg-brand text-white",
       title: "Let's get your first drop live",
@@ -95,7 +109,10 @@ export default async function OverviewPage() {
     next = {
       tone: "bg-brand text-white",
       title: "Your drop is ready to publish",
-      body: `“${draftDrop.title}” is a draft. Publish it to start taking orders and notify your followers.`,
+      // Was "…and notify your followers", which promised a notification DropQ
+      // never sends and an audience vendors can't see. Publishing makes the
+      // drop orderable; getting the link out is the vendor's next move.
+      body: `“${draftDrop.title}” is a draft. Publish it to start taking orders, then share your link.`,
       href: `/dashboard/drops/${draftDrop.id}`,
       cta: "Open the drop",
     };
@@ -133,7 +150,11 @@ export default async function OverviewPage() {
               {seller.storeName}
             </h1>
           </div>
-          <LinkButton href="/dashboard/drops/new" className="shrink-0">
+          <LinkButton
+            href="/dashboard/drops/new"
+            className="shrink-0"
+            data-guidance-anchor="dash.newDrop"
+          >
             + New drop
           </LinkButton>
         </div>

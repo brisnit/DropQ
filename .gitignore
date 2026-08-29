@@ -50,3 +50,7 @@ next-env.d.ts
 
 # macOS / iCloud duplicate files
 * 2.*
+
+# Browser test harness (throwaway database + captured screenshots)
+tests/browser/.pgdata/
+tests/browser/.shots/

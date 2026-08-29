@@ -6,7 +6,9 @@ import { redirect } from "next/navigation";
 import { voidCommissionForOrder } from "@/lib/commission";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@/app/generated/prisma";
 import { requireSeller } from "@/lib/auth";
+import { planRemovals } from "@/lib/drop-items";
 import { dollarsToCents } from "@/lib/format";
 import { saveImage } from "@/lib/upload";
 import {
@@ -521,8 +523,34 @@ export async function updateDropFullAction(formData: FormData) {
       newLibRows.push(base);
     }
   }
+  // Removing an item must never destroy the link between a customer's order
+  // and the thing they bought. An item nobody bought is deleted as before; one
+  // with orders is RETIRED (inventory = sold), which every purchase path
+  // already refuses. See lib/drop-items.ts for why this beats an archive flag.
   const removed = drop.products.filter((p) => !submittedIds.has(p.id)).map((p) => p.id);
-  if (removed.length) await prisma.product.deleteMany({ where: { id: { in: removed }, dropId } });
+  if (removed.length) {
+    const linked = await prisma.orderItem.groupBy({
+      by: ["productId"],
+      where: { productId: { in: removed } },
+    });
+    const { deletable, retirable } = planRemovals(
+      removed,
+      linked.map((g) => g.productId).filter((id): id is string => !!id)
+    );
+
+    if (deletable.length) {
+      await prisma.product.deleteMany({ where: { id: { in: deletable }, dropId } });
+    }
+    if (retirable.length) {
+      // Raw and set-based: `SET inventory = sold` is evaluated by the database
+      // against the CURRENT sold count. Reading `sold` in JS from the products
+      // loaded at the top of this action would lose a purchase that landed
+      // mid-edit and leave the item buyable.
+      await prisma.$executeRaw`
+        UPDATE "Product" SET inventory = sold
+        WHERE "dropId" = ${dropId} AND id IN (${Prisma.join(retirable)})`;
+    }
+  }
 
   // Newly-added items (not from the library) get saved to it, unless opted out.
   if (newLibRows.length && formData.get("saveToLibrary") !== "off") {

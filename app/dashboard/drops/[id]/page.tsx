@@ -16,11 +16,12 @@ import { vocab, showItemMeta } from "@/lib/category";
 import { Section } from "@/components/dashboard-ui";
 import { Badge, Button } from "@/components/ui";
 import { ShareButton } from "@/components/share-button";
+import { QrDownloadLink } from "@/components/qr-download-link";
 import { StatusSelect } from "@/components/status-select";
 import { LiveOrders } from "@/components/live-orders";
 import { ConfirmSubmit } from "@/components/confirm-submit";
 import { Countdown } from "@/components/countdown";
-import { computeDropPhase } from "@/lib/drop-status";
+import { computeDropPhase, dropPhaseNote } from "@/lib/drop-status";
 import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 import { BackLink } from "@/components/back-link";
 import { StripeRequiredBanner } from "@/components/stripe-required-banner";
@@ -175,14 +176,14 @@ export default async function DropDetailPage({
                 {gate.cta} to publish →
               </Link>
             ) : (
-              <form action={updateDropStatusAction}>
+              <form action={updateDropStatusAction} data-guidance-anchor="drop.publish">
                 <input type="hidden" name="dropId" value={drop.id} />
                 <input type="hidden" name="status" value="live" />
                 <Button type="submit">Publish drop</Button>
               </form>
             ))}
           {drop.status === "live" && (
-            <form action={updateDropStatusAction}>
+            <form action={updateDropStatusAction} data-guidance-anchor="drop.close">
               <input type="hidden" name="dropId" value={drop.id} />
               <input type="hidden" name="status" value="closed" />
               <Button type="submit" variant="secondary">Close drop</Button>
@@ -214,7 +215,7 @@ export default async function DropDetailPage({
             <button
               type="submit"
               className="text-sm font-medium inline-flex items-center justify-center min-h-11 px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
-              title="Copy this drop's items and pickup details into a new draft"
+              title="Copies this drop's items and pickup details into a NEW draft. On the Free plan it counts as another of your 3 lifetime drops."
             >
               🔁 Relaunch
             </button>
@@ -247,10 +248,8 @@ export default async function DropDetailPage({
                   <p className="mt-2 text-sm">
                     {phase === "open" ? (
                       <>Ordering closes in <Countdown to={drop.closesAt.toISOString()} /></>
-                    ) : phase === "scheduled" ? (
-                      <span className="text-muted">Scheduled — hasn&rsquo;t opened yet</span>
                     ) : (
-                      <span className="text-muted">Ordering closed</span>
+                      <span className="text-muted">{dropPhaseNote(phase)}</span>
                     )}
                   </p>
                 </>
@@ -350,11 +349,15 @@ export default async function DropDetailPage({
             url={shareUrl}
             title={drop.title}
             label="Copy link"
+            signalDropShare
             className="self-start inline-flex items-center justify-center min-h-11 text-sm font-semibold text-ink bg-cream hover:bg-white px-4 py-2.5 rounded-lg transition"
           />
         </div>
 
-        <div className="bg-paper border border-line rounded-card p-5 flex flex-col items-center gap-3 text-center">
+        <div
+          data-guidance-anchor="drop.qr"
+          className="bg-paper border border-line rounded-card p-5 flex flex-col items-center gap-3 text-center"
+        >
           <p className="text-xs uppercase tracking-wider text-muted">🔗 Share drop QR</p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -368,13 +371,13 @@ export default async function DropDetailPage({
             Opens the public drop page.
             {walkUpOn && " Not for taking payment in person."}
           </p>
-          <a
+          <QrDownloadLink
             href={qrDataUrl}
             download={`dropq-${seller.slug}-${drop.id}.png`}
             className="inline-flex items-center justify-center min-h-11 text-sm font-medium px-3.5 py-2 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition"
           >
             ↓ Download QR
-          </a>
+          </QrDownloadLink>
         </div>
       </div>
 

@@ -67,10 +67,19 @@ export default async function OrdersPage({
       {orders.length === 0 ? (
         <EmptyState
           emoji="🧾"
-          title="No orders here"
-          body="When customers check out, their orders show up here ready to prepare and fulfill."
-          ctaHref="/dashboard/drops"
-          ctaLabel="View your drops"
+          title={filter === "all" ? "Your orders will land here" : "Nothing with this status"}
+          body={
+            filter === "all"
+              ? "Every order from every drop, newest first. You'll mark each one off as you prepare it and hand it over."
+              : "No orders are at this stage right now. Try another filter, or view them all."
+          }
+          ctaHref={filter === "all" ? "/dashboard/drops" : "/dashboard/orders"}
+          ctaLabel={filter === "all" ? "View your drops" : "View all orders"}
+          note={
+            filter === "all"
+              ? "Orders arrive once a drop is published and you've shared its link."
+              : undefined
+          }
         />
       ) : (
         <div className="space-y-3">

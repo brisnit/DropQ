@@ -36,6 +36,10 @@ image uploads are written to `/public/uploads` locally.
 | Payments / walk-up eligibility | `curl localhost:3000/api/dev/payments-selftest` | 43 assertions. Rolled-back DB proofs + source pins on `finalizePaidOrder`. 404s in production. |
 | Vendor activation (Phase V) | `curl localhost:3000/api/dev/activation-selftest` | 75 assertions. **Needs a non-empty `STRIPE_SECRET_KEY`** — see the trap under Payments. 404s in production. |
 | Messaging / consent | `curl localhost:3000/api/dev/messaging-selftest` | 49 assertions. ⚠️ **Creates sellers, drops and orders — never run it while `.env` points at production.** |
+| Vendor guidance (Phase G) | `curl localhost:3000/api/dev/guidance-selftest` | 180 assertions. Pure — no database, no network, writes nothing. **Needs a non-empty `STRIPE_SECRET_KEY`**; returns 503 with an explanation rather than failing confusingly if it's empty. 404s in production. |
+| Drop-item removal | `curl localhost:3000/api/dev/drop-items-selftest` | 23 assertions. Pure. 404s in production. |
+| Help content | `curl localhost:3000/api/dev/help-selftest` | 72 assertions. Schema integrity, unique slugs, related-link resolution, route maps, capability gating, search fixtures, and that every file named by `verifiedAgainst` exists. 404s in production. |
+| **Browser (real Chrome)** | `npm run test:browser` | 156 assertions across two specs, at mobile 390×844 and desktop 1280×900. Boots its own throwaway PostgreSQL, starts the app against it, tears everything down. **Cannot touch production** — see `tests/browser/README.md`. |
 
 Plus `npx tsc --noEmit` and `npm run build`. If `tsc` fails with duplicate
 `PageProps`/`LayoutProps`, clear the stale iCloud copies first:
@@ -145,8 +149,17 @@ prisma/
 ## Payments (Stripe Connect)
 
 DropQ uses **Stripe Connect** so each vendor gets paid directly, and DropQ keeps a
-small platform fee per transaction (a **destination charge** with an
-`application_fee_amount`).
+small platform fee per transaction.
+
+> **Correction (2026-08-29):** this section previously described the model as a
+> **destination charge**. It is not. `lib/checkout-session.ts` builds the
+> session and `lib/actions/order.ts` creates it with
+> `stripe.checkout.sessions.create(params, { stripeAccount })` — a **direct
+> charge on the connected account**, with DropQ's cut taken as
+> `payment_intent_data.application_fee_amount`. The difference is not academic:
+> on a direct charge the **vendor is the merchant of record and pays Stripe's
+> processing fee**; DropQ's `DROPQ_FEE_PERCENT` is on top of that. Any help
+> content about fees or payouts must use this model.
 
 **Demo mode (default):** with no Stripe keys set, checkout completes instantly with
 no real charge — great for trying the app. The Payments page shows a "Demo mode"
@@ -195,9 +208,11 @@ notice.
    stripe listen --forward-to localhost:3000/api/stripe/webhook
    ```
 
-**How the money flows:** buyer pays at Stripe Checkout → funds settle to the
-vendor's connected account → DropQ automatically retains `DROPQ_FEE_PERCENT` as an
-application fee. Orders are created as `pending` and only marked paid (and inventory
+**How the money flows:** buyer pays at Stripe Checkout *on the vendor's connected
+account* → the vendor is merchant of record and Stripe's processing fee comes out
+of their proceeds → DropQ additionally retains `DROPQ_FEE_PERCENT` as an
+application fee → the balance pays out on the vendor's own Stripe payout
+schedule, which DropQ does not set. Orders are created as `pending` and only marked paid (and inventory
 decremented) after Stripe confirms payment — via the webhook **and** an idempotent
 check on the success page, so it works locally even without the Stripe CLI running.
 

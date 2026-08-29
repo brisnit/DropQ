@@ -160,7 +160,70 @@ model Seller {
   pointsAwarded         PointsLedger[]
   walkUpSales           WalkUpSale[]
 
+  // In-app guidance (tour / coachmarks / help). UI acknowledgements only —
+  // never progress. See VendorGuidance below.
+  guidance VendorGuidance?
+
   @@index([salesRepId])
+}
+
+/// What this vendor has DONE TO THE GUIDANCE UI — and nothing else.
+///
+/// ⚠️ Read lib/activation.ts before adding a column here. That module's
+/// governing rule is that activation *progress* is never stored, because a
+/// cached flag goes stale the moment Stripe revokes charges. This table does
+/// not break that rule: it holds only facts with no upstream source of truth
+/// to drift from ("they closed the QR coachmark", "they skipped the tour").
+///
+/// The test for whether a field belongs here: if it can be derived from
+/// Seller / Drop / Product / Order state, it does NOT go in this table —
+/// derive it in lib/guidance.ts instead. Milestones, tiers, percentages and
+/// "can they sell" are all derived and always will be.
+///
+/// One row per seller, created lazily on first write. A seller with no row
+/// reads as all-defaults, so nothing needs backfilling for the feature to
+/// work. (The migration does seed one row per existing seller, but only to
+/// suppress the welcome modal for vendors who predate it — see the migration.)
+model VendorGuidance {
+  id       String @id @default(cuid())
+  sellerId String @unique
+  seller   Seller @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  /// Null until the welcome modal has been shown once. Set on display, not on
+  /// dismissal, so a vendor who closes the tab never sees it twice.
+  welcomeSeenAt DateTime?
+
+  /// not_started | in_progress | completed | skipped.
+  /// A vendor can always restart from Help, which resets this to in_progress.
+  tourStatus    String    @default("not_started")
+  /// 0-based index into TOUR_STEPS in lib/guidance.ts. Meaningless unless
+  /// tourStatus is in_progress; deliberately not cleared on completion so
+  /// "where did they stop?" survives for analytics.
+  tourStep      Int       @default(0)
+  tourStartedAt DateTime?
+  tourEndedAt   DateTime?
+
+  /// Coachmark / tip ids the vendor has dismissed or completed.
+  ///
+  /// Scalar arrays rather than join tables on purpose: these are per-vendor UI
+  /// acknowledgements that are never queried across vendors, never joined, and
+  /// never reported on. A row per dismissal would be two tables and a migration
+  /// for something read exactly once per page render.
+  dismissedCoachmarks String[] @default([])
+  dismissedTips       String[] @default([])
+
+  /// First time this vendor shared a drop link or QR (Copy link / Share /
+  /// Download QR). The one field here that is arguably derivable — but only
+  /// from a paid order, which arrives long after the nudge would have helped.
+  /// See docs/VENDOR-GUIDANCE.md §Q3.
+  sharedAt DateTime?
+
+  /// First time the help panel was opened. Cheap "have they found help yet"
+  /// signal; never used to gate anything.
+  helpOpenedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // A DropQ sales rep / affiliate. Vendors who sign up with the rep's referral

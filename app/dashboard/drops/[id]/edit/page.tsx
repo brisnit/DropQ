@@ -26,7 +26,14 @@ export default async function EditDropPage({
   const seller = await requireSeller();
   const drop = await prisma.drop.findUnique({
     where: { id },
-    include: { products: { orderBy: { sortOrder: "asc" } } },
+    include: {
+      products: {
+        orderBy: { sortOrder: "asc" },
+        // Order count per item so the editor can warn before a vendor removes
+        // something customers have already bought — see lib/drop-items.ts.
+        include: { _count: { select: { orderItems: true } } },
+      },
+    },
   });
   if (!drop || drop.sellerId !== seller.id) notFound();
 
@@ -101,6 +108,7 @@ export default async function EditDropPage({
             productType: p.productType ?? "",
             condition: p.condition ?? "",
             rarity: p.rarity ?? "",
+            orderCount: p._count.orderItems,
           })),
         }}
       />

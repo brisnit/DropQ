@@ -42,6 +42,32 @@ export function isOrderingOpen(d: DropTimes, now: Date = new Date()): boolean {
   return true;
 }
 
+/**
+ * The line a VENDOR reads under the order window on the drop page.
+ *
+ * Extracted so the draft case can be asserted. It used to fall through a
+ * ternary chain to "Ordering closed", which told a vendor their unpublished
+ * draft had finished selling — the opposite of the truth, on the one screen
+ * where they decide whether to publish.
+ *
+ * `open` is deliberately absent: that state renders a live countdown component,
+ * not a static string, so the page keeps that branch.
+ */
+export function dropPhaseNote(phase: Exclude<DropPhase, "open">): string {
+  switch (phase) {
+    case "draft":
+      return "Not published yet — customers can't see this drop.";
+    case "scheduled":
+      return "Scheduled — ordering hasn't opened yet.";
+    case "closed":
+      return "Ordering closed.";
+    case "pickup":
+      return "Ordering closed — pickup is under way.";
+    case "completed":
+      return "Finished — ordering and pickup are both over.";
+  }
+}
+
 export function phaseLabel(phase: DropPhase): string {
   switch (phase) {
     case "draft": return "Draft";

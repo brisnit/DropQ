@@ -45,6 +45,77 @@ export type DiscoveryEvent =
   | "location_approved"
   | "location_rejected";
 
+/**
+ * Vendor guidance events (onboarding, tour, coachmarks, help).
+ *
+ * Kept as its own union rather than bolted onto `DiscoveryEvent`, because these
+ * describe the VENDOR side of the product and that type is about buyers finding
+ * vendors. Both flow through the same `track()` beacon and the same `/api/track`
+ * sink, so pointing that sink at a real pipeline still happens in one place.
+ *
+ * Names follow the `<noun>_<verb>` convention already used above and stay
+ * compatible with the vocabulary approved in docs/VENDOR-ACTIVATION.md §13, so
+ * nothing here has to be renamed when Phase 8 wires up PostHog.
+ */
+export type GuidanceEvent =
+  | "onboarding_welcome_shown"
+  | "onboarding_welcome_dismissed"
+  | "onboarding_tour_started"
+  | "onboarding_tour_step_viewed"
+  | "onboarding_tour_completed"
+  | "onboarding_tour_skipped"
+  | "coachmark_shown"
+  | "coachmark_dismissed"
+  | "smart_tip_shown"
+  | "smart_tip_clicked"
+  | "smart_tip_dismissed"
+  | "help_opened"
+  | "help_searched"
+  | "help_article_viewed"
+  | "drop_shared";
+
+/**
+ * The exact properties each guidance event may carry.
+ *
+ * This map is a privacy control, not a convenience. `help_searched` has no
+ * `query` field and cannot be given one: the decision on record is that raw
+ * free-text search terms are NOT retained, and a typed map makes that a compile
+ * error instead of a code-review question. `queryLength` and `zeroResults`
+ * answer "is search working?" without keeping what anyone typed.
+ *
+ * Nothing here may carry an email, a name, a store name or an order id.
+ * Vendors are identified by `Seller.id` at the sink, never in these props.
+ */
+export type GuidanceEventProps = {
+  onboarding_welcome_shown: Record<string, never>;
+  onboarding_welcome_dismissed: { action: "tour" | "skip" | "close" };
+  onboarding_tour_started: { from: "welcome" | "help" };
+  onboarding_tour_step_viewed: { step: number; key: string };
+  onboarding_tour_completed: { steps: number };
+  onboarding_tour_skipped: { step: number };
+  coachmark_shown: { id: string };
+  coachmark_dismissed: { id: string };
+  smart_tip_shown: { id: string };
+  smart_tip_clicked: { id: string };
+  smart_tip_dismissed: { id: string };
+  help_opened: { from: "header" | "menu" | "empty_state" | "coachmark" | "direct" };
+  /** Deliberately no `query`. See above. */
+  help_searched: { queryLength: number; resultCount: number; zeroResults: boolean };
+  help_article_viewed: { slug: string; from: "panel" | "search" | "related" | "direct" };
+  drop_shared: { method: "copy" | "share_sheet" | "qr_download" };
+};
+
+/**
+ * Typed wrapper over `track()` for guidance events. Use this rather than
+ * `track()` directly so the props map above is actually enforced.
+ */
+export function trackGuidance<E extends GuidanceEvent>(
+  event: E,
+  props: GuidanceEventProps[E]
+) {
+  track(event, props as Record<string, unknown>);
+}
+
 const ORIGIN_KEY = "dropq_origin_vendor";
 
 /** Remember the vendor a customer entered through (QR / link / storefront). */
@@ -69,7 +140,10 @@ export function getOriginatingVendor(): { id: string; slug: string | null } | nu
   }
 }
 
-export function track(event: DiscoveryEvent, props: Record<string, unknown> = {}) {
+export function track(
+  event: DiscoveryEvent | GuidanceEvent,
+  props: Record<string, unknown> = {}
+) {
   if (typeof window === "undefined") return;
   try {
     const payload = JSON.stringify({

@@ -13,6 +13,10 @@ import { NotificationBell } from "@/components/notification-bell";
 import { vendorUnreadTotal } from "@/lib/messaging";
 import { listNotifications, unreadNotificationCount, notificationHref } from "@/lib/notification-center";
 import { markAllNotificationsReadAction } from "@/lib/actions/messages";
+import { loadGuidancePayload } from "@/lib/guidance-context";
+import { shouldShowWelcome, shouldResumeTour, tourInviteLabel } from "@/lib/guidance";
+import { HelpHost, HelpTrigger } from "@/components/help/help-button";
+import { GuidanceHost } from "@/components/guidance/host";
 
 export default async function DashboardLayout({
   children,
@@ -32,11 +36,17 @@ export default async function DashboardLayout({
   const isRep = !!(await salesRepForSeller(seller));
 
   const viewer = { kind: "vendor", sellerId: seller.id } as const;
-  const [unread, notifications, notificationUnread] = await Promise.all([
+  const [unread, notifications, notificationUnread, guidance] = await Promise.all([
     vendorUnreadTotal(seller.id),
     listNotifications(viewer),
     unreadNotificationCount(viewer),
+    // Everything the client guidance layer needs, in one parallel batch.
+    // Deliberately reads only — a page view must not become a write — and
+    // short-circuits to zero queries for demo / internal accounts.
+    loadGuidancePayload(seller),
   ]);
+  // Decided once, server-side. Nothing downstream re-derives applicability.
+  const guidanceApplies = guidance.applicable;
   const bellItems = notifications.map((n) => ({
     id: n.id,
     title: n.title,
@@ -112,13 +122,20 @@ export default async function DashboardLayout({
           <div className="flex items-center justify-between px-5 h-14">
             <Logo href="/dashboard" />
             <div className="flex items-center gap-1">
+              {guidanceApplies && <HelpTrigger />}
               <NotificationBell
                 viewer="vendor"
                 initialItems={bellItems}
                 initialUnread={notificationUnread}
                 markAllAction={markAllNotificationsReadAction}
               />
-              <MobileNav admin={admin} isRep={isRep} slug={seller.slug} unread={unread} />
+              <MobileNav
+                admin={admin}
+                isRep={isRep}
+                slug={seller.slug}
+                unread={unread}
+                showHelp={guidanceApplies}
+              />
             </div>
           </div>
         </div>
@@ -126,7 +143,8 @@ export default async function DashboardLayout({
             at the far right of the screen on every dashboard page. Height
             matches the mobile bar (3.5rem) so full-height pages can use one
             calc for both breakpoints. */}
-        <div className="hidden md:flex sticky top-0 z-30 h-14 items-center justify-end px-5 bg-cream/95 backdrop-blur border-b border-line">
+        <div className="hidden md:flex sticky top-0 z-30 h-14 items-center justify-end gap-1 px-5 bg-cream/95 backdrop-blur border-b border-line">
+          {guidanceApplies && <HelpTrigger />}
           <NotificationBell
             viewer="vendor"
             initialItems={bellItems}
@@ -139,6 +157,25 @@ export default async function DashboardLayout({
           <VerifyBanner verified={seller.emailVerified} />
         </Suspense>
         {children}
+
+        {/* The one Help panel. Every trigger — both headers, the mobile menu —
+            opens this instance, so a phone never gets two overlapping dialogs. */}
+        {guidanceApplies && (
+          <HelpHost
+            capabilities={guidance.capabilities}
+            tourLabel={tourInviteLabel(guidance.state)}
+          />
+        )}
+
+        {/* Blocking guidance (welcome, tour). Lives in the layout so the tour
+            survives navigation between dashboard pages, and renders at most one
+            thing — see components/guidance/host.tsx. */}
+        <GuidanceHost
+          payload={guidance}
+          showWelcome={guidanceApplies && shouldShowWelcome(guidance.state)}
+          resumeTour={guidanceApplies && shouldResumeTour(guidance.state)}
+          initialStep={guidance.state.tourStep}
+        />
       </main>
     </div>
   );

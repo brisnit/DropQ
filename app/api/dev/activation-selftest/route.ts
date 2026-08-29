@@ -58,10 +58,10 @@ const SUSPENDED: ActivationSeller = { ...READY, disabledAt: new Date() };
 /** Charge-ready before V.1 started recording the timestamp. */
 const LEGACY_READY: ActivationSeller = { ...READY, stripeChargesEnabledAt: null };
 
-const NOTHING: ActivationFacts = { dropsWithProducts: 0, liveDrops: 0, paidOrders: 0 };
-const HAS_DROP: ActivationFacts = { dropsWithProducts: 1, liveDrops: 0, paidOrders: 0 };
-const PUBLISHED: ActivationFacts = { dropsWithProducts: 1, liveDrops: 1, paidOrders: 0 };
-const SOLD: ActivationFacts = { dropsWithProducts: 1, liveDrops: 1, paidOrders: 3 };
+const NOTHING: ActivationFacts = { dropsWithProducts: 0, liveDrops: 0, paidOrders: 0, hasShared: false };
+const HAS_DROP: ActivationFacts = { dropsWithProducts: 1, liveDrops: 0, paidOrders: 0, hasShared: false };
+const PUBLISHED: ActivationFacts = { dropsWithProducts: 1, liveDrops: 1, paidOrders: 0, hasShared: false };
+const SOLD: ActivationFacts = { dropsWithProducts: 1, liveDrops: 1, paidOrders: 3, hasShared: false };
 
 export async function GET() {
   if (process.env.NODE_ENV === "production") {
@@ -99,23 +99,43 @@ export async function GET() {
 
   /* ------------------------------- Milestones ---------------------------- */
   {
-    // NOT_STARTED is email-verified, so account + email are done.
+    // G.2: email is no longer a milestone, so only "account" is done here.
     const s = activationState(NOT_STARTED, NOTHING);
-    check("verified vendor with no Stripe and no drop: 2 of 5",
-      s.completed === 2 && s.total === 5, `completed=${s.completed}`);
+    check("vendor with no Stripe and no drop: 1 of 5",
+      s.completed === 1 && s.total === 5, `completed=${s.completed}`);
     check("only Stripe is marked required to sell",
       s.milestones.filter((m) => m.requiredToSell).map((m) => m.key).join() === "stripe");
     check("account milestone is always done",
       s.milestones.find((m) => m.key === "account")!.done);
   }
   {
-    const s = activationState({ ...NOT_STARTED, emailVerified: false }, NOTHING);
-    check("unverified brand-new vendor: 1 of 5", s.completed === 1);
+    // Email verification no longer moves the number in either direction.
+    const verified = activationState({ ...NOT_STARTED, emailVerified: true }, NOTHING);
+    const unverified = activationState({ ...NOT_STARTED, emailVerified: false }, NOTHING);
+    check("email verification no longer affects the count",
+      verified.completed === unverified.completed && verified.completed === 1);
+    check("no milestone is keyed 'email' any more",
+      !verified.milestones.some((m) => (m.key as string) === "email"));
+    check("the five milestones are account/stripe/drop/publish/share",
+      verified.milestones.map((m) => m.key).join() === "account,stripe,drop,publish,share",
+      verified.milestones.map((m) => m.key).join());
+  }
+  /* ---------------------------- Share milestone -------------------------- */
+  {
+    const shared = activationState(READY, { ...PUBLISHED, hasShared: true });
+    check("an explicit share completes 'share'",
+      shared.milestones.find((m) => m.key === "share")!.done);
+    check("no share and no sale leaves 'share' outstanding",
+      !activationState(READY, PUBLISHED).milestones.find((m) => m.key === "share")!.done);
+    check("a paid order counts as proof of sharing",
+      activationState(READY, SOLD).milestones.find((m) => m.key === "share")!.done);
+    check("a fully activated, shared, selling vendor is 5 of 5",
+      activationState(READY, { ...SOLD, hasShared: true }).completed === 5);
   }
   check("a live drop completes 'publish'",
     activationState(READY, PUBLISHED).milestones.find((m) => m.key === "publish")!.done);
   check("a paid order completes 'publish' even with no live drop now",
-    activationState(READY, { dropsWithProducts: 1, liveDrops: 0, paidOrders: 1 })
+    activationState(READY, { dropsWithProducts: 1, liveDrops: 0, paidOrders: 1, hasShared: false })
       .milestones.find((m) => m.key === "publish")!.done);
   check("a drop with no products does not complete 'build a drop'",
     !activationState(READY, NOTHING).milestones.find((m) => m.key === "drop")!.done);
@@ -152,10 +172,14 @@ export async function GET() {
     activationState(READY, HAS_DROP).nextAction!.key === "publish");
   check("published but unsold -> share the link",
     activationState(READY, PUBLISHED).nextAction!.key === "share");
-  check("fully activated and selling -> no next action",
-    activationState(READY, SOLD).nextAction === null);
-  check("unverified email is asked for last, only after selling works",
-    activationState({ ...READY, emailVerified: false }, SOLD).nextAction!.key === "email");
+  check("fully activated, shared and selling -> no next action",
+    activationState(READY, { ...SOLD, hasShared: true }).nextAction === null);
+  check("a selling vendor with an unverified email gets NO next action",
+    // G.2: the VerifyBanner owns email verification. This module no longer nags.
+    activationState({ ...READY, emailVerified: false }, { ...SOLD, hasShared: true })
+      .nextAction === null);
+  check("share is the next action once publishing is done",
+    activationState(READY, PUBLISHED).nextAction!.key === "share");
   check("suspended vendor gets no self-service next action",
     activationState(SUSPENDED, NOTHING).nextAction === null);
 
@@ -508,7 +532,7 @@ export async function GET() {
     check(`${s.storeName}: readyToSell agrees with Stripe state`,
       state.readyToSell === (state.stripe === "charge_ready"));
     check(`${s.storeName}: a complete vendor has no next action`,
-      state.stage !== "complete" || state.nextAction === null || state.nextAction.key === "email");
+      state.stage !== "complete" || state.nextAction === null || state.nextAction.key === "share");
   }
 
   const passed = results.filter((r) => r.pass).length;
