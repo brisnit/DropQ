@@ -15,7 +15,13 @@ export const ROOT = resolve(HERE, "..", "..", "..");
  * app's DATABASE_URL is set explicitly rather than inherited from `.env`
  * (which in this repo points at production).
  */
-export async function startStack({ fresh = false, verbose = false } = {}) {
+/**
+ * @param appUrl  Overrides APP_URL for the app process only. The screenshot
+ *   runner sets the canonical production origin so that share links and the QR
+ *   codes built from them read `drop-q.com` in documentation images instead of
+ *   the capture machine's port. Specs leave it alone and get the local URL.
+ */
+export async function startStack({ fresh = false, verbose = false, appUrl = APP_URL } = {}) {
   const db = await startDatabase({ fresh });
   assertVerifyDatabase(db.url);
 
@@ -27,7 +33,7 @@ export async function startStack({ fresh = false, verbose = false } = {}) {
     // Non-empty on purpose: an empty key makes isVendorSellable() allow
     // everything, which would hide the Stripe gate the docs need to show.
     STRIPE_SECRET_KEY: "sk_test_browser_harness",
-    APP_URL,
+    APP_URL: appUrl,
   };
 
   const push = spawnSync(

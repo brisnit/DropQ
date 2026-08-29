@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-29T21:41:03.311Z",
+  "generatedAt": "2026-08-29T22:19:30.082Z",
   "vendor": {
     "store": "Cedar & Salt",
     "slug": "cedar-and-salt",
@@ -28,11 +28,9 @@
         "w": 350,
         "h": 423
       },
-      "rewrites": [
-        "origin"
-      ],
-      "bytes": 136081,
-      "sha256": "f7f56ee194bd1b96"
+      "rewrites": [],
+      "bytes": 136196,
+      "sha256": "f5c138ffb1f763d6"
     },
     {
       "id": "getting-started-new-drop",
@@ -55,11 +53,9 @@
         "w": 121,
         "h": 44
       },
-      "rewrites": [
-        "origin"
-      ],
-      "bytes": 127406,
-      "sha256": "ed6e9977a1e4e3d6"
+      "rewrites": [],
+      "bytes": 127262,
+      "sha256": "f11e153144fda24e"
     },
     {
       "id": "getting-started-help",
@@ -82,11 +78,9 @@
         "w": 44,
         "h": 44
       },
-      "rewrites": [
-        "origin"
-      ],
-      "bytes": 134699,
-      "sha256": "2d81537f2ef4440f"
+      "rewrites": [],
+      "bytes": 134533,
+      "sha256": "afcbea35b1ad729d"
     },
     {
       "id": "create-drop-choose-type",
@@ -185,8 +179,8 @@
         "h": 149
       },
       "rewrites": [],
-      "bytes": 149181,
-      "sha256": "4133f3f8fc8256cd"
+      "bytes": 148972,
+      "sha256": "7424875ca37acb32"
     },
     {
       "id": "add-items-row",
@@ -210,8 +204,8 @@
         "h": 42
       },
       "rewrites": [],
-      "bytes": 125630,
-      "sha256": "098cfe5146943a03"
+      "bytes": 126998,
+      "sha256": "ff21597f03b8a409"
     },
     {
       "id": "add-items-inventory",
@@ -230,13 +224,13 @@
       "caption": "How many you're selling in THIS drop.",
       "highlightRect": {
         "x": 177,
-        "y": 401,
+        "y": 391,
         "w": 111,
-        "h": 42
+        "h": 62
       },
       "rewrites": [],
-      "bytes": 125283,
-      "sha256": "5d65fc68790b34b5"
+      "bytes": 127013,
+      "sha256": "e0468922b8dc4f24"
     },
     {
       "id": "dates-order-window",
@@ -260,8 +254,8 @@
         "h": 20
       },
       "rewrites": [],
-      "bytes": 136682,
-      "sha256": "7323cae4560adf34"
+      "bytes": 136676,
+      "sha256": "3dc0ece85d44ef06"
     },
     {
       "id": "dates-pickup-window",
@@ -341,7 +335,7 @@
       "id": "dates-summary",
       "article": "how-drop-dates-work",
       "file": "/help/how-drop-dates-work/dates-summary.png",
-      "route": "/dashboard/drops/cmtewn3g500048ojclxtvzwv1",
+      "route": "/dashboard/drops/cmtey0jc70004sksis9h9zvb2",
       "scene": "draft",
       "viewport": "mobile",
       "width": 390,
@@ -358,11 +352,9 @@
         "w": 308,
         "h": 16
       },
-      "rewrites": [
-        "origin"
-      ],
-      "bytes": 142503,
-      "sha256": "a5459c5a2cdc4c23"
+      "rewrites": [],
+      "bytes": 142234,
+      "sha256": "ff5c492e1b4b1f25"
     },
     {
       "id": "stripe-connected",
@@ -386,14 +378,14 @@
         "h": 28
       },
       "rewrites": [],
-      "bytes": 155332,
-      "sha256": "ef090d67cf8a5110"
+      "bytes": 155507,
+      "sha256": "b04a4de7c3c43465"
     },
     {
       "id": "publish-button",
       "article": "publish-a-drop",
       "file": "/help/publish-a-drop/publish-button.png",
-      "route": "/dashboard/drops/cmtewn3g500048ojclxtvzwv1",
+      "route": "/dashboard/drops/cmtey0jc70004sksis9h9zvb2",
       "scene": "draft",
       "viewport": "mobile",
       "width": 390,
@@ -410,17 +402,15 @@
         "w": 128,
         "h": 44
       },
-      "rewrites": [
-        "origin"
-      ],
-      "bytes": 142229,
-      "sha256": "ab04b09275766f55"
+      "rewrites": [],
+      "bytes": 141959,
+      "sha256": "0cba8e3ed93004aa"
     },
     {
       "id": "add-items-result",
       "article": "add-items",
       "file": "/help/add-items/add-items-result.png",
-      "route": "/dashboard/drops/cmtewn3g500048ojclxtvzwv1",
+      "route": "/dashboard/drops/cmtey0jc70004sksis9h9zvb2",
       "scene": "live",
       "viewport": "mobile",
       "width": 390,
@@ -437,17 +427,15 @@
         "w": 350,
         "h": 24
       },
-      "rewrites": [
-        "origin"
-      ],
-      "bytes": 116434,
-      "sha256": "db89c5ac5dc3c0cc"
+      "rewrites": [],
+      "bytes": 115899,
+      "sha256": "5074d2fd33909b0c"
     },
     {
       "id": "publish-live-state",
       "article": "publish-a-drop",
       "file": "/help/publish-a-drop/publish-live-state.png",
-      "route": "/dashboard/drops/cmtewn3g500048ojclxtvzwv1",
+      "route": "/dashboard/drops/cmtey0jc70004sksis9h9zvb2",
       "scene": "live",
       "viewport": "mobile",
       "width": 390,
@@ -464,9 +452,7 @@
         "w": 308,
         "h": 16
       },
-      "rewrites": [
-        "origin"
-      ],
+      "rewrites": [],
       "bytes": 140897,
       "sha256": "04cad317a53fded6"
     },
@@ -474,7 +460,7 @@
       "id": "publish-share-link",
       "article": "publish-a-drop",
       "file": "/help/publish-a-drop/publish-share-link.png",
-      "route": "/dashboard/drops/cmtewn3g500048ojclxtvzwv1",
+      "route": "/dashboard/drops/cmtey0jc70004sksis9h9zvb2",
       "scene": "live",
       "viewport": "mobile",
       "width": 390,
@@ -491,17 +477,15 @@
         "w": 93,
         "h": 44
       },
-      "rewrites": [
-        "origin"
-      ],
-      "bytes": 115079,
-      "sha256": "5ec88e57151150c5"
+      "rewrites": [],
+      "bytes": 115140,
+      "sha256": "5b411c97461c32d3"
     },
     {
       "id": "publish-qr",
       "article": "publish-a-drop",
       "file": "/help/publish-a-drop/publish-qr.png",
-      "route": "/dashboard/drops/cmtewn3g500048ojclxtvzwv1",
+      "route": "/dashboard/drops/cmtey0jc70004sksis9h9zvb2",
       "scene": "live",
       "viewport": "mobile",
       "width": 390,
@@ -518,11 +502,9 @@
         "w": 350,
         "h": 282
       },
-      "rewrites": [
-        "origin"
-      ],
-      "bytes": 112642,
-      "sha256": "03aa291f9b6dc393"
+      "rewrites": [],
+      "bytes": 112215,
+      "sha256": "10b1f2cb5ba75c65"
     }
   ]
 }

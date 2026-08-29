@@ -82,10 +82,17 @@ export default async function DropDetailPage({
         select: { id: true },
       });
 
+  // APP_URL first, then the request — the same order as baseUrl() in
+  // lib/actions/dashboard.ts and the referral link on the dashboard. This link
+  // and the QR built from it get printed and posted, so they should carry the
+  // canonical domain rather than whichever host the vendor happened to reach
+  // the dashboard on. Falls back to the request host when APP_URL is unset,
+  // which is exactly the previous behaviour.
   const h = await headers();
-  const host = h.get("host") ?? "localhost:3001";
-  const proto = h.get("x-forwarded-proto") ?? "http";
-  const shareUrl = `${proto}://${host}/s/${seller.slug}/${drop.id}`;
+  const origin =
+    process.env.APP_URL?.replace(/\/$/, "") ??
+    `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host") ?? "localhost:3001"}`;
+  const shareUrl = `${origin}/s/${seller.slug}/${drop.id}`;
   const qrDataUrl = await QRCode.toDataURL(shareUrl, {
     width: 360,
     margin: 1,

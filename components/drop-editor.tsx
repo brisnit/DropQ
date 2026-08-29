@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button, Field, Input, Textarea, Select } from "@/components/ui";
 import { vocab, showItemMeta, isFood } from "@/lib/category";
@@ -248,6 +248,13 @@ export function DropEditor({
       : [blankRow(defaultEmoji), blankRow(defaultEmoji)];
 
   const [rows, setRows] = useState<Row[]>(initialRows);
+  /**
+   * Prefix for the per-item field ids that the price / quantity labels point
+   * at. NOT `row.key`: that counter is module state, so it keeps climbing on
+   * the server across requests while a fresh client starts at zero, and the
+   * ids hydrate mismatched. `useId()` is generated to match on both sides.
+   */
+  const fieldId = useId();
   const [error, setError] = useState<string | null>(null);
   const [saveToLibrary, setSaveToLibrary] = useState(true);
   const [libOpen, setLibOpen] = useState(false);
@@ -727,27 +734,59 @@ export function DropEditor({
                       placeholder="Short description (optional)"
                       className="w-full bg-paper border border-line-strong rounded-lg px-3 py-2 text-sm text-ink placeholder:text-muted/70 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                     />
-                    <div className="flex gap-3">
-                      <div className="relative flex-1">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm">$</span>
-                        <input
-                          name="p_price"
-                          value={row.price}
-                          onChange={(e) => update(row.key, { price: e.target.value })}
-                          inputMode="decimal"
-                          placeholder="0.00"
-                          className="w-full bg-paper border border-line-strong rounded-lg pl-7 pr-3 py-2 text-ink placeholder:text-muted/70 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-                        />
+                    {/*
+                      Price and quantity, side by side — so each field is about
+                      half a phone's width, which is 50px of usable room at
+                      320px. A placeholder cannot say "how many for this drop"
+                      in 50px; it just truncates to "How many f" and teaches
+                      nobody anything. A LABEL can, because it wraps instead of
+                      clipping. So the meaning lives in the label and the
+                      placeholder stays short enough to survive any width.
+                    */}
+                    {/*
+                      `items-stretch` + `mt-auto`: at 320px "Qty for this drop"
+                      wraps to two lines while "Price" stays on one, and without
+                      this the two inputs sit at different heights.
+                    */}
+                    <div className="flex items-stretch gap-3">
+                      <div className="flex-1 min-w-0 flex flex-col">
+                        <label
+                          htmlFor={`${fieldId}-price-${i}`}
+                          className="block text-xs font-medium text-muted mb-1"
+                        >
+                          Price
+                        </label>
+                        <div className="relative mt-auto">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm">$</span>
+                          <input
+                            id={`${fieldId}-price-${i}`}
+                            name="p_price"
+                            value={row.price}
+                            onChange={(e) => update(row.key, { price: e.target.value })}
+                            inputMode="decimal"
+                            placeholder="0.00"
+                            className="w-full bg-paper border border-line-strong rounded-lg pl-7 pr-3 py-2 text-ink placeholder:text-muted/70 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                          />
+                        </div>
                       </div>
-                      <div className="relative flex-1" {...(i === 0 ? { "data-guidance-anchor": "editor.inventory" } : {})}>
+                      <div
+                        className="flex-1 min-w-0 flex flex-col"
+                        {...(i === 0 ? { "data-guidance-anchor": "editor.inventory" } : {})}
+                      >
+                        <label
+                          htmlFor={`${fieldId}-qty-${i}`}
+                          className="block text-xs font-medium text-muted mb-1"
+                        >
+                          Qty for this drop
+                        </label>
                         <input
+                          id={`${fieldId}-qty-${i}`}
                           name="p_inventory"
                           value={row.inventory}
                           onChange={(e) => update(row.key, { inventory: e.target.value })}
                           inputMode="numeric"
-                          aria-label="How many available in this drop"
-                          placeholder="How many for this drop?"
-                          className="w-full bg-paper border border-line-strong rounded-lg px-3 py-2 text-ink placeholder:text-muted/70 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                          placeholder="0"
+                          className="w-full mt-auto bg-paper border border-line-strong rounded-lg px-3 py-2 text-ink placeholder:text-muted/70 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                         />
                       </div>
                     </div>

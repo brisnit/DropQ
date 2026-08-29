@@ -130,10 +130,12 @@ Things that were learned the hard way and are now enforced in code:
   element used to be. There are guards for both off-screen highlights and
   highlights that cover more than 55% of the frame.
 
-Known limitation: the **QR code images encode the local capture origin**, not
-`drop-q.com`. The share link text is rewritten (`rewrites: ["origin"]` in the
-manifest) but the QR is a server-rendered PNG built from the request's Host
-header. It is illustrative only — don't scan it.
+Share links and QR codes read `drop-q.com`, not the capture port, because the
+runner starts the stack with `appUrl: PUBLIC_ORIGIN`. That matters for the QR
+in particular: it is a server-built PNG, so no amount of DOM rewriting could
+have corrected it. The DOM-level origin rewrite is still in place as a safety
+net — if a shot ever reports `rewrites: ["origin"]`, something rendered a URL
+from the request host instead of `APP_URL`.
 
 After any UI change to a documented screen, regenerate and *look at the images*.
 `--check` proves they exist; only your eyes prove they are still true.

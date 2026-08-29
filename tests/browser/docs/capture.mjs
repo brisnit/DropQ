@@ -264,7 +264,13 @@ async function capture() {
   }
 
   log("• starting isolated stack…");
-  const stack = await startStack({ verbose: !!process.env.BROWSER_VERBOSE });
+  // The app renders share links and QR codes from APP_URL, so pointing it at the
+  // canonical origin makes both honest in the images — the QR is a server-built
+  // PNG that no amount of DOM rewriting could have corrected.
+  const stack = await startStack({
+    verbose: !!process.env.BROWSER_VERBOSE,
+    appUrl: PUBLIC_ORIGIN,
+  });
   const termsVersion = readFileSync(join(ROOT, "lib", "terms.ts"), "utf8")
     .match(/TERMS_VERSION = "([^"]+)"/)[1];
   let browser;

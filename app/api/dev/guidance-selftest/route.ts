@@ -849,8 +849,15 @@ export async function GET() {
       check("inventory guidance names the library confusion",
         /not a running total/i.test(inv.body));
       const editorSrc = readFileSync("components/drop-editor.tsx", "utf8");
-      check("the inventory field asks the question in plain language",
-        /How many for this drop\?/.test(editorSrc));
+      // A VISIBLE label, not a placeholder. At 320px the field is ~50px wide,
+      // so a placeholder carrying this meaning truncates to nonsense; a label
+      // wraps. The placeholder must stay short enough to survive that width.
+      check("the quantity field is labelled, and the label says which drop",
+        /htmlFor=\{`\$\{fieldId\}-qty-\$\{i\}`\}/.test(editorSrc) &&
+        /id=\{`\$\{fieldId\}-qty-\$\{i\}`\}/.test(editorSrc) &&
+        /Qty for this drop/.test(editorSrc));
+      check("the quantity placeholder is short enough for a phone",
+        (editorSrc.match(/name="p_inventory"[\s\S]{0,400}?placeholder="([^"]*)"/)?.[1] ?? "x".repeat(99)).length <= 4);
       check("the saved-product picker says stock is per drop",
         /You still set how many you&apos;re selling in/.test(editorSrc) ||
         /still set how many/.test(editorSrc));
