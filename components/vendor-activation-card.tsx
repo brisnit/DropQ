@@ -40,36 +40,46 @@ function Tick({ done }: { done: boolean }) {
 }
 
 function MilestoneRow({ m, isNext }: { m: Milestone; isNext: boolean }) {
+  const trailing = !m.done && (m.requiredToSell || (m.href && m.action));
   return (
-    <li className="flex items-center gap-2.5 py-1.5">
+    /* `flex-wrap` matters. This row can carry a label, a "Required to sell"
+       pill AND an action link at once — only the Stripe milestone does — and on
+       a 320px phone those do not fit on one line. Without wrapping, the action
+       link ran off the right edge of the card and was unreachable.
+       `overflow-x: clip` on <body> meant the page never gained a scrollbar, so
+       the clipping was silent. */
+    <li className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 py-1.5">
       <Tick done={m.done} />
       <span
-        className={
+        className={`min-w-[7rem] flex-1 ${
           m.done
             ? "text-muted line-through decoration-line-strong"
             : isNext
               ? "text-ink font-semibold"
               : "text-ink-soft"
-        }
+        }`}
       >
         {m.label}
       </span>
-      {m.requiredToSell && !m.done && (
-        <span className="ml-auto shrink-0 text-[11px] font-semibold uppercase tracking-wide text-brand-dark bg-brand-tint rounded-pill px-2 py-0.5">
-          Required to sell
+      {/* Pill and action travel together as one unit, so they wrap onto a
+          second line as a pair instead of the link being orphaned or clipped. */}
+      {trailing && (
+        <span className="flex items-center gap-2 ml-auto shrink-0">
+          {m.requiredToSell && (
+            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-brand-dark bg-brand-tint rounded-pill px-2 py-0.5">
+              Required to sell
+            </span>
+          )}
+          {m.href && m.action && (
+            <Link
+              href={m.href}
+              className="shrink-0 whitespace-nowrap text-sm font-semibold text-brand hover:text-brand-dark hover:underline underline-offset-4 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+            >
+              {m.action} <span aria-hidden>&rarr;</span>
+              <span className="sr-only">: {m.label}</span>
+            </Link>
+          )}
         </span>
-      )}
-      {/* Every outstanding row is directly actionable. `ml-auto` only when the
-          "Required to sell" pill isn't already holding that position, so the
-          two never fight over the right edge. */}
-      {!m.done && m.href && m.action && (
-        <Link
-          href={m.href}
-          className={`${m.requiredToSell ? "" : "ml-auto "}shrink-0 text-sm font-semibold text-brand hover:text-brand-dark hover:underline underline-offset-4 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50`}
-        >
-          {m.action} <span aria-hidden>&rarr;</span>
-          <span className="sr-only">: {m.label}</span>
-        </Link>
       )}
     </li>
   );

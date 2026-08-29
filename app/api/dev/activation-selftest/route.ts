@@ -401,8 +401,25 @@ export async function GET() {
     const sellerCount = await prisma.seller.count();
     check("V.Admin loader returns every seller",
       rows.length === sellerCount, `loader=${rows.length} table=${sellerCount}`);
-    check("V.Admin Grandies is flagged needs_help",
-      find("Grandies")?.attention === "needs_help", find("Grandies")?.attention);
+    // Was: `find("Grandies")?.attention === "needs_help"`. That asserted one
+    // named vendor's TRANSIENT state, and broke the day that account was
+    // replaced — exactly the failure the comment above warns about. The
+    // invariant is what mattered: demonstrated intent without the ability to
+    // take payment is always worth an admin's attention, whoever it is.
+    {
+      const shouldBeFlagged = rows.filter(
+        (r) => !r.state.readyToSell && r.facts.dropsWithProducts > 0 && r.state.stage !== "paused"
+      );
+      check("V.Admin every vendor with a drop and no Stripe is flagged needs_help",
+        shouldBeFlagged.every((r) => r.attention === "needs_help"),
+        shouldBeFlagged.filter((r) => r.attention !== "needs_help")
+          .map((r) => `${r.storeName}=${r.attention}`).join(", "));
+      check("V.Admin nobody is flagged needs_help without demonstrated intent",
+        rows.filter((r) => r.attention === "needs_help")
+          .every((r) => r.facts.dropsWithProducts > 0 && !r.state.readyToSell),
+        rows.filter((r) => r.attention === "needs_help")
+          .map((r) => `${r.storeName}:drops=${r.facts.dropsWithProducts}`).join(", "));
+    }
     check("V.Admin The Clovery (selling) is not flagged",
       find("The Clovery")?.attention === "none");
     check("V.Admin Paraiso (selling) is not flagged",

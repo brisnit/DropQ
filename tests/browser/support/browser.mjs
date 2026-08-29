@@ -111,6 +111,36 @@ export const noHorizontalOverflow = (page) =>
     () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1
   );
 
+/**
+ * Does anything inside `selector` stick out past its own right edge?
+ *
+ * ⚠️ This exists because `noHorizontalOverflow` is not enough. `app/globals.css`
+ * sets `overflow-x: clip` on <html> and <body> to stop decorative bleed causing
+ * sideways scroll — which also means content that overflows is silently CUT OFF
+ * rather than making the document wider. A page-level scrollWidth check
+ * therefore passes while a button hangs off the edge of a card, unreachable.
+ * Real example: the "Connect →" action on the Stripe milestone at 320px.
+ *
+ * Returns the offending elements so a failure names them.
+ */
+export function overflowingChildren(page, selector) {
+  return page.evaluate((sel) => {
+    const root = document.querySelector(sel);
+    if (!root) return ["<missing container: " + sel + ">"];
+    const box = root.getBoundingClientRect();
+    const bad = [];
+    for (const el of root.querySelectorAll("*")) {
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) continue;
+      // 1px tolerance for sub-pixel rounding.
+      if (r.right > box.right + 1 || r.left < box.left - 1) {
+        bad.push(`${el.tagName.toLowerCase()}"${(el.textContent || "").trim().slice(0, 24)}"`);
+      }
+    }
+    return bad;
+  }, selector);
+}
+
 /** Minimal assertion recorder — same shape as the repo's other self-tests. */
 export function recorder(label) {
   let pass = 0;

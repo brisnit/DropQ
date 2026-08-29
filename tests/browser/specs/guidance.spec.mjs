@@ -10,7 +10,7 @@
  * from a stale measurement, guidance pointing below the fold.
  */
 import prismaModule from "../../../app/generated/prisma/index.js";
-import { launch, vendorContext, url, screenshot, noHorizontalOverflow, recorder, guidanceReady, focusLanded } from "../support/browser.mjs";
+import { launch, vendorContext, url, screenshot, noHorizontalOverflow, recorder, guidanceReady, focusLanded, overflowingChildren } from "../support/browser.mjs";
 import { assertVerifyDatabase } from "../support/guard.mjs";
 import { seedFresh, seedSelling, settleGuidance, clearGuidance, openClient, VENDOR_SLUG } from "../seed/vendor.mjs";
 import { readFileSync } from "node:fs";
@@ -177,6 +177,31 @@ for (const viewport of ["mobile", "desktop"]) {
   await screenshot(page, `${viewport}-first-order`);
 
   await ctx.close();
+}
+
+/* ------- narrow phones: nothing may be cut off the activation card ------- */
+r.section("NARROW WIDTHS");
+{
+  const seller = await seedFresh(prismaModule, DB, TERMS);
+  await settleGuidance(prismaModule, DB, seller.id);
+  // 320 is a real device width (iPhone SE, and any iPhone with Display Zoom on)
+  // and it is where the Stripe milestone row — label + "Required to sell" pill
+  // + action link — first stops fitting on one line.
+  for (const width of [320, 360, 390]) {
+    const ctx = await browser.newContext({
+      viewport: { width, height: 780 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+    await ctx.addCookies([(await import("../support/session.mjs")).sessionCookie(seller.id)]);
+    const page = await ctx.newPage();
+    await page.goto(url("/dashboard"), { waitUntil: "networkidle" });
+    const over = await overflowingChildren(page, '[data-guidance-anchor="dash.checklist"]');
+    r.ok(`${width}px: nothing overflows the activation card`, over.length === 0, over.join(", "));
+    const link = await page.getByRole("link", { name: /Connect.*Connect Stripe/ }).first().boundingBox();
+    r.ok(`${width}px: the Stripe action link is fully on screen`,
+      !!link && link.x >= 0 && link.x + link.width <= width + 1,
+      link ? `x=${Math.round(link.x)} w=${Math.round(link.width)}` : "not found");
+    if (width === 320) await screenshot(page, "narrow-320-checklist");
+    await ctx.close();
+  }
 }
 
 /* ---------------- accessibility ---------------- */
