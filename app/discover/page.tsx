@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "@/components/logo";
 import { DiscoverClient } from "@/components/discover-client";
 
 export const metadata = {
@@ -13,10 +14,13 @@ export default function DiscoverPage() {
       {/* Minimal top bar — DropQ branding, links home */}
       <header className="border-b border-line bg-cream/80 backdrop-blur sticky top-0 z-30">
         <div className="max-w-5xl mx-auto px-5 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/brand/dropq-mark.png" alt="DropQ" className="h-[22px] w-auto" />
-          </Link>
+          {/*
+            The full wordmark, same component as every other public page. This
+            was the bare mark, which read as an unexplained coral glyph to
+            someone arriving here from a shared drop link — the one audience
+            this page has.
+          */}
+          <Logo href="/" />
           <Link href="/signup" className="text-sm font-medium text-brand hover:underline">
             Sell on DropQ →
           </Link>
