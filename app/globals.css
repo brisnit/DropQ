@@ -127,3 +127,10 @@ body {
 /* Hide number input spinners for cleaner qty steppers */
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* A looping hero is motion the visitor did not ask for. Dropping the <video>
+   reveals the poster already painted on the frame behind it, so the column
+   keeps its size and composition and simply stops moving. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-video { display: none; }
+}

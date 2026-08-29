@@ -5,81 +5,6 @@ import { LinkButton, Eyebrow, Card, Badge } from "@/components/ui";
 import { Reveal } from "@/components/reveal";
 
 /* ----------------------------- Hero mockup ----------------------------- */
-function DropMockup() {
-  // Mirrors the live Marble & Crumb demo storefront — its warm brown accent,
-  // header photo, and bakery logo — so the hero previews a real DropQ store.
-  const accent = "#7a5230";
-  const items = [
-    { emoji: "🍪", name: "Brown Butter Chocolate Chunk", price: "$18", left: 17, total: 40 },
-    { emoji: "🥐", name: "Morning Bun", price: "$6.50", left: 6, total: 36 },
-    { emoji: "🟤", name: "Miso Snickerdoodle", price: "$16", left: 11, total: 30 },
-  ];
-  return (
-    <div className="relative">
-      <div className="absolute -inset-6 hero-glow blur-2xl" aria-hidden />
-      <Card className="relative p-0 overflow-hidden w-full max-w-sm mx-auto lg:mx-0 lg:ml-auto">
-        {/* branded banner — header photo with a brown wash, like the storefront */}
-        <div className="relative h-24" style={{ backgroundColor: accent }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/demo/marble-crumb-header.png"
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          <div
-            className="absolute inset-0"
-            style={{ background: `linear-gradient(to top, ${accent}cc, ${accent}33)` }}
-          />
-          <span className="absolute top-3 right-3 inline-flex items-center gap-1.5 bg-white/95 text-xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-pill" style={{ color: accent }}>
-            <span className="w-1.5 h-1.5 rounded-full live-dot" style={{ backgroundColor: accent }} /> Live
-          </span>
-        </div>
-        {/* logo avatar overlapping the banner + store identity */}
-        <div className="relative z-10 px-5 -mt-9">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/demo/marble-crumb-logo.png"
-            alt="Marble & Crumb"
-            className="w-16 h-16 rounded-2xl object-cover border-4 border-paper bg-white shadow-[var(--shadow-soft)]"
-          />
-          <h3 className="font-display text-lg font-semibold mt-2">Marble &amp; Crumb</h3>
-          <p className="text-xs text-muted">Friday Cookie Drop · Pickup 4–6pm</p>
-        </div>
-        {/* items */}
-        <div className="p-4 pt-3 space-y-2.5">
-          {items.map((it) => (
-            <div
-              key={it.name}
-              className="flex items-center gap-3 rounded-xl border border-line px-3 py-2.5"
-            >
-              <span className="text-2xl">{it.emoji}</span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate">{it.name}</p>
-                <p className="text-xs text-muted">{it.left} of {it.total} left</p>
-              </div>
-              <span className="text-sm font-semibold">{it.price}</span>
-            </div>
-          ))}
-          <div
-            className="flex items-center justify-between text-white rounded-xl px-4 py-3 mt-1"
-            style={{ backgroundColor: accent }}
-          >
-            <span className="text-sm font-medium">Checkout · 3 items</span>
-            <span className="font-semibold">$40.50</span>
-          </div>
-        </div>
-      </Card>
-      {/* floating order toast */}
-      <div className="absolute -bottom-4 -left-3 sm:-left-8 bg-paper border border-line rounded-2xl shadow-[var(--shadow-lift)] px-4 py-3 flex items-center gap-3 animate-in">
-        <span className="w-9 h-9 rounded-full bg-sage-tint text-sage grid place-items-center text-lg">✓</span>
-        <div>
-          <p className="text-sm font-semibold">New order · $40.50</p>
-          <p className="text-xs text-muted">Jordan just checked out</p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ------------------------------- Sections ------------------------------ */
 function Section({
@@ -222,7 +147,41 @@ export default function Home() {
             No monthly fee to start · Set up in minutes · Cancel anytime
           </p>
         </div>
-        <DropMockup />
+        {/* Hero video.
+            Autoplaying muted is the only way a browser starts this without a
+            click, so the source's AAC track is silent here by design.
+            `playsInline` stops iOS hijacking it into fullscreen.
+
+            The poster is painted on the FRAME as a background, not just on the
+            <video>: that way `prefers-reduced-motion` can drop the video
+            element entirely and the still frame is already behind it, rather
+            than leaving a hole where the column used to be. */}
+        <div className="relative animate-in min-w-0">
+          {/* Bleeds vertically only. The old mockup card was `max-w-sm`, so a
+              symmetric -inset-6 stayed on screen; the video frame is full-width
+              on a phone, where the same glow put its box 24px past both edges. */}
+          <div className="absolute -inset-y-6 inset-x-0 hero-glow blur-2xl" aria-hidden />
+          <div
+            className="relative w-full aspect-video lg:aspect-[5/4] rounded-card border border-line shadow-[var(--shadow-lift)] overflow-hidden bg-line bg-cover bg-center"
+            style={{ backgroundImage: "url('/hero/hero-poster.jpg')" }}
+            role="img"
+            aria-label="A baker laying out trays of fresh cookies in a sunlit kitchen"
+          >
+            <video
+              className="hero-video w-full h-full object-cover"
+              poster="/hero/hero-poster.jpg"
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              aria-hidden
+              tabIndex={-1}
+            >
+              <source src="/hero/hero.mp4" type="video/mp4" />
+            </video>
+          </div>
+        </div>
       </Section>
 
       {/* CATEGORIES — DropQ is for every kind of seller */}
