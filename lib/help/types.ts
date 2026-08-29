@@ -60,7 +60,23 @@ export const CATEGORY_ORDER: HelpCategory[] = [
 export type HelpBlock =
   | { kind: "p"; text: string }
   | { kind: "steps"; items: string[] }
-  | { kind: "note"; text: string };
+  | { kind: "note"; text: string }
+  /**
+   * An illustrated walkthrough: numbered steps, each with a short line and a
+   * real screenshot of DropQ.
+   *
+   * The image does most of the teaching, so the text stays to a sentence or
+   * two. `shot` is a screenshot id from public/help/manifest.json — the
+   * content self-test refuses an id that was never captured.
+   */
+  | { kind: "walk"; items: WalkStep[] };
+
+export type WalkStep = {
+  title: string;
+  text: string;
+  /** Screenshot id, or omitted for a step that genuinely needs no image. */
+  shot?: string;
+};
 
 /**
  * A capability an article depends on.
@@ -98,3 +114,28 @@ export type HelpArticle = {
 export const p = (text: string): HelpBlock => ({ kind: "p", text });
 export const steps = (...items: string[]): HelpBlock => ({ kind: "steps", items });
 export const note = (text: string): HelpBlock => ({ kind: "note", text });
+export const walk = (...items: WalkStep[]): HelpBlock => ({ kind: "walk", items });
+
+/**
+ * All the prose in a block, flattened.
+ *
+ * One definition, used by search, by the content self-test and by anything else
+ * that needs an article's words — so adding a block kind cannot silently make
+ * part of an article unsearchable or unverifiable.
+ */
+export function blockText(b: HelpBlock): string {
+  switch (b.kind) {
+    case "p":
+    case "note":
+      return b.text;
+    case "steps":
+      return b.items.join(" ");
+    case "walk":
+      return b.items.map((i) => `${i.title} ${i.text}`).join(" ");
+  }
+}
+
+/** Every word of an article's body. */
+export function bodyText(blocks: HelpBlock[]): string {
+  return blocks.map(blockText).join(" ");
+}

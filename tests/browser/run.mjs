@@ -17,19 +17,18 @@
  * key `isVendorSellable()` short-circuits to "everyone can sell" and half the
  * guidance under test would be unreachable. See the README's local-dev trap.
  */
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
-import { startDatabase } from "./support/database.mjs";
-import { APP_PORT, APP_URL, TEST_SESSION_SECRET, assertVerifyDatabase } from "./support/guard.mjs";
+import { startStack } from "./support/stack.mjs";
+import { APP_URL } from "./support/guard.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "..", "..");
 const only = process.argv.slice(2).filter((a) => !a.startsWith("-"));
 
-let server;
-let db;
+let stack;
 
 async function waitForServer(timeoutMs = 60_000) {
   const deadline = Date.now() + timeoutMs;
@@ -46,46 +45,16 @@ async function waitForServer(timeoutMs = 60_000) {
 }
 
 function shutdown() {
-  if (server && !server.killed) server.kill("SIGTERM");
+  if (stack) void stack.stop();
 }
 process.on("SIGINT", () => { shutdown(); process.exit(130); });
 process.on("SIGTERM", () => { shutdown(); process.exit(143); });
 
 try {
-  console.log("• starting throwaway postgres…");
-  db = await startDatabase({ fresh: process.argv.includes("--fresh-db") });
-  assertVerifyDatabase(db.url);
-
-  const env = {
-    ...process.env,
-    DATABASE_URL: db.url,
-    DATABASE_URL_UNPOOLED: db.url,
-    SESSION_SECRET: TEST_SESSION_SECRET,
-    // A non-empty dummy: keeps the Stripe sell gate live without any network.
-    STRIPE_SECRET_KEY: "sk_test_browser_harness",
-    APP_URL,
-    // ⚠️ Deliberately NOT setting NODE_ENV or PORT. `next dev` sets NODE_ENV
-    // itself, and forcing it leaves the client bundle believing it is in a
-    // different mode than the server — the page renders, no request fails, no
-    // error is logged, and React simply never hydrates. The port goes through
-    // the CLI flag only.
-  };
-
-  console.log("• pushing schema…");
-  const push = spawnSync(
-    join(ROOT, "node_modules", ".bin", "prisma"),
-    ["db", "push", "--skip-generate", "--accept-data-loss"],
-    { cwd: ROOT, env, stdio: "inherit" }
-  );
-  if (push.status !== 0) throw new Error("prisma db push failed");
-
-  console.log(`• starting app on ${APP_URL}…`);
-  server = spawn("npm", ["run", "dev", "--", "--port", String(APP_PORT)], {
-    cwd: ROOT,
-    env,
-    stdio: process.env.BROWSER_VERBOSE ? "inherit" : "ignore",
-  });
-  await waitForServer();
+  console.log("• starting isolated stack (postgres → schema → app)…");
+  stack = await startStack({ fresh: process.argv.includes("--fresh-db"),
+                             verbose: !!process.env.BROWSER_VERBOSE });
+  console.log(`• app ready on ${APP_URL}`);
 
   const specs = readdirSync(join(HERE, "specs"))
     .filter((f) => f.endsWith(".spec.mjs"))
@@ -99,19 +68,17 @@ try {
     console.log(`\n──────── ${spec} ────────`);
     const run = spawnSync(process.execPath, [join(HERE, "specs", spec)], {
       cwd: ROOT,
-      env,
+      env: stack.env,
       stdio: "inherit",
     });
     if (run.status !== 0) failed++;
   }
 
-  shutdown();
-  await db.stop();
+  await stack.stop();
   console.log(failed === 0 ? "\n✅ browser suite passed" : `\n❌ ${failed} spec(s) failed`);
   process.exit(failed === 0 ? 0 : 1);
 } catch (err) {
-  shutdown();
-  if (db) await db.stop().catch(() => {});
+  if (stack) await stack.stop().catch(() => {});
   console.error("\n✗ browser suite could not run:\n", err.message);
   process.exit(1);
 }

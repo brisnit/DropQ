@@ -4,8 +4,9 @@ import { useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { GuidanceOverlay } from "@/components/guidance/overlay";
-import { CATEGORY_LABELS, CATEGORY_ORDER, type HelpArticle } from "@/lib/help/types";
+import { CATEGORY_LABELS, CATEGORY_ORDER, type HelpArticle, type WalkStep } from "@/lib/help/types";
 import { availableArticles, articlesForRoute, searchHelp, relatedArticles } from "@/lib/help/search";
+import { shot } from "@/lib/help/screenshots";
 import { trackGuidance } from "@/lib/analytics";
 import { startTourAction, markHelpOpenedAction } from "@/lib/actions/guidance";
 import { START_TOUR_EVENT, type GuidanceCapabilities } from "@/lib/guidance";
@@ -273,6 +274,9 @@ export function HelpBody({ article }: { article: HelpArticle }) {
             </ol>
           );
         }
+        if (b.kind === "walk") {
+          return <Walkthrough key={i} items={b.items} />;
+        }
         return (
           <p
             key={i}
@@ -283,5 +287,57 @@ export function HelpBody({ article }: { article: HelpArticle }) {
         );
       })}
     </>
+  );
+}
+
+/**
+ * An illustrated walkthrough: numbered step, one line of explanation, then the
+ * screenshot. The image carries the teaching, so the prose stays short.
+ *
+ * Images are captured at 2× on a 390px viewport, so they are 780px wide and
+ * stay sharp; `max-w-full` plus an explicit aspect ratio means they never
+ * overflow the Help panel or force horizontal scrolling, and never cause a
+ * layout jump while loading.
+ */
+function Walkthrough({ items }: { items: WalkStep[] }) {
+  return (
+    <ol className="space-y-7 not-prose">
+      {items.map((step, i) => {
+        const s = step.shot ? shot(step.shot) : undefined;
+        return (
+          <li key={i}>
+            <div className="flex items-baseline gap-2.5">
+              <span
+                aria-hidden
+                className="shrink-0 grid place-items-center w-6 h-6 rounded-full bg-brand text-white text-xs font-bold"
+              >
+                {i + 1}
+              </span>
+              <h4 className="font-display font-semibold text-[1.02rem] leading-snug">
+                {step.title}
+              </h4>
+            </div>
+            <p className="text-[0.95rem] text-ink-soft leading-relaxed mt-1.5 ml-[2.1rem]">
+              {step.text}
+            </p>
+            {s && (
+              <figure className="mt-3 ml-[2.1rem]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={s.file}
+                  alt={s.caption}
+                  width={s.width}
+                  height={s.height}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-full max-w-[19rem] h-auto rounded-xl border border-line-strong bg-paper shadow-[var(--shadow-soft)]"
+                />
+                <figcaption className="sr-only">{s.caption}</figcaption>
+              </figure>
+            )}
+          </li>
+        );
+      })}
+    </ol>
   );
 }

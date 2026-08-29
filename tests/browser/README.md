@@ -13,6 +13,13 @@ npm run test:browser -- --fresh-db   # discard the throwaway database first
 BROWSER_VERBOSE=1 npm run test:browser   # show the app's server log
 ```
 
+## Don't run `npm run dev` at the same time
+
+The harness starts its own app on port 3123. A dev server already running on
+3000 doesn't collide on the port — it competes for CPU, and the harness gives up
+with `app did not start on http://localhost:3123` after 60s. Stop the dev server
+first.
+
 ## Production safety
 
 **This suite creates and deletes vendors, drops and orders.** Three independent
@@ -81,3 +88,52 @@ so "mobile" cannot quietly change meaning with a Playwright upgrade.
 Create `specs/<area>.spec.mjs`, import the support helpers, use `recorder()`,
 and `process.exit(ok ? 0 : 1)`. The runner picks it up automatically and
 `npm run test:browser -- <area>` will filter to it.
+
+## Help screenshots (`tests/browser/docs/`)
+
+The illustrated Help articles are generated, not hand-taken.
+
+```
+npm run help:screenshots        # regenerate every image + the manifest
+npm run help:screenshots:check  # fast: are the files present and referenced?
+```
+
+`docs/shots.mjs` is the list — one entry per image, naming the article it
+belongs to, the scene, the route, what to highlight and the caption.
+`docs/capture.mjs` runs them against the same isolated stack the specs use, with
+the same three-layer production guard, and writes `public/help/<article>/<id>.png`
+plus `public/help/manifest.json`. The app imports that manifest, so an article
+can only show an image that was actually captured.
+
+Three scenes, seeded by `seed/docs-vendor.mjs` — Cedar & Salt, a fictional
+bakery on `example.com` addresses:
+
+| scene | what it is |
+|-------|------------|
+| `new` | first minutes: no Stripe, no drops, checklist at 1 of 5 |
+| `draft` | a drop built but not published |
+| `live` | the same drop published, shared, two orders on it |
+
+Things that were learned the hard way and are now enforced in code:
+
+- **Don't wipe `public/help/` before capturing.** The app imports the manifest;
+  deleting it makes every page that mounts Help fail to compile, including the
+  dashboard being photographed. Images are overwritten in place and stale ones
+  swept afterwards.
+- **The clock has to be real.** A drop's phase is derived from `Date.now()`, so
+  a fixed fictional date renders every drop as "Scheduled" no matter what state
+  it is in. `DOCS_NOW` is today at 9am Pacific; scenes set dates relative to it.
+- **Target controls by role, not by text.** `getByText("Connect with Stripe")`
+  finds the sentence *about* the button first.
+- **Scroll with `behavior: "instant"`.** The app sets `scroll-behavior: smooth`,
+  so a highlight measured straight after `scrollIntoView` is drawn where the
+  element used to be. There are guards for both off-screen highlights and
+  highlights that cover more than 55% of the frame.
+
+Known limitation: the **QR code images encode the local capture origin**, not
+`drop-q.com`. The share link text is rewritten (`rewrites: ["origin"]` in the
+manifest) but the QR is a server-rendered PNG built from the request's Host
+header. It is illustrative only — don't scan it.
+
+After any UI change to a documented screen, regenerate and *look at the images*.
+`--check` proves they exist; only your eyes prove they are still true.

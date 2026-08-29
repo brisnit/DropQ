@@ -1,4 +1,5 @@
 import { assertVerifyDatabase } from "../support/guard.mjs";
+import { readFileSync } from "node:fs";
 
 /**
  * Deterministic fixture vendor for the browser suite.
@@ -132,6 +133,46 @@ export async function settleGuidance(prismaModule, url, sellerId) {
         dismissedTips: [],
       },
     });
+  } finally {
+    await db.$disconnect();
+  }
+}
+
+/**
+ * The ids of every coachmark and tip that currently exists, read out of
+ * lib/guidance.ts.
+ *
+ * Parsed from the source rather than hard-coded so that adding a coachmark
+ * cannot silently start blocking clicks in tests that are not about guidance.
+ */
+export function guidanceIds() {
+  const src = readFileSync("lib/guidance.ts", "utf8");
+  const grab = (typeName) => {
+    const block = src.split(`export type ${typeName} =`)[1]?.split(";")[0] ?? "";
+    return [...block.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  };
+  return { coachmarks: grab("CoachmarkId"), tips: grab("TipId") };
+}
+
+/**
+ * A vendor with nothing left to say to them: welcome seen, tour done, every
+ * coachmark and tip dismissed.
+ *
+ * For tests about something else. A docked coachmark covers the bottom of the
+ * viewport and intercepts clicks, so any spec that navigates the dashboard
+ * without being about guidance needs this.
+ */
+export async function silenceGuidance(prismaModule, url, sellerId) {
+  const { coachmarks, tips } = guidanceIds();
+  const db = await client(prismaModule, url);
+  try {
+    const data = {
+      welcomeSeenAt: new Date(),
+      tourStatus: "completed",
+      dismissedCoachmarks: coachmarks,
+      dismissedTips: tips,
+    };
+    await db.vendorGuidance.upsert({ where: { sellerId }, create: { sellerId, ...data }, update: data });
   } finally {
     await db.$disconnect();
   }

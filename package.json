@@ -19,7 +19,9 @@
     "test:drop-schedule": "node --env-file=.env scripts/drop-schedule-selftest.mjs",
     "test:browser": "node tests/browser/run.mjs",
     "test:browser:guidance": "node tests/browser/run.mjs guidance",
-    "test:browser:help": "node tests/browser/run.mjs help"
+    "test:browser:help": "node tests/browser/run.mjs help",
+    "help:screenshots": "node tests/browser/docs/capture.mjs",
+    "help:screenshots:check": "node tests/browser/docs/capture.mjs --check"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

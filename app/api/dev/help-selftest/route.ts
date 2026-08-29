@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { HELP_ARTICLES } from "@/lib/help/content";
 import {
@@ -9,8 +10,9 @@ import {
   relatedArticles,
   searchHelp,
 } from "@/lib/help/search";
-import { CATEGORY_ORDER, CATEGORY_LABELS } from "@/lib/help/types";
+import { CATEGORY_ORDER, CATEGORY_LABELS, bodyText } from "@/lib/help/types";
 import { NO_CAPABILITIES, type GuidanceCapabilities } from "@/lib/guidance";
+import { HELP_SHOTS, isIllustrated, shot } from "@/lib/help/screenshots";
 
 /**
  * Help content self-test — "every answer is findable, linked, and true."
@@ -128,9 +130,7 @@ export async function GET() {
     check("gated articles are a minority — most help is universal",
       none.length >= HELP_ARTICLES.length - 8, `${none.length}/${HELP_ARTICLES.length}`);
     check("no ungated article mentions walk-up",
-      none.every((a) => !/walk[- ]up/i.test(
-        `${a.title} ${a.summary} ${a.body.map((b) => (b.kind === "steps" ? b.items.join(" ") : b.text)).join(" ")}`
-      )),
+      none.every((a) => !/walk[- ]up/i.test(`${a.title} ${a.summary} ${bodyText(a.body)}`)),
       none.filter((a) => /walk[- ]up/i.test(a.summary)).map((a) => a.slug).join());
     check("related links from a gated article are filtered for the reader",
       relatedArticles(articleBySlug("walkup-which-qr")!, NO_CAPABILITIES)
@@ -203,9 +203,7 @@ export async function GET() {
   {
     const text = (slug: string) => {
       const a = articleBySlug(slug)!;
-      return `${a.title} ${a.summary} ${a.body
-        .map((b) => (b.kind === "steps" ? b.items.join(" ") : b.text))
-        .join(" ")}`;
+      return `${a.title} ${a.summary} ${bodyText(a.body)}`;
     };
     check("Stripe: started is distinguished from charge-ready",
       /not the same as being able to take money/i.test(text("stripe-started-vs-ready")));
@@ -232,10 +230,7 @@ export async function GET() {
     check("restarting the tour is documented as not resetting progress",
       /doesn't reset your checklist/i.test(text("restart-the-tour")));
     check("no article claims DropQ handles cash",
-      HELP_ARTICLES.every((a) => {
-        const t = a.body.map((b) => (b.kind === "steps" ? b.items.join(" ") : b.text)).join(" ");
-        return !/we (take|handle) cash|cash payments are/i.test(t);
-      }));
+      HELP_ARTICLES.every((a) => !/we (take|handle) cash|cash payments are/i.test(bodyText(a.body))));
   }
 
   /* ------------------------- 8. Privacy source pins --------------------- */
@@ -271,12 +266,108 @@ export async function GET() {
       /\["Help center", "\/help"\]/.test(footer));
   }
 
+  /* ---------------------- 10. Visual documentation ---------------------- */
+  {
+    // Every property that makes a screenshot trustworthy: it exists on disk, it
+    // matches the bytes that were captured, it was taken from the docs seed and
+    // not from production, and no article points at an image that isn't there.
+    const shots = HELP_SHOTS;
+    check("screenshots were generated", shots.length >= 15, `${shots.length} shots`);
+
+    const shotIds = shots.map((s) => s.id);
+    check("screenshot ids are unique", new Set(shotIds).size === shotIds.length,
+      shotIds.filter((s, i) => shotIds.indexOf(s) !== i).join());
+
+    check("every screenshot belongs to a real article",
+      shots.every((s) => articleBySlug(s.article)),
+      shots.filter((s) => !articleBySlug(s.article)).map((s) => s.id).join());
+
+    check("every screenshot file exists",
+      shots.every((s) => existsSync(`public${s.file}`)),
+      shots.filter((s) => !existsSync(`public${s.file}`)).map((s) => s.file).join());
+
+    // The manifest records a 16-char prefix, which is plenty to catch a file
+    // edited or replaced by hand without regenerating.
+    const digest = (s: { file: string }) =>
+      createHash("sha256").update(readFileSync(`public${s.file}`)).digest("hex").slice(0, 16);
+    check("the files on disk are the files that were captured",
+      shots.every((s) => digest(s) === s.sha256),
+      shots.filter((s) => digest(s) !== s.sha256).map((s) => s.id).join());
+
+    check("every screenshot has a caption that describes it",
+      shots.every((s) => s.caption.trim().length >= 15 && /[.!?]$/.test(s.caption.trim())),
+      shots.filter((s) => s.caption.trim().length < 15).map((s) => s.id).join());
+
+    // Shots are viewport-sized, not full-page, so anything the highlight box
+    // reports outside width×height was drawn where nobody can see it. This is
+    // exactly the smooth-scroll bug that put four markers off-screen.
+    const offScreen = (s: (typeof shots)[number]) => {
+      const r = s.highlightRect;
+      return (
+        r.w <= 0 || r.h <= 0 || r.x < 0 || r.y < 0 || r.x + r.w > s.width || r.y + r.h > s.height
+      );
+    };
+    check("highlights landed on screen", !shots.some(offScreen),
+      shots.filter(offScreen).map((s) => `${s.id} y=${Math.round(s.highlightRect.y)}`).join());
+
+    // The one thing a leak would look like: a real name, a real address, a
+    // localhost URL shipped as if it were the product.
+    const FORBIDDEN = /grandies|britts bunnies|casa makulay|marble ?(&|and) ?crumb|localhost|127\.0\.0\.1/i;
+    check("no screenshot metadata names a real vendor or a dev origin",
+      !FORBIDDEN.test(JSON.stringify(shots)),
+      JSON.stringify(shots).match(FORBIDDEN)?.[0]);
+
+    // Articles → shots. A `walk` step naming an id that was never captured
+    // renders a step with no picture, which is worse than no walkthrough.
+    const referenced: string[] = [];
+    for (const a of HELP_ARTICLES) {
+      for (const b of a.body) {
+        if (b.kind !== "walk") continue;
+        for (const step of b.items) {
+          if (!step.shot) continue;
+          referenced.push(step.shot);
+          check(`${a.slug} → ${step.shot} exists`, Boolean(shot(step.shot)));
+          check(`${a.slug} → ${step.shot} belongs to it`, shot(step.shot)?.article === a.slug,
+            shot(step.shot)?.article);
+        }
+      }
+    }
+    check("every captured screenshot is actually used",
+      shots.every((s) => referenced.includes(s.id)),
+      shots.filter((s) => !referenced.includes(s.id)).map((s) => s.id).join());
+
+    const illustrated = HELP_ARTICLES.filter((a) => a.body.some((b) => b.kind === "walk"));
+    check("six articles are illustrated", illustrated.length === 6,
+      illustrated.map((a) => a.slug).join());
+    check("illustrated articles let the picture teach",
+      illustrated.every((a) =>
+        a.body.every((b) =>
+          b.kind !== "walk" || b.items.every((i) => i.text.length <= 260 && i.title.length <= 60)
+        )
+      ));
+    check("isIllustrated agrees with the corpus",
+      illustrated.every((a) => isIllustrated(a.slug)) &&
+        HELP_ARTICLES.filter((a) => !illustrated.includes(a)).every((a) => !isIllustrated(a.slug)));
+
+    // The capture runner must stay unable to point at anything but the local
+    // throwaway database.
+    const capture = readFileSync("tests/browser/docs/capture.mjs", "utf8");
+    check("the screenshot runner goes through the production guard",
+      /assertVerifyDatabase|support\/guard\.mjs/.test(capture));
+    check("the screenshot runner scans its own output for secrets",
+      /SECRET_PATTERNS/.test(capture));
+    const seed = readFileSync("tests/browser/seed/docs-vendor.mjs", "utf8");
+    check("the documentation vendor is fictional and uses a reserved domain",
+      /\.example\.com/.test(seed) && !FORBIDDEN.test(seed));
+  }
+
   const passed = results.filter((r) => r.pass).length;
   const failures = results.filter((r) => !r.pass);
   return NextResponse.json(
     {
       suite: "help",
       articles: HELP_ARTICLES.length,
+      screenshots: HELP_SHOTS.length,
       passed,
       failed: failures.length,
       results: failures.length ? failures : "all pass",

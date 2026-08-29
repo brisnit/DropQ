@@ -1,7 +1,7 @@
 import { HELP_ARTICLES } from "@/lib/help/content";
 import { routeMatches } from "@/lib/guidance";
 import type { GuidanceCapabilities } from "@/lib/guidance";
-import type { HelpArticle, HelpRequires } from "@/lib/help/types";
+import { bodyText, type HelpArticle, type HelpRequires } from "@/lib/help/types";
 
 /**
  * Help search and filtering. Pure, deterministic, and deliberately not clever.
@@ -45,10 +45,9 @@ function terms(q: string): string[] {
 }
 
 function articleText(a: HelpArticle): string {
-  const body = a.body
-    .map((b) => (b.kind === "steps" ? b.items.join(" ") : b.text))
-    .join(" ");
-  return norm(`${a.title} ${a.question} ${a.summary} ${a.keywords.join(" ")} ${body}`);
+  return norm(
+    `${a.title} ${a.question} ${a.summary} ${a.keywords.join(" ")} ${bodyText(a.body)}`
+  );
 }
 
 /**

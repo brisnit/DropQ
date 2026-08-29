@@ -7,9 +7,9 @@
  * touching activation progress.
  */
 import prismaModule from "../../../app/generated/prisma/index.js";
-import { launch, vendorContext, url, screenshot, noHorizontalOverflow, recorder, guidanceReady } from "../support/browser.mjs";
+import { launch, vendorContext, url, screenshot, noHorizontalOverflow, overflowingChildren, recorder, guidanceReady } from "../support/browser.mjs";
 import { assertVerifyDatabase } from "../support/guard.mjs";
-import { seedFresh, seedSelling, settleGuidance, openClient, VENDOR_SLUG } from "../seed/vendor.mjs";
+import { seedFresh, seedSelling, settleGuidance, silenceGuidance, openClient, VENDOR_SLUG } from "../seed/vendor.mjs";
 import { readFileSync } from "node:fs";
 
 const DB = assertVerifyDatabase();
@@ -148,6 +148,111 @@ r.section("PUBLIC /help");
   r.ok("a gated article 404s for the public", gated?.status() === 404, `status=${gated?.status()}`);
   await screenshot(page, "public-help-article");
   await ctx.close();
+}
+
+/* --------------------- illustrated walkthroughs ------------------- */
+/**
+ * Phase 5. The screenshots have to survive the trip into the page: load at all,
+ * stay inside their container at 320px, and appear in BOTH places an article is
+ * read — the in-dashboard panel and the public route.
+ */
+{
+  const manifest = JSON.parse(readFileSync("public/help/manifest.json", "utf8"));
+  const ILLUSTRATED = [...new Set(manifest.shots.map((s) => s.article))];
+  r.section("ILLUSTRATED ARTICLES");
+
+  // Widest and narrowest phone we support, plus desktop. 320 is where the
+  // activation card clipped in production, so every new image is checked there.
+  for (const width of [320, 390, 1280]) {
+    const ctx = await browser.newContext({ viewport: { width, height: 900 } });
+    const page = await ctx.newPage();
+    for (const slug of ILLUSTRATED) {
+      const res = await page.goto(url(`/help/${slug}`), { waitUntil: "networkidle" });
+      r.ok(`${width}px /help/${slug} renders`, res?.status() === 200, `status=${res?.status()}`);
+
+      // The images are lazy, so the ones below the fold have not started
+      // loading yet — which is the point of lazy, and also what a vendor sees
+      // as they read down. Bring each into view the way reading would.
+      // (`window.scrollTo` is useless here: the app sets scroll-behavior:
+      // smooth, so a scroll loop returns before anything has moved.)
+      const shown = page.locator("main img");
+      for (let k = 0, n = await shown.count(); k < n; k++) {
+        await shown.nth(k).scrollIntoViewIfNeeded();
+      }
+      await page
+        .waitForFunction(
+          () => [...document.querySelectorAll("main img")].every((i) => i.complete),
+          null,
+          { timeout: 15_000 }
+        )
+        .catch(() => {});
+
+      const imgs = await page.evaluate(() =>
+        [...document.querySelectorAll("main img")].map((i) => ({
+          src: new URL(i.currentSrc || i.src).pathname,
+          loaded: i.complete && i.naturalWidth > 0,
+          alt: i.alt,
+          w: i.getBoundingClientRect().width,
+        }))
+      );
+      const expected = manifest.shots.filter((s) => s.article === slug);
+      r.ok(`${width}px ${slug} shows all ${expected.length} screenshots`,
+        imgs.length === expected.length, `rendered ${imgs.length}`);
+      r.ok(`${width}px ${slug} images all load`, imgs.every((i) => i.loaded),
+        imgs.filter((i) => !i.loaded).map((i) => i.src).join());
+      r.ok(`${width}px ${slug} images point at the manifest files`,
+        imgs.every((i) => expected.some((e) => e.file === i.src)),
+        imgs.map((i) => i.src).join());
+      r.ok(`${width}px ${slug} images have real alt text`,
+        imgs.every((i) => i.alt.length > 10));
+      r.ok(`${width}px ${slug} does not scroll sideways`, await noHorizontalOverflow(page));
+      const spill = await overflowingChildren(page, "main");
+      r.ok(`${width}px ${slug} keeps everything inside the column`, spill.length === 0,
+        spill.slice(0, 3).join());
+    }
+    if (width === 390) await screenshot(page, "illustrated-article-mobile");
+    if (width === 1280) await screenshot(page, "illustrated-article-desktop");
+    await ctx.close();
+  }
+
+  // …and the same article inside the panel, which is a much narrower column.
+  // Every coachmark dismissed: one docked at the bottom of /dashboard/drops
+  // would sit over the mobile menu and swallow the click.
+  const seller = await seedFresh(prismaModule, DB, TERMS);
+  await silenceGuidance(prismaModule, DB, seller.id);
+  for (const viewport of ["mobile", "desktop"]) {
+    const ctx = await vendorContext(browser, seller.id, viewport);
+    const page = await ctx.newPage();
+    await page.goto(url("/dashboard/drops"), { waitUntil: "networkidle" });
+    if (viewport === "mobile") {
+      await page.getByRole("button", { name: "Open menu" }).click();
+      await page.getByRole("button", { name: "Help" }).last().click();
+    } else {
+      await page.getByRole("button", { name: "Help" }).first().click();
+    }
+    const panel = page.locator('[role="dialog"]');
+    await panel.waitFor({ state: "visible" });
+    await panel.getByRole("button", { name: /Publishing a drop/i }).first().click();
+    await page.waitForFunction(() => {
+      const imgs = [...document.querySelectorAll('[role="dialog"] img')];
+      return imgs.length > 0 && imgs.every((i) => i.complete);
+    });
+    const inPanel = await page.evaluate(() =>
+      [...document.querySelectorAll('[role="dialog"] img')].map((i) => ({
+        loaded: i.naturalWidth > 0,
+        w: i.getBoundingClientRect().width,
+      }))
+    );
+    r.ok(`${viewport} panel shows the walkthrough images`, inPanel.length === 4,
+      `${inPanel.length} images`);
+    r.ok(`${viewport} panel images load`, inPanel.every((i) => i.loaded));
+    const spill = await overflowingChildren(page, '[role="dialog"]');
+    r.ok(`${viewport} panel images stay inside the panel`, spill.length === 0,
+      spill.slice(0, 3).join());
+    r.ok(`${viewport} panel does not scroll sideways`, await noHorizontalOverflow(page));
+    await screenshot(page, `illustrated-panel-${viewport}`);
+    await ctx.close();
+  }
 }
 
 await browser.close();

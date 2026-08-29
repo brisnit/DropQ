@@ -139,7 +139,10 @@ function SaveBar({
   // it submits the drop's existing status and can never publish.
   if (mode === "create" && publishGate) {
     return (
-      <div className="sticky bottom-0 -mx-5 sm:-mx-8 px-5 sm:px-8 py-4 bg-cream/90 backdrop-blur border-t border-line flex flex-wrap items-center justify-between gap-3">
+      <div
+        data-guidance-anchor="editor.saveBar"
+        className="sticky bottom-0 -mx-5 sm:-mx-8 px-5 sm:px-8 py-4 bg-cream/90 backdrop-blur border-t border-line flex flex-wrap items-center justify-between gap-3"
+      >
         <p className="text-sm text-ink-soft max-w-md">
           {publishGate.reason} Your work is saved as a draft in the meantime.
         </p>

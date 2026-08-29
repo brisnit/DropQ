@@ -1,4 +1,4 @@
-import { p, steps, note, type HelpArticle } from "@/lib/help/types";
+import { p, steps, note, walk, type HelpArticle } from "@/lib/help/types";
 
 /**
  * Every Help article DropQ ships.
@@ -90,14 +90,25 @@ export const HELP_ARTICLES: HelpArticle[] = [
     category: "getting-started",
     keywords: ["first", "start", "checklist", "order", "steps"],
     body: [
-      steps(
-        "Connect Stripe — this is the only hard requirement.",
-        "Create a drop with a few items and quantities you can actually deliver.",
-        "Set when customers can order and when they collect.",
-        "Publish it.",
-        "Share the link or print the QR code.",
+      p("Five things, in this order: connect Stripe, build one drop, set your dates, publish, share it. Everything else can wait."),
+      walk(
+        {
+          title: "Start on your dashboard",
+          text: "The checklist ticks itself off from what you've actually done — you never mark anything complete by hand.",
+          shot: "getting-started-dashboard",
+        },
+        {
+          title: "Everything starts with a drop",
+          text: "A drop is one sale with a start and an end. New drop is on the Drops page.",
+          shot: "getting-started-new-drop",
+        },
+        {
+          title: "Help is always in the header",
+          text: "It knows which page you're on and shows the articles for it first.",
+          shot: "getting-started-help",
+        },
       ),
-      p("The checklist on your dashboard tracks all of this for you. It ticks itself off from what you've actually done — you never mark anything complete by hand."),
+      note("Connecting Stripe is the only hard requirement. Until it can take card payments, DropQ saves your drops as drafts."),
     ],
     related: ["connect-stripe", "create-your-first-drop", "share-your-drop"],
     routes: ["/dashboard"],
@@ -133,15 +144,29 @@ export const HELP_ARTICLES: HelpArticle[] = [
     category: "drops",
     keywords: ["create", "new drop", "first drop", "make", "build"],
     body: [
-      steps(
-        "Go to Drops and choose Regular drop or Live selling drop.",
-        "Give it a title and a short description — this is what customers see.",
-        "Choose your fulfilment (pickup, local delivery, or on-site handoff) and where.",
-        "Set when customers can order, then when they collect.",
-        "Add your items with a price and a quantity for this drop.",
-        "Save as a draft, or publish it if Stripe is connected.",
+      walk(
+        {
+          title: "Choose the drop type",
+          text: "Regular drop for a scheduled sale, Live selling for one you open and close by hand. You pick this once — it can't be changed later.",
+          shot: "create-drop-choose-type",
+        },
+        {
+          title: "Title and description",
+          text: "This is what customers read on your storefront. Say what it is and anything they need to know before ordering.",
+          shot: "create-drop-details",
+        },
+        {
+          title: "Fulfilment and location",
+          text: "Pickup, local delivery, or on-site handoff — and where it happens.",
+          shot: "create-drop-fulfilment",
+        },
+        {
+          title: "Add your items, then save",
+          text: "Each item needs a name, a price and a quantity for this drop. Save as a draft, or publish if Stripe is connected.",
+          shot: "create-drop-save",
+        },
       ),
-      p("You can edit everything afterwards, including while the drop is live."),
+      p("You can edit everything afterwards, including while the drop is live. Dates come next — see How drop dates work."),
     ],
     related: ["drop-types", "how-drop-dates-work", "add-items", "publish-a-drop"],
     routes: ["/dashboard/drops/new", "/dashboard/drops"],
@@ -158,9 +183,22 @@ export const HELP_ARTICLES: HelpArticle[] = [
     keywords: ["dates", "order window", "pickup window", "schedule", "opens", "closes", "time"],
     body: [
       p("A regular drop has two windows, and they run in order."),
-      steps(
-        "Customers can order — from when, until when. Ordering locks itself at the close time.",
-        "Customers pick up — from when, until when. This starts at or after ordering closes, so you have time to make everything.",
+      walk(
+        {
+          title: "When customers can order",
+          text: "From when, until when. Ordering locks itself at the close time — you don't have to be there.",
+          shot: "dates-order-window",
+        },
+        {
+          title: "When they collect",
+          text: "Starts at or after ordering closes, so you have time to make everything.",
+          shot: "dates-pickup-window",
+        },
+        {
+          title: "How it reads once it's set",
+          text: "Both windows, in your store's timezone.",
+          shot: "dates-summary",
+        },
       ),
       p("DropQ enforces the relationship: ordering must close before or exactly when pickup starts, each window needs both a start and an end, and an end must come after its start."),
       note("Times are shown in your store's timezone, which you can set in Store settings. Live selling drops have no windows — they're open while you keep them open."),
@@ -232,8 +270,28 @@ export const HELP_ARTICLES: HelpArticle[] = [
     category: "drops",
     keywords: ["publish", "live", "go live", "publishing"],
     body: [
-      p("Publishing makes the drop public. Customers can order it during the order window you set — not before it opens, and not after it closes."),
-      p("Publishing does not tell anyone. Sharing the link or the QR code is what brings customers to it."),
+      walk(
+        {
+          title: "Publish it",
+          text: "Publishing puts the drop on your storefront. Customers can order during the window you set — not before it opens, not after it closes.",
+          shot: "publish-button",
+        },
+        {
+          title: "It goes live and counts down",
+          text: "The drop shows its status and the time left until ordering closes.",
+          shot: "publish-live-state",
+        },
+        {
+          title: "Copy the link",
+          text: "Publishing does not tell anyone. This link is what brings customers to the drop — post it wherever they already follow you.",
+          shot: "publish-share-link",
+        },
+        {
+          title: "Or use the QR code",
+          text: "Every drop has its own QR code. Print it and put it on the table, on the box, or in the window.",
+          shot: "publish-qr",
+        },
+      ),
       note("A drop can only be published when Stripe can take card payments for you. If it can't, DropQ saves your work as a draft instead of putting a checkout in front of customers that cannot take their money."),
     ],
     related: ["share-your-drop", "why-cant-i-publish", "connect-stripe"],
@@ -252,7 +310,23 @@ export const HELP_ARTICLES: HelpArticle[] = [
     category: "products",
     keywords: ["items", "products", "add", "menu", "photos"],
     body: [
-      p("Inside the drop editor, each item needs a name and a price. You can add photos (up to six per item), a short description, and a quantity for this drop."),
+      walk(
+        {
+          title: "Name and price",
+          text: "The minimum an item needs. You can also add up to six photos and a short description.",
+          shot: "add-items-row",
+        },
+        {
+          title: "Quantity for this drop",
+          text: "How many you're selling in THIS drop, not how many you own. When it hits zero the item sells out and the rest of the drop stays open.",
+          shot: "add-items-inventory",
+        },
+        {
+          title: "Watch it sell through",
+          text: "Once the drop is running, each item shows sold against the quantity you set.",
+          shot: "add-items-result",
+        },
+      ),
       p("If you've saved products before, use Add from saved products to pull in the name, price and photos. You still set the quantity for each drop."),
       note("New items you type into a drop are saved to your product library automatically, so you can reuse them. There's a checkbox to opt out."),
     ],
@@ -356,13 +430,23 @@ export const HELP_ARTICLES: HelpArticle[] = [
     category: "payments",
     keywords: ["stripe", "connect", "setup", "payments", "bank", "payout"],
     body: [
-      steps(
-        "Go to Payments in your dashboard.",
-        "Choose Connect with Stripe.",
-        "Complete Stripe's setup — this happens on Stripe's own site, not in DropQ.",
-        "You'll be returned to DropQ. Once Stripe says you can accept charges, you can publish.",
+      walk(
+        {
+          title: "Go to Payments",
+          text: "Connect with Stripe is the only thing on the page until you've done it.",
+          shot: "stripe-payments-page",
+        },
+        {
+          title: "DropQ hands you to Stripe",
+          text: "The rest happens on Stripe's own site. Stripe asks for your business details, an ID check, and the bank account you want money paid into — DropQ never sees or stores any of it.",
+          shot: "stripe-handoff",
+        },
+        {
+          title: "Come back and check the status",
+          text: "Coming back from Stripe is not the same as being finished. Payments tells you when Stripe can actually take charges — that's when you can publish.",
+          shot: "stripe-connected",
+        },
       ),
-      p("Stripe asks for the details it needs to pay you and to meet its own rules — typically your business details, an ID check, and the bank account you want money paid into. DropQ never sees or stores any of it."),
       note("Coming back from Stripe is not the same as being finished. See the next article."),
     ],
     related: ["stripe-started-vs-ready", "when-do-i-get-paid", "why-cant-i-publish"],
