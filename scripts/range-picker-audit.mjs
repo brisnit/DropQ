@@ -68,6 +68,9 @@ const read = (p) => ev(`(()=>{const n=(k)=>document.querySelector('input[name="'
   const g=${GRIDS}[${p}]; const sel=[...g.querySelectorAll('button')].filter(b=>/bg-brand text-white/.test(b.querySelector('span')?.className||'')).map(b=>b.textContent.trim().replace(/\\D/g,''));
   const banded=[...g.children].filter(d=>/bg-brand-tint/.test(d.className)).length;
   return {start:n('${PICKERS[p].start}'), end:n('${PICKERS[p].end}'), selected:sel, bandedCells:banded};})()`);
+const stepMonth = (p) => ev(`(()=>{const c=${GRIDS}[${p}].closest('.rounded-card')||${GRIDS}[${p}].parentElement;
+  const nav=[...c.querySelectorAll('button')].filter(b=>['‹','›'].includes(b.textContent.trim()))[1];
+  nav.click(); return true;})()`);
 const monthLabel = (p) => ev(`(()=>{const card=${GRIDS}[${p}].closest('.rounded-card')||${GRIDS}[${p}].parentElement;
   return card.querySelector('select')?.value ?? null;})()`);
 
@@ -88,15 +91,24 @@ await reset();
 const todayNum = await ev(`document.querySelector('[aria-current="date"]').textContent.trim().replace(/\\D/g,'')`);
 const daysInMonth = await ev(`(()=>{const g=${GRIDS}[0];return [...g.querySelectorAll('button')].length})()`);
 console.log(`  today = day ${todayNum} of a ${daysInMonth}-day month`);
-const later = Number(todayNum) + 4 <= daysInMonth ? Number(todayNum)+4 : Number(todayNum)-4;
-const forward = Number(later) > Number(todayNum);
+// "later" must be FORWARD. Past days are disabled, so a backward target would
+// click a dead button and the scenario would quietly assert nothing — which is
+// exactly what happened the first time the month rolled past today+4.
+const roomThisMonth = Number(todayNum) < daysInMonth;
+const later = roomThisMonth ? Math.min(Number(todayNum) + 4, daysInMonth) : 5;
+const laterIsNextMonth = !roomThisMonth;
+/** Click the "later" day, stepping to next month when today is month-end. */
+const clickLater = async (p) => {
+  if (laterIsNextMonth) { await stepMonth(p); await sleep(450); }
+  await clickDay(p, later);
+};
 
 for (let p = 0; p < PICKERS.length; p++) {
   const L = PICKERS[p].label;
   console.log(`\n## ${L}`);
 
   // --- A: today -> later date -------------------------------------------
-  await reset(); await clickDay(p, todayNum); await sleep(350); await clickDay(p, later); await sleep(450);
+  await reset(); await clickDay(p, todayNum); await sleep(350); await clickLater(p); await sleep(450);
   let r = await read(p);
   console.log(`  A today(${todayNum}) -> later(${later})          start=${day(r.start)} ${wall(r.start)}  end=${day(r.end)} ${wall(r.end)}  selected=[${r.selected}] band=${r.bandedCells}`);
   record(`${L}: today -> later sets Opens=today and Closes=later`,
@@ -169,8 +181,9 @@ for (let p = 0; p < PICKERS.length; p++) {
 
   // --- F: the same-tick double click (what the screenshot script did) ----
   await reset();
-  await ev(`(()=>{const g=${GRIDS}[${p}]; const bs=[...g.querySelectorAll('button')];
-    const t=bs.find(x=>x.textContent.trim().replace(/\\D/g,'')==='${todayNum}');
+  if (laterIsNextMonth) { await stepMonth(p); await sleep(450); }
+  await ev(`(()=>{const g=${GRIDS}[${p}]; const bs=[...g.querySelectorAll('button')].filter(b=>!b.disabled);
+    const t=bs.find(x=>x.textContent.trim().replace(/\\D/g,'')==='${laterIsNextMonth ? later : todayNum}');
     const l=bs.find(x=>x.textContent.trim().replace(/\\D/g,'')==='${later}');
     t.click(); l.click(); return true;})()`);
   await sleep(600);
