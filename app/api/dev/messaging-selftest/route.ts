@@ -394,6 +394,13 @@ export async function GET() {
     // Cascades clean up drops, orders, conversations, messages, notifications.
     await prisma.seller.deleteMany({ where: { id: { in: madeSellerIds } } }).catch(() => {});
     await prisma.customer.deleteMany({ where: { id: { in: madeCustomerIds } } }).catch(() => {});
+    // 13b's OAuth customer is created by linkOAuthCustomer(), which never adds
+    // it to madeCustomerIds — so it was only cleaned up in the CATCH path, and
+    // every SUCCESSFUL run left one behind. Fourteen "OAuth Tester" rows had
+    // accumulated in production since 2026-08-14 before this was noticed.
+    await prisma.customerAccount.deleteMany({ where: { providerAccountId: { contains: stamp } } }).catch(() => {});
+    await prisma.customer.deleteMany({ where: { email: { contains: `oauth-${stamp}` } } }).catch(() => {});
+    await prisma.customer.deleteMany({ where: { email: { contains: `changed-${stamp}` } } }).catch(() => {});
   }
 
   const failed = results.filter((r) => !r.pass);
