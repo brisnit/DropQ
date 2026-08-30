@@ -29,35 +29,79 @@ Accepted values: `on`, `consent`, `off`. Anything unrecognised — including a
 typo like `true` or `enabled` — is treated as **off**. There is no value that
 turns analytics on by accident.
 
-## 2. A redeploy IS required — and the reason is not the obvious one
+## 2. How Vercel applies an environment change — measured, not assumed
 
-`analyticsMode()` takes the environment as a parameter (`env = process.env`) and
-reads it as a dynamic property lookup, which Next explicitly does not inline. I
-checked the built bundle: the edge middleware contains
-`rn(e=process.env){let t=(e.ANALYTICS_MODE??""` — a runtime read, in the edge
-chunk. **Middleware would start issuing cookies without a rebuild.**
+The first draft of this runbook got this wrong. It said the middleware reads
+`ANALYTICS_MODE` at runtime and would start issuing cookies without a rebuild,
+reasoning from the compiled bundle: `analyticsMode()` takes the environment as a
+parameter, so the value is a dynamic `process.env` lookup that Next does not
+inline. That much is true, and it is also irrelevant — **the process environment
+itself is fixed when a deployment is created.**
 
-The reason a redeploy is still required is the root layout:
+### The experiment
 
-```tsx
-<PageView enabled={analyticsMode() !== "off"} />
+A throwaway branch (`env-propagation-probe`, since deleted) added a route
+echoing `analyticsMode()` from the Node runtime and middleware headers echoing it
+from the Edge runtime, and deployed to Preview. `ANALYTICS_MODE=on` was then set
+in Preview scope for that branch alone.
+
+| | Node runtime | Edge middleware |
+|---|---|---|
+| Before the variable existed | `off`, raw `null` | `off`, raw `unset` |
+| **Same deployment, 60s+ after setting it, no redeploy** | **`off`, raw `null`** | **`off`, raw `unset`** |
+| New deployment via `vercel redeploy` | `on`, raw `on` | `on`, raw `on` |
+| The original deployment, still running, same project env | **`off`** | **`off`** |
+
+Three findings, all measured:
+
+1. **A running deployment never sees a changed variable.** Not the Node runtime,
+   not the Edge middleware, not after a minute, not with cache-busting.
+2. **A redeploy is required, for both runtimes.** This is in addition to the
+   static-prerender reason below, not instead of it.
+3. **A deployment serves the environment snapshot it was built with.** The old
+   preview kept reporting `off` while a sibling deployment of the same commit
+   reported `on`. **This is what makes rollback a valid emergency-off** — with
+   one caveat in §5.
+
+A fourth thing fell out for free: with `ANALYTICS_MODE=on` genuinely set on a
+Preview deployment, `writesAllowed` was **false** and **no cookies were issued**.
+The preview guard was confirmed live, against a real preview build, with the
+variable actually on.
+
+### The second reason a redeploy is required
+
+The root layout renders `<PageView enabled={analyticsMode() !== "off"} />`, and
+`/`, `/discover`, `/privacy` and `/terms` are statically prerendered (`○` in the
+build output). Their HTML has `enabled` baked in at build time. `/pricing`,
+`/help` and `/signup` are dynamic (`ƒ`).
+
+Both reasons point the same way, so the rule is simple and has no exceptions:
+
+> **A change to `ANALYTICS_MODE` does nothing until you deploy.**
+
+## 3. Turning it on — atomic from the operator's side
+
+No half-on state is possible, because nothing at all changes until step 3.
+
+```
+# 1. confirm the privacy policy is already published, and the baseline
+psql "$DATABASE_URL" -c 'SELECT count(*) FROM "AnalyticsEvent";'   # expect 0
+
+# 2. configure — Production scope only
+vercel env add ANALYTICS_MODE production --value on --yes
+
+# 3. deploy — nothing above takes effect without this
+#    Vercel dashboard → latest Production deployment → ⋯ → Redeploy
+#    (no code change, no new commit)
+
+# 4. verify
+curl -sD- -o /dev/null https://www.drop-q.com/pricing | grep -i set-cookie
 ```
 
-That prop is evaluated when the page renders, and several public routes are
-**statically prerendered** — `/`, `/discover`, `/privacy`, `/terms` are `○` in
-the build output. Their HTML already contains `enabled={false}`, frozen at the
-last build. `/pricing`, `/help` and `/signup` are dynamic (`ƒ`) and would pick
-it up immediately.
+Between steps 2 and 3 the site behaves exactly as it does today. That is the
+whole reason this ordering is safe.
 
-So setting the variable alone produces a **half-on state**: identity cookies
-issued everywhere, `page_viewed` events only from the dynamic pages. That is
-worse than either extreme, because the funnel would silently under-count the
-homepage — the top of the funnel.
-
-**Therefore: set the variable, then redeploy.** In Vercel: the latest Production
-deployment → ⋯ → **Redeploy**. No code change, no new commit.
-
-## 3. What the first request should do
+## 4. What the first request should do
 
 A person visiting `https://www.drop-q.com/pricing?utm_source=ig&utm_campaign=test`
 with a fresh browser:
@@ -96,43 +140,66 @@ isInternal     false
 props          null
 ```
 
-Things to look at specifically, because each is a bug if wrong: `path` has no
-`?`, there is no IP anywhere, `env` says `production`, and `isBot` is false for
-a real browser.
+Four things to check specifically, each a bug if wrong: `path` contains no `?`,
+there is no IP anywhere in the row, `env` says `production`, and `isBot` is false
+for a real browser.
 
-## 4. Proving Preview still writes nothing
+## 5. Emergency off — corrected
+
+**Rollback works, and it is not enough on its own.**
+
+It works because a deployment serves its own build-time snapshot (finding 3), so
+a deployment created before the variable existed has `ANALYTICS_MODE` unset and
+issues no cookies. Two conditions, both easy to get wrong under pressure:
+
+- the rollback target must have been built **before** the variable was set —
+  a deployment built after it inherits `on`;
+- the project environment still says `on`, so **the next deploy from `main`
+  silently re-enables analytics.** Rollback stops the bleeding; it does not
+  change the decision.
+
+**Use this order:**
+
+```
+# 1. STOP IT NOW (seconds, no build)
+#    Vercel → Deployments → the last deployment built BEFORE analytics
+#    was enabled → Instant Rollback
+#    Verify: curl -sD- -o /dev/null https://www.drop-q.com/pricing | grep -i set-cookie
+#            → nothing
+
+# 2. MAKE IT STICK (minutes) — otherwise the next push turns it back on
+vercel env rm ANALYTICS_MODE production --yes
+#    then Redeploy from the dashboard
+
+# 3. VERIFY
+curl -sD- -o /dev/null https://www.drop-q.com/pricing | grep -i set-cookie   # nothing
+psql "$DATABASE_URL" -c 'SELECT count(*), max(at) FROM "AnalyticsEvent";'    # count stops rising
+```
+
+If there is any doubt about which deployment is safe to roll back to, **skip
+step 1 and go straight to step 2** — set or remove the variable so it evaluates
+to `off`, then redeploy. It is a few minutes slower and has no ambiguity.
+
+**What "off" does not do:** it does not delete anything already collected, and it
+does not clear cookies already in people's browsers — those expire on their own
+schedule (12 months / 30 minutes / 90 days). If collected data must go, that is a
+`DELETE FROM "AnalyticsEvent"`, prepared the way the last cleanup was: an
+explicit id allowlist and before/after verification.
+
+## 5a. Proving Preview still writes nothing
 
 Two independent checks:
 
-1. **The variable is not there.** `vercel env ls` should show `ANALYTICS_MODE`
-   scoped to Production only.
-2. **Even if it were.** Open any preview deployment URL, browse two pages, then:
+1. **The variable is not there.** `vercel env ls` shows `ANALYTICS_MODE` scoped to
+   Production only.
+2. **Even if it were.** This has now been measured: with `ANALYTICS_MODE=on` set
+   on a Preview deployment, `writesAllowed` was false and no cookies were issued.
+   Confirm after activation with:
    ```sql
    SELECT count(*), env FROM "AnalyticsEvent" GROUP BY env;
    ```
-   Every row must say `production`. A row with `env = 'preview'` means the guard
-   failed and analytics should be turned off immediately.
-
-The browser suite already proves this against a real `VERCEL_ENV=preview` app
-sharing the production database; check 2 is the belt to that braces.
-
-## 5. Turning it off again
-
-**Fastest (seconds), no build:** Vercel → Deployments → the previous Production
-deployment → **Instant Rollback**. The old build has `enabled={false}` baked in
-and the middleware reads the variable at runtime, so identity stops immediately.
-
-**Clean:** `vercel env rm ANALYTICS_MODE production`, then redeploy. Cookies stop
-being issued at once (runtime read); the statically prerendered pages stop
-beaconing after the rebuild.
-
-**What off does NOT do:** it does not delete anything already collected, and it
-does not clear cookies already in people's browsers. Those expire on their own
-schedule. If you need collected data gone, that is a `DELETE FROM
-"AnalyticsEvent"` — say so and I will prepare it the way the last cleanup was
-prepared, with an explicit allowlist and before/after verification.
-
----
+   Every row must say `production`. A row saying `preview` means the guard failed
+   and analytics should go off immediately.
 
 ## 6. First-live-data verification
 
@@ -143,19 +210,48 @@ the numbers.
 
 **Do not use a real vendor, a real customer, or The Clovery's live drop.**
 
-Create one controlled vendor through the real signup form, then classify it so
-it can never contaminate business reporting:
+Signup creates an ordinary Seller — there is no way to mark an account internal
+during signup, and adding one would be a product change for a test. So the
+classification is an explicit mutation immediately afterwards, and it is
+verified rather than assumed.
 
-- store name: **Analytics Activation Check**
-- email: `analytics-check@dropq.example` — the `dropq.example` domain is
-  reserved, unroutable, and already used by the marketing demo store
-- immediately after signup: `UPDATE "Seller" SET "internalKind" = 'staff' WHERE
-  email = 'analytics-check@dropq.example';`
+| | |
+|---|---|
+| Store name | `Analytics Activation Check` |
+| Email | `analytics-check@dropq.example` |
+| Password | anything; it is never used again |
 
-`internalKind = 'staff'` removes it from every business audience via
-`lib/reporting.ts` while leaving it visible operationally. It is a real vendor
-row created through the real front door — which is the point, since the thing
-being tested is the real signup path.
+`dropq.example` is a reserved, unroutable domain, already used by the marketing
+demo store. No mail can reach it and no person owns it.
+
+**The mutation, run immediately after signup completes:**
+
+```sql
+-- 1. exactly one row, and it is the one we just made
+SELECT id, "storeName", email, "internalKind", "createdAt"
+FROM "Seller" WHERE email = 'analytics-check@dropq.example';
+
+-- 2. classify it, by id from step 1
+UPDATE "Seller" SET "internalKind" = 'staff' WHERE id = '<id from step 1>';
+
+-- 3. prove it left every business audience
+SELECT
+  (SELECT count(*) FROM "Seller")                             AS all_sellers,
+  (SELECT count(*) FROM "Seller" WHERE "internalKind" IS NULL) AS business_sellers;
+```
+
+`business_sellers` must be unchanged from before the test began, while
+`all_sellers` is one higher. That is `sellerWhere("business")` from
+`lib/reporting.ts` — the same predicate every business number uses — so proving
+it here proves it everywhere.
+
+`internalKind = 'staff'` is one of the six values in `INTERNAL_KINDS`. It removes
+the vendor from business reporting while leaving it fully visible operationally,
+which is correct: it is a real account that a real person could log into.
+
+Its `AnalyticsEvent` rows still carry `isInternal = false`, because that flag is
+stamped at write time and the vendor was not classified yet. That is expected and
+is why step 6 below deletes the check's events rather than relying on the flag.
 
 ### The walk
 
@@ -199,13 +295,21 @@ null after signup, or the three page views span more than one `visitorId`.
 
 ### Afterwards
 
-Keep the check vendor — classified `staff`, it costs nothing and gives you a
-known-good row to compare against later. Delete its analytics events if you want
-a clean first day:
+Keep the check vendor. Classified `staff` it costs nothing, and it is a
+known-good row to compare against later.
+
+Delete its analytics events so the first real day's numbers are not a mix of your
+walk-through and actual visitors:
 
 ```sql
 DELETE FROM "AnalyticsEvent" WHERE "visitorId" = '<the dq_vid from step 1>';
+SELECT count(*) FROM "AnalyticsEvent";   -- now genuinely only real traffic
 ```
+
+Then leave analytics on and let it collect. Phase B (wiring the remaining
+conversion events) and Phase C (the admin dashboard) are worth starting once
+there are a couple of weeks of real events — a funnel drawn over three days
+mostly measures the days.
 
 ## 7. Then, and only then
 
