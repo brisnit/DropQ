@@ -73,8 +73,8 @@ export default function PrivacyPage() {
             </li>
             <li>
               <b>Cookies.</b> We use only our own first-party cookies &mdash; to keep you logged in,
-              to credit the vendor whose link or QR code you arrived through, and (where enabled)
-              for our own analytics. See Section 6.
+              to remember which vendor&rsquo;s link or QR code you arrived through so activity is
+              credited correctly, and (where enabled) for our own analytics. See Section 6.
             </li>
           </ul>
         </Section>
@@ -195,9 +195,9 @@ export default function PrivacyPage() {
                 <tr className="border-t border-line">
                   <td className="px-3 py-2 align-top font-mono text-[0.85rem]">dq_touch</td>
                   <td className="px-3 py-2 align-top">
-                    Records which vendor&rsquo;s storefront, link or QR code you arrived through, so
-                    that vendor &mdash; and any sales representative who introduced them &mdash; is
-                    credited for your order. Essential to how DropQ pays people.
+                    Remembers when you arrive through a vendor&rsquo;s storefront, shared link or QR
+                    code, so that eligible purchases and sign-ups are credited to the right vendor.
+                    It does not affect payment itself.
                   </td>
                   <td className="px-3 py-2 align-top whitespace-nowrap">30 days</td>
                 </tr>
@@ -229,7 +229,8 @@ export default function PrivacyPage() {
           </div>
           <p>
             Most browsers let you control cookies. Disabling essential cookies may prevent you from
-            logging in, or prevent a vendor from being credited for your order.
+            logging in, or prevent a vendor from being credited for activity you started through
+            their link.
           </p>
         </Section>
 
