@@ -20,6 +20,7 @@ import {
   MAX_BODY,
 } from "@/lib/messaging";
 import { unreadNotificationCount, markAllNotificationsRead } from "@/lib/notification-center";
+import { fixtureRefusal, fixtureRefusalBody } from "@/lib/fixture-guard";
 
 /**
  * Development-only self-test for the messaging layer. Exercises the real
@@ -34,6 +35,15 @@ type Result = { name: string; pass: boolean; detail?: string };
 export async function GET() {
   if (process.env.NODE_ENV === "production") {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+
+  // This suite creates application records as fixtures. It runs only against
+  // the isolated harness database — never production, never preview, never a
+  // developer's own database. See lib/fixture-guard.ts for why teardown is not
+  // considered sufficient.
+  const refusal = fixtureRefusal();
+  if (refusal) {
+    return NextResponse.json(fixtureRefusalBody(refusal), { status: 503 });
   }
 
   const results: Result[] = [];

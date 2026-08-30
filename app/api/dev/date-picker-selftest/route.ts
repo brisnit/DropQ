@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { TERMS_VERSION } from "@/lib/terms";
+import { fixtureRefusal, fixtureRefusalBody } from "@/lib/fixture-guard";
 
 /**
  * Development-only cover for the "today" treatment in the Drop date picker
@@ -59,6 +60,15 @@ function dateInZone(timeZone: string) {
 export async function GET(req: Request) {
   if (process.env.NODE_ENV === "production") {
     return new NextResponse("Not found", { status: 404 });
+  }
+
+  // This suite creates application records as fixtures. It runs only against
+  // the isolated harness database — never production, never preview, never a
+  // developer's own database. See lib/fixture-guard.ts for why teardown is not
+  // considered sufficient.
+  const refusal = fixtureRefusal();
+  if (refusal) {
+    return NextResponse.json(fixtureRefusalBody(refusal), { status: 503 });
   }
 
   const checks: Check[] = [];

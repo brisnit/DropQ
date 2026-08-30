@@ -89,6 +89,20 @@ Create `specs/<area>.spec.mjs`, import the support helpers, use `recorder()`,
 and `process.exit(ok ? 0 : 1)`. The runner picks it up automatically and
 `npm run test:browser -- <area>` will filter to it.
 
+## Self-tests never touch production
+
+`npm run test:selftests` boots the isolated stack and calls every
+`/api/dev/*-selftest` route against it. The five that create fixtures —
+attribution, date-picker, messaging, walkup-pay, walkup-route — **refuse to run
+anywhere else**, including production, preview and a developer's own database.
+See `lib/fixture-guard.ts`; `isolation-selftest` proves the guard is still
+wired and fails by name if anyone removes it.
+
+Two suites (`activation`, `payments`) assert invariants about REAL production
+rows and are skipped by that runner. Run them against `.env`; both are
+read-only, apart from one payments transaction that always rolls back and then
+proves the row is unchanged.
+
 ## Analytics: the bot filter sees Playwright
 
 `chromium.launch({ channel: "chrome" })` announces itself as **HeadlessChrome**,

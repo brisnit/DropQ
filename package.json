@@ -21,7 +21,8 @@
     "test:browser:guidance": "node tests/browser/run.mjs guidance",
     "test:browser:help": "node tests/browser/run.mjs help",
     "help:screenshots": "node tests/browser/docs/capture.mjs",
-    "help:screenshots:check": "node tests/browser/docs/capture.mjs --check"
+    "help:screenshots:check": "node tests/browser/docs/capture.mjs --check",
+    "test:selftests": "node tests/selftests.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
