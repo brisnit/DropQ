@@ -15,32 +15,32 @@ datasource db {
 }
 
 model Seller {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  storeName    String
-  slug         String   @unique
-  tagline      String?
-  bio          String?
-  location     String?
-  logoUrl      String?  // uploaded store logo (storefront avatar)
+  id             String  @id @default(cuid())
+  email          String  @unique
+  passwordHash   String
+  storeName      String
+  slug           String  @unique
+  tagline        String?
+  bio            String?
+  location       String?
+  logoUrl        String? // uploaded store logo (storefront avatar)
   headerImageUrl String? // uploaded storefront header/banner background
-  accent       String   @default("#ff666c") // brand accent for storefront
+  accent         String  @default("#ff666c") // brand accent for storefront
 
   // Social media links (stored as full URLs)
-  instagram String?
-  tiktok    String?
-  twitter   String?
-  facebook  String?
-  youtube   String?
-  website   String?
-  category     String   @default("food") // food | collectibles | apparel | art | other
-  emailVerified Boolean @default(false)
-  isAdmin      Boolean  @default(false) // DropQ internal admin
-  disabledAt   DateTime? // set when an admin suspends the vendor (blocks login + storefront)
+  instagram       String?
+  tiktok          String?
+  twitter         String?
+  facebook        String?
+  youtube         String?
+  website         String?
+  category        String    @default("food") // food | collectibles | apparel | art | other
+  emailVerified   Boolean   @default(false)
+  isAdmin         Boolean   @default(false) // DropQ internal admin
+  disabledAt      DateTime? // set when an admin suspends the vendor (blocks login + storefront)
   termsAcceptedAt DateTime? // when the vendor accepted the Vendor Agreement
-  termsVersion    String?   // which version they accepted
-  createdAt    DateTime @default(now())
+  termsVersion    String? // which version they accepted
+  createdAt       DateTime  @default(now())
 
   // Subscription plan: starter | growth | partner | pro
   plan               String    @default("starter")
@@ -55,8 +55,22 @@ model Seller {
   // Sales rep attribution — set once at signup from ?ref=CODE; permanent unless
   // an admin changes it. See SalesRep / CommissionLedger.
   salesRepId       String?
-  referralCodeUsed String?   // the raw code entered at signup
+  referralCodeUsed String? // the raw code entered at signup
   referredAt       DateTime? // when attribution was set
+
+  /// Anonymous acquisition (Phase A analytics). Stamped once at signup from the
+  /// visitor's own cookies; never overwritten. `firstTouch*` is the acquisition
+  /// of record — same first-write-wins doctrine as Customer.firstVendorId —
+  /// and `lastTouch*` records the most recent qualifying source before they
+  /// converted, so a campaign that closed a vendor is visible alongside the one
+  /// that found them.
+  firstTouchVisitorId String?
+  firstTouchAt        DateTime?
+  signupSource        String? // derived channel: direct|search|social|referral|campaign|qr
+  signupSourceDetail  String? // referrer domain or utm_source
+  signupCampaign      String? // utm_campaign
+  lastTouchSource     String?
+  lastTouchCampaign   String?
 
   /// Marks a DropQ-controlled account: founder, canary/smoke-test, staff or the
   /// marketing demo store. NULL means real external commerce.
@@ -72,8 +86,8 @@ model Seller {
   internalKind String?
 
   // Stripe Connect (payouts)
-  stripeAccountId      String? @unique
-  stripeChargesEnabled Boolean @default(false)
+  stripeAccountId        String?   @unique
+  stripeChargesEnabled   Boolean   @default(false)
   /// The FIRST time this seller became Stripe charge-ready. An activation
   /// timestamp, NOT a representation of current status — `stripeChargesEnabled`
   /// remains authoritative for that. Set once on the first false->true
@@ -95,7 +109,7 @@ model Seller {
 
   // IANA timezone for scheduling drops (e.g. "America/New_York"). Null = use the
   // vendor's browser timezone when scheduling.
-  timezone        String?
+  timezone String?
 
   // Geofencing notifications (location + opt-in radius)
   geofenceEnabled Boolean @default(false)
@@ -114,14 +128,14 @@ model Seller {
   // show (city/neighborhood level); exact addresses live on the drop and are
   // never exposed in discovery. Reusable by a future DropMaps feature.
   isDiscoverable             Boolean @default(false) // master opt-in switch
-  showActiveDropsInDiscovery Boolean @default(true)  // show my live/upcoming drops
-  showEventsInDiscovery      Boolean @default(true)  // show my pop-ups / markets (live drops)
-  hideExactAddress           Boolean @default(true)  // never expose exact address in discovery
-  publicNeighborhood String? // e.g. "East Austin"
-  publicCity         String? // shown publicly; falls back to `location`
-  publicState        String? // e.g. "TX"
-  publicZip          String? // for zip-based search matching
-  discoveryRadius    Int     @default(25) // vendor service radius in miles (informational)
+  showActiveDropsInDiscovery Boolean @default(true) // show my live/upcoming drops
+  showEventsInDiscovery      Boolean @default(true) // show my pop-ups / markets (live drops)
+  hideExactAddress           Boolean @default(true) // never expose exact address in discovery
+  publicNeighborhood         String? // e.g. "East Austin"
+  publicCity                 String? // shown publicly; falls back to `location`
+  publicState                String? // e.g. "TX"
+  publicZip                  String? // for zip-based search matching
+  discoveryRadius            Int     @default(25) // vendor service radius in miles (informational)
 
   drops          Drop[]
   orders         Order[]
@@ -130,8 +144,8 @@ model Seller {
   reviews        Review[]
   gallery        GalleryImage[]
   vendorProducts VendorProduct[]
-  referralsMade  Referral[]     @relation("Referrer")
-  referredBy     Referral?      @relation("Referred")
+  referralsMade  Referral[]      @relation("Referrer")
+  referredBy     Referral?       @relation("Referred")
 
   salesRep    SalesRep?          @relation("SalesRepVendors", fields: [salesRepId], references: [id], onDelete: SetNull)
   commissions CommissionLedger[] @relation("VendorCommissions")
@@ -155,7 +169,7 @@ model Seller {
   claimsReviewed     ClaimRequest[]      @relation("ClaimReviewedBy")
 
   // Customer relationships
-  acquiredCustomers   Customer[]       @relation("CustomerFirstVendor")
+  acquiredCustomers     Customer[]       @relation("CustomerFirstVendor")
   customerRelationships CustomerVendor[]
   pointsAwarded         PointsLedger[]
   walkUpSales           WalkUpSale[]
@@ -229,23 +243,23 @@ model VendorGuidance {
 // A DropQ sales rep / affiliate. Vendors who sign up with the rep's referral
 // code are permanently attributed to them and earn the rep commission.
 model SalesRep {
-  id             String   @id @default(cuid())
+  id             String  @id @default(cuid())
   // The rep activates their dashboard by signing up/logging in as a normal
   // DropQ user with this same email; userId links to that Seller account.
-  userId         String?  @unique
+  userId         String? @unique
   name           String
-  email          String   @unique
+  email          String  @unique
   phone          String?
-  passwordHash   String?  // legacy (standalone portal) — activation is now email-match
-  referralCode   String?  @unique // legacy — obsolete; signup links now use the rep id
-  commissionRate Float    @default(0.01) // 1% — change here or per-rep to adjust
-  status         String   @default("active") // active | inactive
+  passwordHash   String? // legacy (standalone portal) — activation is now email-match
+  referralCode   String? @unique // legacy — obsolete; signup links now use the rep id
+  commissionRate Float   @default(0.01) // 1% — change here or per-rep to adjust
+  status         String  @default("active") // active | inactive
 
   inviteSentAt     DateTime? // last time the invite email/SMS was sent
   inviteAcceptedAt DateTime? // when the rep first activated their dashboard
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   vendors     Seller[]           @relation("SalesRepVendors")
   commissions CommissionLedger[]
@@ -254,24 +268,24 @@ model SalesRep {
 // One ledger row per vendor order attributed to a sales rep. Idempotent via the
 // unique (orderId, salesRepId). Refunds add a voided/negative adjustment.
 model CommissionLedger {
-  id         String @id @default(cuid())
+  id         String   @id @default(cuid())
   salesRepId String
   salesRep   SalesRep @relation(fields: [salesRepId], references: [id], onDelete: Cascade)
   vendorId   String
   vendor     Seller   @relation("VendorCommissions", fields: [vendorId], references: [id], onDelete: Cascade)
 
-  orderId   String  // the order this commission is for
+  orderId   String // the order this commission is for
   paymentId String? // Stripe payment intent id, if available
 
   // All amounts in cents so reporting can recompute against any base.
-  grossOrderAmount     Int  // order total
-  vendorTakeAmount     Int  // gross - DropQ fee (what the vendor nets)
+  grossOrderAmount     Int // order total
+  vendorTakeAmount     Int // gross - DropQ fee (what the vendor nets)
   dropqFeeAmount       Int? // DropQ platform fee, if known
-  commissionBaseAmount Int  // the base the rate is applied to (see lib/commission.ts)
+  commissionBaseAmount Int // the base the rate is applied to (see lib/commission.ts)
   commissionRate       Float
-  commissionAmount     Int  // base * rate, rounded (can be negative for adjustments)
+  commissionAmount     Int // base * rate, rounded (can be negative for adjustments)
 
-  status String @default("pending") // pending | approved | paid | voided
+  status String  @default("pending") // pending | approved | paid | voided
   notes  String?
 
   createdAt  DateTime  @default(now())
@@ -339,7 +353,7 @@ model Token {
   id        String   @id @default(cuid())
   sellerId  String
   seller    Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-  type      String   // "verify" | "reset"
+  type      String // "verify" | "reset"
   tokenHash String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
@@ -356,7 +370,7 @@ model Drop {
   status      String    @default("draft") // draft | live | closed
   mode        String    @default("preorder") // preorder (regular drop) | live (live selling / on-site QR)
   fulfillment String    @default("pickup") // pickup | delivery | handoff
-  pickupInfo  String?   // legacy free-text location line (kept for back-compat)
+  pickupInfo  String? // legacy free-text location line (kept for back-compat)
   opensAt     DateTime? // order window start (UTC)
   closesAt    DateTime? // order window end (UTC) — ordering locks after this
 
@@ -381,9 +395,9 @@ model Drop {
   // Discovery: a drop is eligible for /discover only when its vendor is
   // discoverable AND this is true. Defaults true so existing drops surface once
   // their vendor opts in; a vendor can mark a specific drop private.
-  isPublic    Boolean   @default(true)
+  isPublic Boolean @default(true)
 
-  createdAt   DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   products    Product[]
   orders      Order[]
@@ -397,7 +411,7 @@ model Drop {
   appearances VendorAppearance[]
 
   // Customers whose very first DropQ touch was this drop
-  acquiredCustomers Customer[] @relation("CustomerFirstDrop")
+  acquiredCustomers Customer[]   @relation("CustomerFirstDrop")
   savedBy           SavedDrop[]
   walkUpSales       WalkUpSale[]
 
@@ -416,11 +430,11 @@ model VendorProduct {
   description String?
   priceCents  Int      @default(0) // default/master price; overridable per drop
   emoji       String   @default("🍪")
-  imageUrl    String?  // primary photo (kept in sync with images[0])
+  imageUrl    String? // primary photo (kept in sync with images[0])
   images      String[] @default([])
-  category    String?  // optional grouping (e.g. "Pastries", "Drinks")
-  allergens   String?  // optional dietary/allergen notes
-  productType String?  // collectible metadata (mirrors Product)
+  category    String? // optional grouping (e.g. "Pastries", "Drinks")
+  allergens   String? // optional dietary/allergen notes
+  productType String? // collectible metadata (mirrors Product)
   condition   String?
   rarity      String?
   isActive    Boolean  @default(true)
@@ -433,23 +447,23 @@ model VendorProduct {
 }
 
 model Product {
-  id          String  @id @default(cuid())
-  dropId      String
-  drop        Drop    @relation(fields: [dropId], references: [id], onDelete: Cascade)
+  id              String         @id @default(cuid())
+  dropId          String
+  drop            Drop           @relation(fields: [dropId], references: [id], onDelete: Cascade)
   // Optional link back to the saved library item this was created from. Nullable
   // so existing/ad-hoc drop products are unaffected; SetNull so deleting a
   // library item never breaks a live drop.
   vendorProductId String?
   vendorProduct   VendorProduct? @relation(fields: [vendorProductId], references: [id], onDelete: SetNull)
-  name        String
-  description String?
-  priceCents  Int
-  emoji       String  @default("🍪") // fallback visual when no photo uploaded
-  imageUrl    String? // primary photo (kept in sync with images[0] for back-compat)
-  images      String[] @default([]) // all product photos (gallery); first is primary
-  inventory   Int     @default(0) // total units made available
-  sold        Int     @default(0)
-  sortOrder   Int     @default(0)
+  name            String
+  description     String?
+  priceCents      Int
+  emoji           String         @default("🍪") // fallback visual when no photo uploaded
+  imageUrl        String? // primary photo (kept in sync with images[0] for back-compat)
+  images          String[]       @default([]) // all product photos (gallery); first is primary
+  inventory       Int            @default(0) // total units made available
+  sold            Int            @default(0)
+  sortOrder       Int            @default(0)
 
   // Optional metadata, used mainly by collectible / non-food storefronts
   productType String? // category / type (e.g. "Trading card", "Designer toy")
@@ -460,34 +474,34 @@ model Product {
 }
 
 model Order {
-  id         String   @id @default(cuid())
-  dropId     String
-  drop       Drop     @relation(fields: [dropId], references: [id], onDelete: Cascade)
-  sellerId   String
-  seller     Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-  buyerName  String
-  buyerEmail String
-  buyerPhone String?
+  id                    String    @id @default(cuid())
+  dropId                String
+  drop                  Drop      @relation(fields: [dropId], references: [id], onDelete: Cascade)
+  sellerId              String
+  seller                Seller    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  buyerName             String
+  buyerEmail            String
+  buyerPhone            String?
   // Buyer contact stays denormalized on the order (it's a historical record of
   // what they typed at checkout). customerId links it to the durable Customer
   // identity used for messaging — nullable because pre-messaging orders are
   // backfilled by email, and SetNull so deleting a Customer never voids orders.
-  customerId String?
-  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
-  note       String?
-  totalCents Int
-  feeCents   Int      @default(0) // DropQ platform fee taken from this order
-  status     String   @default("new") // pending | new | in_progress | ready | completed | canceled (legacy: fulfilled)
-  source     String   @default("online") // online (preorder/regular drop) | live (live QR / on-site POS)
+  customerId            String?
+  customer              Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  note                  String?
+  totalCents            Int
+  feeCents              Int       @default(0) // DropQ platform fee taken from this order
+  status                String    @default("new") // pending | new | in_progress | ready | completed | canceled (legacy: fulfilled)
+  source                String    @default("online") // online (preorder/regular drop) | live (live QR / on-site POS)
   // unpaid | pending (Stripe session open) | paid | refund_pending | refunded | expired
   // DropQ takes card payment through Stripe only — there is no pay-in-person
   // option. "unpaid" means nobody has paid, not an agreed arrangement.
-  paymentStatus String @default("unpaid")
+  paymentStatus         String    @default("unpaid")
   // Stripe
-  stripeSessionId       String? @unique
+  stripeSessionId       String?   @unique
   stripePaymentIntentId String?
-  customerArrivedAt DateTime? // customer tapped "I'm here" at pickup
-  createdAt  DateTime @default(now())
+  customerArrivedAt     DateTime? // customer tapped "I'm here" at pickup
+  createdAt             DateTime  @default(now())
 
   items  OrderItem[]
   events OrderEvent[]
@@ -504,8 +518,8 @@ model OrderEvent {
   id        String   @id @default(cuid())
   orderId   String
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  type      String   // created | status | payment
-  detail    String?  // e.g. the new status or payment state
+  type      String // created | status | payment
+  detail    String? // e.g. the new status or payment state
   createdAt DateTime @default(now())
 
   @@index([orderId])
@@ -526,26 +540,26 @@ model OrderItem {
 
 // Customers who sign up for future drops / opt into notifications.
 model Subscriber {
-  id        String   @id @default(cuid())
-  sellerId  String
-  seller    Seller   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
-  dropId    String?
-  drop      Drop?    @relation(fields: [dropId], references: [id], onDelete: SetNull)
-  name      String?
-  email     String?
-  phone     String?
+  id                 String    @id @default(cuid())
+  sellerId           String
+  seller             Seller    @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  dropId             String?
+  drop               Drop?     @relation(fields: [dropId], references: [id], onDelete: SetNull)
+  name               String?
+  email              String?
+  phone              String?
   // Consent is tracked per channel. SMS marketing needs *express written
   // consent* under the TCPA and carriers (via A2P 10DLC review) can ask us to
   // produce it, so optInSms is its own unbundled, default-false field and we
   // stamp the moment it was given. optInNotifications is kept as the
   // any-channel rollup for existing reads.
-  optInNotifications Boolean @default(true) // future drops / marketing (email OR sms)
-  optInEmail         Boolean @default(true)
-  optInSms           Boolean @default(false)
+  optInNotifications Boolean   @default(true) // future drops / marketing (email OR sms)
+  optInEmail         Boolean   @default(true)
+  optInSms           Boolean   @default(false)
   smsConsentAt       DateTime? // when the SMS box was checked — proof of consent
-  optInGeofence      Boolean @default(false)
-  source    String   @default("waitlist") // waitlist | checkout | manual
-  createdAt DateTime @default(now())
+  optInGeofence      Boolean   @default(false)
+  source             String    @default("waitlist") // waitlist | checkout | manual
+  createdAt          DateTime  @default(now())
 
   @@index([sellerId])
   @@index([dropId])
@@ -597,11 +611,17 @@ model Customer {
   firstDropId   String?
   firstDrop     Drop?   @relation("CustomerFirstDrop", fields: [firstDropId], references: [id], onDelete: SetNull)
   /// storefront | drop | qr | dropmeet | checkout | direct | admin
-  signupSource     String?
+  /// DropQ-controlled customer: the founder, staff, a self-test leftover.
+  /// NULL means real external demand. Mirrors Seller.internalKind exactly —
+  /// same word, same meaning, both sides of the marketplace. Never inferred
+  /// from a name or a behaviour pattern; an admin sets it.
+  internalKind  String?
+
+  signupSource       String?
   /// Free-form provenance for the entry point (a slug, a ref code, a share id).
   signupSourceDetail String?
-  firstTouchAt     DateTime?
-  firstPurchaseAt  DateTime?
+  firstTouchAt       DateTime?
+  firstPurchaseAt    DateTime?
 
   /// Reserved for saved payment methods (decision 2). Populated when
   /// SetupIntent-based card management ships; unused until then.
@@ -650,13 +670,13 @@ model Customer {
 // vendor-side Token model but kept separate so customer auth can never widen
 // the blast radius of vendor auth.
 model CustomerToken {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   customerId String
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  tokenHash  String   @unique
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
   expiresAt  DateTime
   usedAt     DateTime?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   /// Intent captured when the link was requested, applied on redemption.
   /// Carrying it here rather than in the redirect URL means a follow can't be
@@ -755,7 +775,7 @@ model Broadcast {
 
   audience       String // drop_all | active_orders | ready_pickup | selected
   body           String
-  recipientCount Int    @default(0)
+  recipientCount Int      @default(0)
   createdAt      DateTime @default(now())
 
   messages Message[]
@@ -766,10 +786,10 @@ model Broadcast {
 // Per-user, per-event notification with deep-link context. recipientType is the
 // discriminator; exactly one of sellerId/customerId is set.
 model Notification {
-  id            String  @id @default(cuid())
+  id            String    @id @default(cuid())
   recipientType String // vendor | customer
   sellerId      String?
-  seller        Seller? @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  seller        Seller?   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
   customerId    String?
   customer      Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
@@ -800,11 +820,11 @@ model MessageDelivery {
   messageId String
   message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
-  channel String // in_app | email | sms | push
-  status  String @default("pending") // pending | sent | skipped | failed
-  detail  String? // provider id, or the reason it was skipped/failed
-  sentAt  DateTime?
-  createdAt DateTime @default(now())
+  channel   String // in_app | email | sms | push
+  status    String    @default("pending") // pending | sent | skipped | failed
+  detail    String? // provider id, or the reason it was skipped/failed
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
 
   @@unique([messageId, channel])
 }
@@ -832,13 +852,13 @@ model MessageDelivery {
 /// point-in-polygon checks; the bbox columns are a cheap pre-filter so most
 /// rejects never touch the polygon math.
 model Region {
-  id       String @id @default(cuid())
-  name     String
-  slug     String @unique
+  id                String    @id @default(cuid())
+  name              String
+  slug              String    @unique
   /// GeoJSON Polygon/MultiPolygon geometry, stored as text.
-  boundaryGeoJson String?
+  boundaryGeoJson   String?
   /// Provenance for the boundary itself.
-  boundarySource  String?
+  boundarySource    String?
   boundaryFetchedAt DateTime?
 
   minLatitude  Float?
@@ -906,7 +926,7 @@ model Location {
   lastVerifiedAt        DateTime?
 
   /// Set when this row was promoted out of the ingestion queue.
-  candidateId String?
+  candidateId   String?
   /// Points at the surviving record when this one is closed as a duplicate.
   duplicateOfId String?
   duplicateOf   Location?  @relation("LocationDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
@@ -951,8 +971,8 @@ model Market {
 
   /// Claiming is a request an admin grants — never self-service.
   claimedBySellerId String?
-  claimedBySeller   Seller? @relation("MarketClaimedBy", fields: [claimedBySellerId], references: [id], onDelete: SetNull)
-  isClaimed         Boolean @default(false)
+  claimedBySeller   Seller?   @relation("MarketClaimedBy", fields: [claimedBySellerId], references: [id], onDelete: SetNull)
+  isClaimed         Boolean   @default(false)
   claimedAt         DateTime?
 
   status             String @default("pending")
@@ -1006,12 +1026,12 @@ model MarketSchedule {
   recurrence String @default("weekly")
 
   /// 0=Sunday … 6=Saturday. Null for one_time.
-  dayOfWeek Int?
+  dayOfWeek   Int?
   /// For monthly rules: 1–4 = first…fourth, -1 = last.
   weekOfMonth Int?
   /// For one_time rules, and the window bounds for seasonal rules.
-  startDate DateTime?
-  endDate   DateTime?
+  startDate   DateTime?
+  endDate     DateTime?
 
   /// Local wall-clock times, "HH:MM" 24h — a market opens at 9am local
   /// regardless of DST, so these are deliberately not UTC instants.
@@ -1022,7 +1042,7 @@ model MarketSchedule {
   /// the Today/This Weekend filters and renders as "Sundays · hours not listed".
   startTime String?
   endTime   String?
-  timezone  String @default("America/Los_Angeles")
+  timezone  String  @default("America/Los_Angeles")
 
   notes  String?
   active Boolean @default(true)
@@ -1040,9 +1060,9 @@ model MarketScheduleException {
   market   Market @relation(fields: [marketId], references: [id], onDelete: Cascade)
 
   /// The local calendar date affected (midnight local, stored UTC).
-  date DateTime
+  date      DateTime
   /// cancelled | closed | special_hours
-  type String @default("cancelled")
+  type      String   @default("cancelled")
   /// Overrides for special_hours.
   startTime String?
   endTime   String?
@@ -1276,7 +1296,7 @@ model VendorLead {
   submitterEmail String?
 
   /// new | contacted | joined | rejected
-  status String @default("new")
+  status String  @default("new")
   notes  String?
 
   createdAt DateTime @default(now())
@@ -1284,7 +1304,6 @@ model VendorLead {
 
   @@index([status, createdAt])
 }
-
 
 /// The customer↔vendor relationship. One row per pair, created the first time
 /// they interact — a follow, a purchase, or signing up through that vendor.
@@ -1331,7 +1350,6 @@ model CustomerVendor {
   @@index([customerId, lastPurchaseAt])
 }
 
-
 /// A drop a customer saved for later. Server-side and cross-device, unlike the
 /// localStorage-only save in lib/saved-store.ts, which is per-browser and
 /// invisible to the rest of the platform.
@@ -1348,7 +1366,6 @@ model SavedDrop {
   @@index([customerId, createdAt])
 }
 
-
 /// Links an OAuth identity (Google today, Apple later) to a DropQ Customer.
 ///
 /// Deliberately NOT Auth.js's default `Account` model: Auth.js's Prisma adapter
@@ -1359,23 +1376,22 @@ model SavedDrop {
 /// The unique on (provider, providerAccountId) is what makes repeat logins
 /// resolve to the same Customer instead of creating duplicates.
 model CustomerAccount {
-  id                String   @id @default(cuid())
-  customerId        String
-  customer          Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
-  provider          String   // "google" | "apple"
-  providerAccountId String   // the provider's stable subject id
+  provider          String // "google" | "apple"
+  providerAccountId String // the provider's stable subject id
   /// Email as the provider asserted it, kept for audit. May differ from
   /// Customer.email (e.g. a future Apple private-relay address).
   providerEmail     String?
 
-  createdAt         DateTime @default(now())
-  lastLoginAt       DateTime?
+  createdAt   DateTime  @default(now())
+  lastLoginAt DateTime?
 
   @@unique([provider, providerAccountId])
   @@index([customerId])
 }
-
 
 /// DropPoints — append-only ledger, not a balance column.
 ///
@@ -1477,4 +1493,81 @@ model WalkUpSale {
   @@index([sellerId])
   /// The expiry sweep.
   @@index([expiresAt])
+}
+
+/// Append-only analytics events.
+///
+/// The system of record for "who visited and what did they do" — see the Phase A
+/// audit. Postgres rather than a third-party pipeline because every question we
+/// have is a JOIN: visitor → Seller → Drop → Order. PostHog cannot answer those
+/// without exporting the business database into it.
+///
+/// ⚠️ APPEND-ONLY. Nothing updates a row after it is written. There is no
+/// `updatedAt` on purpose: an analytics event is a statement about a moment, and
+/// a mutable one is worthless as evidence.
+///
+/// ⚠️ NO FOREIGN KEYS to Seller/Customer/Drop. Two reasons, both deliberate:
+/// a write on a hot path must never wait on a referential check, and an event
+/// must outlive the row it mentions — a deleted drop's page views are still
+/// facts about traffic. The ids are recorded as plain strings and joined
+/// explicitly when queried.
+///
+/// ⚠️ NO IP ADDRESS, EVER. Vercel logs request IPs at the platform level under
+/// its own retention; the application does not read them and this table has
+/// nowhere to put one.
+model AnalyticsEvent {
+  id   String   @id @default(cuid())
+  /// Canonical name from lib/analytics-events.ts. Unknown names are rejected at
+  /// the sink rather than stored, so this column cannot drift.
+  name String
+  at   DateTime @default(now())
+
+  /// Anonymous identity. 32 hex chars, from the dq_vid / dq_sid cookies.
+  visitorId String
+  sessionId String
+
+  /// Known participants, when there are any. Plain ids — see the FK note above.
+  sellerId   String?
+  customerId String?
+  dropId     String?
+
+  /// Path only, query string stripped. See sanitizePath().
+  path           String
+  /// Registrable domain only, never a full referrer URL.
+  referrerDomain String?
+  utmSource      String?
+  utmMedium      String?
+  utmCampaign    String?
+  utmContent     String?
+  utmTerm        String?
+  /// mobile | tablet | desktop | unknown
+  device         String  @default("unknown")
+
+  /// production | preview | development | test. Recorded even though preview is
+  /// refused at the sink, so that a guard failure is visible in the data rather
+  /// than invisible.
+  env        String
+  /// Self-declaring crawler. Stored, not dropped, so bot volume is measurable.
+  isBot      Boolean @default(false)
+  /// Seller or customer was DropQ-controlled at write time. Denormalised from
+  /// internalKind so that reporting never needs a join to exclude ourselves.
+  isInternal Boolean @default(false)
+
+  /// Small bag of event-specific values. Keys in FORBIDDEN_PROPERTY_KEYS are
+  /// rejected at the sink.
+  props Json?
+
+  /// Funnel counts and the time-series charts: every dashboard query starts
+  /// with a name and a window.
+  @@index([name, at])
+  /// One visitor's journey, including across sessions — the pre-signup story.
+  @@index([visitorId, at])
+  /// One sitting, for the session timeline.
+  @@index([sessionId, at])
+  /// Everything a converted vendor did.
+  @@index([sellerId, at])
+  /// Campaign performance. The only source/medium dimension that gets its own
+  /// index, because campaign is the one we plan to group by; source and medium
+  /// are read from rows already narrowed by name + window.
+  @@index([utmCampaign, at])
 }

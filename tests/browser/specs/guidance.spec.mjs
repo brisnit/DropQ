@@ -21,10 +21,36 @@ const r = recorder("guidance");
 const browser = await launch();
 let db = await openClient(prismaModule, DB);
 
-/** The bubble must never sit on top of the element it is teaching. */
+/**
+ * The bubble must never sit on top of the element it is teaching.
+ *
+ * Waits for the bubble to STOP MOVING rather than sleeping for a fixed 650ms.
+ * The coachmark scrolls its anchor into view, measures itself, then re-measures
+ * through a ResizeObserver, so a fixed sleep is a race: it passed on a quiet
+ * machine and failed about half the time on a busy one, which is the worst
+ * possible kind of test. Settling is a real condition, so wait for it — and
+ * then assert it happened fast enough that no vendor sees the intermediate
+ * position, which the old sleep never checked at all.
+ */
+async function settledBox(page, timeout = 3000) {
+  const start = Date.now();
+  let previous = null;
+  while (Date.now() - start < timeout) {
+    const box = await page.locator('[role="note"]').boundingBox();
+    if (box && previous &&
+        Math.abs(box.x - previous.x) < 1 && Math.abs(box.y - previous.y) < 1 &&
+        Math.abs(box.height - previous.height) < 1) {
+      return { box, ms: Date.now() - start };
+    }
+    previous = box;
+    await page.waitForTimeout(100);
+  }
+  return { box: await page.locator('[role="note"]').boundingBox(), ms: Date.now() - start };
+}
+
 async function checkPlacement(page, label) {
-  await page.waitForTimeout(650); // let scroll-into-view settle
-  const box = await page.locator('[role="note"]').boundingBox();
+  const settled = await settledBox(page);
+  const box = settled.box;
   const anchor = await page.evaluate(() => {
     const el = document.querySelector(".guidance-spotlight");
     if (!el) return null;
@@ -41,6 +67,7 @@ async function checkPlacement(page, label) {
     anchor.y >= 0 && anchor.y + anchor.height <= vp.height);
   r.ok(`${label}: the guidance is fully on screen`,
     box.y >= 0 && box.y + box.height <= vp.height && box.x >= 0 && box.x + box.width <= vp.width);
+  r.ok(`${label}: settles before a vendor could see it move`, settled.ms < 1500, `${settled.ms}ms`);
 }
 
 for (const viewport of ["mobile", "desktop"]) {

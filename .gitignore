@@ -54,3 +54,6 @@ next-env.d.ts
 # Browser test harness (throwaway database + captured screenshots)
 tests/browser/.pgdata/
 tests/browser/.shots/
+
+# Extra build dirs used by the analytics browser spec
+.next-analytics-*

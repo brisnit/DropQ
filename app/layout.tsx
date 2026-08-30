@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Varela_Round, Google_Sans_Flex, Allerta_Stencil } from "next/font/google";
 import "./globals.css";
+import { PageView } from "@/components/analytics/page-view";
+import { analyticsMode } from "@/lib/analytics-identity";
 
 // Primary / display font (single weight 400 — bold is synthesized)
 const varela = Varela_Round({
@@ -52,7 +54,13 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${varela.variable} ${googleSans.variable} ${allertaStencil.variable} h-full`}>
-      <body className="min-h-full antialiased">{children}</body>
+      <body className="min-h-full antialiased">
+        {children}
+        {/* Reports page_viewed on public pages. `enabled` is decided here, on
+            the server, from ANALYTICS_MODE — off everywhere today, so this
+            currently renders a component that does nothing at all. */}
+        <PageView enabled={analyticsMode() !== "off"} />
+      </body>
     </html>
   );
 }

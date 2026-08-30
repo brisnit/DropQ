@@ -1,3 +1,5 @@
+import type { BehaviourEvent } from "@/lib/analytics-events";
+
 // Lightweight client analytics for the Vendor Finder. Fire-and-forget beacons to
 // /api/track — no cookies, no customer profile, no PII. Also tracks the
 // originating vendor (in sessionStorage) so DropQ can tell whether discovery led
@@ -140,8 +142,15 @@ export function getOriginatingVendor(): { id: string; slug: string | null } | nu
   }
 }
 
+/**
+ * Canonical behavioural events (Phase A). These are the only names the sink
+ * will STORE; everything else still reaches the log and nothing else.
+ * See lib/analytics-events.ts for the full vocabulary and the renames.
+ */
+export type CanonicalClientEvent = BehaviourEvent;
+
 export function track(
-  event: DiscoveryEvent | GuidanceEvent,
+  event: DiscoveryEvent | GuidanceEvent | CanonicalClientEvent,
   props: Record<string, unknown> = {}
 ) {
   if (typeof window === "undefined") return;

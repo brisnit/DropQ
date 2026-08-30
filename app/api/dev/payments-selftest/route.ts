@@ -918,8 +918,17 @@ export async function GET() {
     check("Order.source is the purchase channel, not the drop type",
       /const source = "online";/.test(orderSrc) &&
       !/drop\.mode === "live" \? "live"/.test(orderSrc));
-    check("C1 created no lib/reporting.ts (that belongs to Phase G)", (() => {
-      try { readFileSync("lib/reporting.ts", "utf8"); return false; } catch { return true; }
+    // This used to assert lib/reporting.ts did NOT exist — C1's scope boundary,
+    // deferring the shared exclusion module. It exists now, created in the
+    // analytics Phase A foundation. The boundary it was protecting still holds,
+    // so the assertion is inverted rather than deleted: payments must not be
+    // the thing that grew a reporting dependency.
+    check("payments still does not depend on the reporting module", (() => {
+      const reporting = (() => {
+        try { return readFileSync("lib/reporting.ts", "utf8"); } catch { return null; }
+      })();
+      if (!reporting) return false; // Phase A shipped it; a missing file is now the bug.
+      return !/lib\/reporting/.test(orderSrc) && /audience/.test(reporting);
     })());
   }
 

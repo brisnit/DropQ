@@ -22,6 +22,7 @@ import { recordReferral } from "@/lib/referral";
 import { normalizeCode } from "@/lib/commission";
 import { linkSellerAsRep } from "@/lib/sales-rep";
 import { createGrowthCheckoutUrl } from "@/lib/billing";
+import { attributeSignup, recordEventSafely } from "@/lib/analytics-server";
 
 export type AuthState = { error?: string };
 export type ResetState = { error?: string; sent?: boolean; done?: boolean };
@@ -108,6 +109,21 @@ export async function signupAction(
       ...planData,
     },
   });
+
+  // Anonymous → vendor. Stamp the browsing history that produced this account
+  // before anything else touches the row: first-touch is written once and the
+  // guard inside is `firstTouchAt: null`, so an early write is the safe order.
+  // Fails silently and never blocks signup — a vendor's account must not depend
+  // on their cookies. No-ops entirely while ANALYTICS_MODE is off.
+  await attributeSignup(seller.id);
+  after(() =>
+    recordEventSafely({
+      name: "vendor_signed_up",
+      path: "/signup",
+      sellerId: seller.id,
+      props: { plan: planData.plan ?? "starter", category, hasInviteCode: !!inviteCode },
+    })
+  );
 
   // If they came through a referral link, credit the referrer (background).
   const ref = String(formData.get("ref") ?? "").trim();

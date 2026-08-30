@@ -89,6 +89,23 @@ Create `specs/<area>.spec.mjs`, import the support helpers, use `recorder()`,
 and `process.exit(ok ? 0 : 1)`. The runner picks it up automatically and
 `npm run test:browser -- <area>` will filter to it.
 
+## Analytics: the bot filter sees Playwright
+
+`chromium.launch({ channel: "chrome" })` announces itself as **HeadlessChrome**,
+and the analytics bot filter refuses it — correctly. Any spec that expects an
+analytics cookie or an analytics row must set a realistic `userAgent` on the
+context, or it will silently record nothing and every assertion will fail in a
+way that looks like the feature is broken.
+
+`specs/analytics.spec.mjs` has a `HUMAN_UA` constant for this. Its bot section
+deliberately uses a real Googlebot string, so the filter is still proven.
+
+That spec also starts two extra dev servers (`ANALYTICS_MODE=on`, and a
+`VERCEL_ENV=preview` build against the same database), each with its own
+`NEXT_DIST_DIR`, because two `next dev` processes sharing `.next` deadlock.
+Next writes those directories into `tsconfig.json`'s `include` array while they
+exist — that edit is a local artefact and can be discarded.
+
 ## Help screenshots (`tests/browser/docs/`)
 
 The illustrated Help articles are generated, not hand-taken.
