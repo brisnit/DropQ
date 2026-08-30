@@ -455,3 +455,44 @@ data rather than on an env var.
 **In-flight money is never rolled back by any of these.** A completed Stripe
 charge always finalizes into a correct order; reversing it is a refund, which is
 Phase F and today means the Stripe dashboard.
+
+
+---
+
+## 13. Backlog — operator scripts have no production confirmation (2026-08-30)
+
+The self-test isolation work (`lib/fixture-guard.ts`) closed the accidental path:
+no `/api/dev/*-selftest` route can write to production any more. The deliberate
+path is still open.
+
+These write to whatever `DATABASE_URL` points at, with no confirmation prompt,
+no dry-run and no environment check:
+
+| Script | npm script | What it does |
+|---|---|---|
+| `prisma/seed.mjs` | `db:seed` | Creates vendors, drops, products, orders |
+| `prisma/seed-showcase.mjs` | — | Creates the marketing demo store |
+| `prisma/seed-region.mjs` | `db:seed-region` | Creates region rows |
+| `prisma/seed-dropmeet-sd.mjs` | `db:seed-dropmeet` | Creates locations and markets |
+| `prisma/backfill-customers.mjs` | `db:backfill-customers` | Updates Customer rows |
+| `prisma/backfill-attribution.mjs` | `db:backfill-attribution` | Updates attribution fields |
+| `prisma/backfill-points.mjs` | `db:backfill-points` | Writes PointsLedger |
+| `prisma/classify-internal-sellers.mjs` | — | Sets Seller.internalKind |
+| `prisma/repair-abandoned-purchase.mjs` | — | Repairs CustomerVendor rows |
+
+Every one is invoked as `node --env-file=.env …`, and `.env` points at
+production. That is *intended* for the backfills and the repair — they exist to
+fix production. It is not intended for the seeds, and `npm run db:seed` against
+production would create fake vendors and orders in the live database with a
+single command and no prompt.
+
+**Deliberately not fixed in the analytics hardening**, which was scoped to
+self-tests. Recommended when picked up:
+
+1. Seeds (`seed`, `seed-showcase`, `seed-region`, `seed-dropmeet`) adopt
+   `fixtureRefusal()` — they create fixture data and have no business running
+   against production.
+2. Backfills and the repair keep production access but gain `--dry-run` as the
+   DEFAULT and require `--apply` plus typing the database name to proceed.
+3. A check in `isolation-selftest` asserting both, so this cannot regress the way
+   the self-test guard could have.
