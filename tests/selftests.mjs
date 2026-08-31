@@ -49,6 +49,7 @@ const SUITES = [
   { name: "messaging", fixtures: true },
   { name: "payments", productionData: true },
   { name: "pricing" },
+  { name: "rate-limit", fixtures: true },
   { name: "walkup-pay", fixtures: true },
   { name: "walkup-route", fixtures: true },
   { name: "webhook" },

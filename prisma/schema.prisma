@@ -1571,3 +1571,31 @@ model AnalyticsEvent {
   /// are read from rows already narrowed by name + window.
   @@index([utmCampaign, at])
 }
+
+/// Rate-limit counters for the authentication surface.
+///
+/// One row per (bucket, key, window). `key` is an HMAC of a normalised email or
+/// an IP address — never the value itself, so this table cannot become a record
+/// of who tried to sign in from where.
+///
+/// ⚠️ Nothing here is account state. A blocked email has a row here and an
+/// untouched Seller; blocks expire with the window and have no unlock step,
+/// which is what stops "lock any vendor out by failing five logins" from being
+/// an attack.
+///
+/// Rows are deleted by the existing reminders cron once `expiresAt` passes.
+model RateLimit {
+  id        String   @id @default(cuid())
+  /// "<rule>:<dimension>:<windowMs>", e.g. "login:email:900000"
+  bucket    String
+  /// HMAC-SHA256 of the normalised identifier, truncated to 128 bits.
+  key       String
+  /// Start of the fixed window this counter belongs to.
+  windowAt  DateTime
+  count     Int      @default(0)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([bucket, key, windowAt])
+  @@index([expiresAt])
+}

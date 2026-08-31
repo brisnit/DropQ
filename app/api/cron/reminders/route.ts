@@ -3,6 +3,7 @@ import { runRepeatReminders } from "@/lib/reminders";
 import { convertExpiredPartners } from "@/lib/billing";
 import { reconcilePendingOrders } from "@/lib/checkout";
 import { closeExpiredDrops } from "@/lib/drop-close";
+import { purgeExpiredRateLimits } from "@/lib/rate-limit";
 
 // Daily maintenance cron. Wired to Vercel Cron via vercel.json.
 // Protected by CRON_SECRET (Vercel sends it as a Bearer token automatically
@@ -21,5 +22,10 @@ export async function GET(req: NextRequest) {
   const partnersConverted = await convertExpiredPartners();
   // Backstop for paid-but-stuck / abandoned Stripe orders.
   const reconciled = await reconcilePendingOrders(15);
-  return Response.json({ ok: true, dropsClosed, ...result, partnersConverted, reconciled });
+  // Closed rate-limit windows. Folded into the existing daily job rather than
+  // adding a second schedule; it is one indexed range delete.
+  const rateLimitRowsPurged = await purgeExpiredRateLimits();
+  return Response.json({
+    ok: true, dropsClosed, ...result, partnersConverted, reconciled, rateLimitRowsPurged,
+  });
 }

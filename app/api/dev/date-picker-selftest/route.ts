@@ -222,7 +222,19 @@ export async function GET(req: Request) {
       html.match(/<button[^>]*\bdisabled=""[^>]*>[\s\S]{0,600}?<\/button>/g) ?? [];
     const newPage = await get("/dashboard/drops/new", created.east!);
     const past = pastCells(newPage.body);
-    check("past days are disabled on a fresh drop", past.length > 0, `disabled cells=${past.length}`);
+    // How many past cells there SHOULD be, rather than "more than none".
+    //
+    // This seller lives in Pacific/Kiritimati (UTC+14) precisely so the suite
+    // exercises the timezone edge, and on the store's 1st of the month there
+    // are legitimately zero past days — the picker opens on the current month
+    // and every day in it is still ahead. `> 0` failed there for the right
+    // reason, which made a correct picker look broken one day in thirty. The
+    // exact count is both stricter and true on every day of the month.
+    const storeDay = Number(new Intl.DateTimeFormat("en-US", {
+      timeZone: "Pacific/Kiritimati", day: "numeric",
+    }).format(new Date()));
+    check("every day before today is disabled on a fresh drop", past.length === storeDay - 1,
+      `disabled cells=${past.length}, store day-of-month=${storeDay}`);
     check("past days are ghosted rather than hidden",
       past.every((c) => /text-ink\/25/.test(c)), past[0]?.slice(0, 160));
     check("past days say so to a screen reader",
