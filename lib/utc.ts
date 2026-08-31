@@ -81,3 +81,20 @@ export function retentionCutoff(days: number, now: Date = new Date()): Date {
 
 /** Days that raw analytics events are kept. Approved, not yet enforced. */
 export const ANALYTICS_RETENTION_DAYS = 90;
+
+/**
+ * When acquisition analytics became trustworthy.
+ *
+ * Commit b480020 reached production at this instant, fixing two attribution
+ * defects: the beacon's own `Referer` was being read as the visitor's referrer
+ * (so every earlier row says `referrerDomain = drop-q.com`), and a Next
+ * prefetch was being treated as a storefront visit.
+ *
+ * ⚠️ ANY query that groups by referrerDomain, utmSource, utmCampaign or a
+ * derived channel must filter `at >= TRUSTED_ANALYTICS_FROM`, or label earlier
+ * rows as pre-fix. Page-view COUNTS before it are fine — the visit happened and
+ * the path is right. It is the attribution fields that are not.
+ *
+ * See docs/ANALYTICS-ACTIVATION.md for the full boundary note.
+ */
+export const TRUSTED_ANALYTICS_FROM = utc("2026-08-31T01:19:23Z");

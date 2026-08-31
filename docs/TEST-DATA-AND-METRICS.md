@@ -496,3 +496,49 @@ self-tests. Recommended when picked up:
    DEFAULT and require `--apply` plus typing the database name to proceed.
 3. A check in `isolation-selftest` asserting both, so this cannot regress the way
    the self-test guard could have.
+
+
+---
+
+## 14. Backlog — `internalKind` means two unrelated things (2026-08-31)
+
+Surfaced by the attribution fix, where a rule written against one meaning broke
+the other.
+
+| Meaning | Read by | Question it answers |
+|---|---|---|
+| Reporting exclusion | `lib/reporting.ts` | is this account us? |
+| Walk-Up pilot cohort | `lib/walkup.ts` → `walkUpMode()` | may this vendor sell in person? |
+
+Nothing connects them except that both cohorts were the same four accounts on
+the day the flag was added.
+
+**How it bit.** The acquisition-eligibility check added to `applyFirstTouch`
+refused to credit any DropQ-internal vendor as a customer's acquisition source —
+correct for a browsing touch, since otherwise the marketing site's demo
+storefront owns the first touch of every homepage visitor. But the Walk-Up pilot
+cohort *is* `internalKind`, so the rule silently dropped attribution for every
+walk-up sale. The self-tests caught it. The fix was an exemption for
+`authoritative` touches — a real card charged with the customer present — which
+is correct on its own merits and is **not** a workaround to be removed when the
+flag is split.
+
+**How it will bite next.** The first REAL vendor to join the Walk-Up pilot needs
+`internalKind` set to get the feature, and setting it deletes them from business
+reporting — GMV, active vendors, conversion. That is a silent, wrong answer to
+"is DropQ working?", produced by enabling a feature.
+
+**Recommended when picked up:** give Walk-Up its own state (`Seller.walkUpMode`,
+or a cohort table if the pilot grows), leave `internalKind` meaning exactly one
+thing, and add an assertion that no other module reads `internalKind` for
+feature gating.
+
+**Not now**, and the authoritative-touch exemption stays either way.
+
+### And the thing it is most often misread as
+
+`internalKind != null` does **not** mean the seller's activity is fictitious. A
+canary vendor's Stripe charge is real money on a real connected account with a
+real application fee; a founder's order still has to be fulfilled. Only the
+`business` audience filters. Operational and financial views exclude nothing, on
+purpose — see §1 and `lib/reporting.ts`.

@@ -36,6 +36,14 @@ export const MAX_WALKUP_QTY_PER_LINE = 999;
  *   "true"                → every eligible vendor
  *
  * `internal` exists so the canary pilot needs no hard-coded vendor name, id or
+ * ⚠️ OVERLOADED FLAG, on the backlog. `internalKind` decides two unrelated
+ * things: this pilot cohort, and exclusion from business reporting
+ * (lib/reporting.ts). They coincide today only because the pilot happens to be
+ * DropQ's own accounts. The first REAL vendor to join Walk-Up would have to be
+ * marked internal to get the feature, which would remove them from business
+ * metrics — at which point these need separating. Do not add new meanings to
+ * this field.
+ *
  * email: the cohort is whoever `Seller.internalKind` says it is, so
  * reclassifying a vendor moves them in or out with a single database update.
  *

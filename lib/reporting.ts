@@ -38,7 +38,44 @@ export type ReportingAudience = "business" | "operational" | "financial";
  * store happens to be called "Test Kitchen".
  */
 export const INTERNAL_KINDS = ["founder", "canary", "staff", "demo", "docs", "harness"] as const;
+
 export type InternalKind = (typeof INTERNAL_KINDS)[number];
+
+/**
+ * ⚠️ WHAT `internalKind != null` DOES **NOT** MEAN
+ *
+ * It does NOT mean "ignore everything this seller does". It means "exclude this
+ * seller from the BUSINESS reporting audience". Their activity is real:
+ *
+ *  - a canary vendor's Stripe charge is real money on a real connected account,
+ *    with a real application fee, appearing in real payouts and tax records;
+ *  - a founder's order still has to be fulfilled;
+ *  - a walk-up sale by an internal vendor really did happen, to a real customer
+ *    who was standing there.
+ *
+ * Operational and financial views therefore exclude nothing, by design. Only
+ * `business` filters. A rule that reads `internalKind` as "fictitious" will
+ * quietly delete or refuse real operational data — which has already happened
+ * once: the first version of the acquisition-eligibility check in
+ * lib/attribution.ts refused to attribute ANY touch to an internal vendor, and
+ * silently dropped attribution for every Walk-Up sale DropQ has taken.
+ *
+ * ⚠️ AND IT IS OVERLOADED. `internalKind` currently carries two unrelated
+ * concepts:
+ *
+ *   1. reporting exclusion  — is this account us?          (this module)
+ *   2. Walk-Up pilot cohort — may this vendor sell in       (lib/walkup.ts,
+ *      person?                                               walkUpMode())
+ *
+ * Nothing connects those ideas except that both cohorts happened to be the same
+ * four accounts on the day the flag was introduced. They will diverge the first
+ * time a REAL vendor joins the Walk-Up pilot: that vendor would need
+ * `internalKind` set to get the feature, and setting it would delete them from
+ * business reporting.
+ *
+ * ON THE BACKLOG, not now: give Walk-Up its own field or cohort table, leaving
+ * `internalKind` to mean exactly one thing. See docs/TEST-DATA-AND-METRICS.md.
+ */
 
 export function isInternalKind(value: string | null | undefined): boolean {
   return typeof value === "string" && value.length > 0;

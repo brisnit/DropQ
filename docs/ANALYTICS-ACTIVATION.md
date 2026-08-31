@@ -1,5 +1,44 @@
 # Turning analytics on — the exact procedure
 
+---
+
+## ⚠️ TRUSTED-DATA BOUNDARY — read this before writing any source report
+
+> **Acquisition analytics are trustworthy from `2026-08-31T01:19:23Z`.**
+>
+> That is when commit `b480020` reached production. Every event recorded before
+> it carries attribution fields produced by two defects (below), and **must not
+> be mixed into source, referrer or conversion reporting**.
+
+Any query that groups by `referrerDomain`, `utmSource`, `utmCampaign` or a
+derived channel must either:
+
+```sql
+WHERE at >= '2026-08-31T01:19:23Z'          -- trusted only
+```
+
+or label the earlier rows explicitly as pre-fix. Silently mixing them produces
+a chart in which DropQ is its own largest referrer.
+
+**Page-view counts before the boundary are still fine** — a visit happened, the
+path is right, the timestamp is right. It is the *attribution* fields that are
+not. That is why those rows were kept rather than deleted.
+
+**What was wrong before the boundary:**
+
+| Defect | Effect on pre-fix rows |
+|---|---|
+| The beacon's own `Referer` was read as the visitor's referrer | every row says `referrerDomain = drop-q.com` |
+| A Next prefetch was treated as a visit | `dq_touch` attributed homepage visitors to the demo storefront |
+
+**Pre-fix rows remaining in production: 3**, from 2 visitors, all `page_viewed`.
+They are kept deliberately: they may be real people, and deleting real traffic
+because its metadata is unreliable would be worse than labelling it. Six further
+pre-fix rows from five visitors were removed because they were verification
+traffic generated during activation, deleted by exact visitor id.
+
+---
+
 **Nothing here has been done.** `ANALYTICS_MODE` is unset in all three Vercel
 environments and `AnalyticsEvent` has 0 rows. This is the runbook for when the
 privacy policy is published and you decide to switch it on.
