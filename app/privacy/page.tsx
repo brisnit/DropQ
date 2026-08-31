@@ -3,7 +3,7 @@ import { Logo } from "@/components/logo";
 
 export const metadata = { title: "Privacy Policy — DropQ" };
 
-const EFFECTIVE = "June 25, 2026";
+const EFFECTIVE = "August 30, 2026";
 
 function Section({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {
   return (
@@ -72,8 +72,9 @@ export default function PrivacyPage() {
               pages viewed, and interactions, collected to operate and secure the Services.
             </li>
             <li>
-              <b>Cookies.</b> We use a small number of essential cookies (for example, a signed
-              session cookie to keep you logged in). See Section 6.
+              <b>Cookies.</b> We use only our own first-party cookies &mdash; to keep you logged in,
+              to remember which vendor&rsquo;s link or QR code you arrived through so activity is
+              credited correctly, and (where enabled) for our own analytics. See Section 6.
             </li>
           </ul>
         </Section>
@@ -170,9 +171,97 @@ export default function PrivacyPage() {
 
         <Section n="6" title="Cookies &amp; Similar Technologies">
           <p>
-            We use essential cookies to keep you signed in and to operate the Services securely. We
-            do not use third-party advertising cookies. Most browsers let you control cookies, but
-            disabling essential cookies may prevent you from logging in.
+            We use only first-party cookies &mdash; cookies set by DropQ itself. We do not use
+            third-party advertising cookies, and we do not allow third parties to track you across
+            other websites through DropQ. None of our cookies can be read by scripts running in your
+            browser, and none of them contains your name, email address or any other detail about
+            you.
+          </p>
+          <div className="overflow-x-auto -mx-1 px-1">
+            <table className="w-full text-[0.9rem] border border-line rounded-lg overflow-hidden">
+              <thead>
+                <tr className="bg-cream text-left">
+                  <th className="px-3 py-2 font-semibold">Cookie</th>
+                  <th className="px-3 py-2 font-semibold">What it does</th>
+                  <th className="px-3 py-2 font-semibold whitespace-nowrap">Expires</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-line">
+                  <td className="px-3 py-2 align-top">Session cookie</td>
+                  <td className="px-3 py-2 align-top">Keeps you signed in. Essential.</td>
+                  <td className="px-3 py-2 align-top whitespace-nowrap">On sign-out</td>
+                </tr>
+                <tr className="border-t border-line">
+                  <td className="px-3 py-2 align-top font-mono text-[0.85rem]">dq_touch</td>
+                  <td className="px-3 py-2 align-top">
+                    Remembers when you arrive through a vendor&rsquo;s storefront, shared link or QR
+                    code, so that eligible purchases and sign-ups are credited to the right vendor.
+                    It does not affect payment itself.
+                  </td>
+                  <td className="px-3 py-2 align-top whitespace-nowrap">30 days</td>
+                </tr>
+                <tr className="border-t border-line">
+                  <td className="px-3 py-2 align-top font-mono text-[0.85rem]">dq_vid</td>
+                  <td className="px-3 py-2 align-top">
+                    A random number that lets us recognise the same browser across visits, for our
+                    own analytics. It is generated at random and describes nothing about your device.
+                  </td>
+                  <td className="px-3 py-2 align-top whitespace-nowrap">12 months</td>
+                </tr>
+                <tr className="border-t border-line">
+                  <td className="px-3 py-2 align-top font-mono text-[0.85rem]">dq_sid</td>
+                  <td className="px-3 py-2 align-top">
+                    A random number that groups the pages you view in a single visit.
+                  </td>
+                  <td className="px-3 py-2 align-top whitespace-nowrap">30 minutes</td>
+                </tr>
+                <tr className="border-t border-line">
+                  <td className="px-3 py-2 align-top font-mono text-[0.85rem]">dq_attr</td>
+                  <td className="px-3 py-2 align-top">
+                    The link, website or marketing campaign you arrived through, so we can tell which
+                    of our own efforts bring people to DropQ.
+                  </td>
+                  <td className="px-3 py-2 align-top whitespace-nowrap">90 days</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            Most browsers let you control cookies. Disabling essential cookies may prevent you from
+            logging in, or prevent a vendor from being credited for activity you started through
+            their link.
+          </p>
+        </Section>
+
+        <Section n="6a" title="Analytics">
+          <p>
+            On our public pages we record a small number of product events: which page was viewed,
+            whether someone opened vendor signup, and whether they went on to create a store,
+            connect payments, publish a drop or make a sale. Each event is stored with the random
+            identifiers described in Section 6, the page address with anything after the
+            &ldquo;?&rdquo; removed, the domain name of the website you came from, any campaign tags
+            in the link you followed, and a broad device type (mobile, tablet or desktop).
+          </p>
+          <p>
+            We do not record the full web address you came from, anything you type, your search
+            terms, or any information you enter into a form. We do not use session recording, screen
+            recording or heatmaps. We do not build a fingerprint of your device, and our analytics
+            records have no field for your IP address.
+          </p>
+          <p>
+            We do not collect analytics inside the vendor dashboard or the admin area &mdash; only on
+            our public pages.
+          </p>
+          <p>
+            If you create a vendor account, we associate the anonymous activity already recorded for
+            your browser with that account, so that we can understand which channels bring vendors to
+            DropQ. Activity from our own internal, staff and test accounts is excluded from our
+            business reporting.
+          </p>
+          <p>
+            This information is stored in our own database. We do not sell it, and we do not share it
+            with advertising networks.
           </p>
         </Section>
 
@@ -182,6 +271,13 @@ export default function PrivacyPage() {
             Services, comply with legal, tax, and accounting obligations, resolve disputes, and
             enforce our agreements. We may retain certain records (such as order and commission
             history) as required for those purposes.
+          </p>
+          <p>
+            Anonymous analytics events are retained for 90 days and then deleted. Aggregate figures
+            calculated from them &mdash; counts and conversion rates that contain no identifiers
+            &mdash; may be kept for longer. Where anonymous activity has been associated with a
+            vendor account, a summary of how that account was acquired is retained for the life of
+            the account, like other account records.
           </p>
         </Section>
 
