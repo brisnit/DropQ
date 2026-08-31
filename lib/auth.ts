@@ -37,6 +37,38 @@ export function hashPassword(pw: string): Promise<string> {
   return bcrypt.hash(pw, 10);
 }
 
+/**
+ * A real bcrypt hash of a value nobody knows, compared against when an account
+ * does not exist.
+ *
+ * WITHOUT THIS, login leaks account existence through a stopwatch. `if (!user
+ * || !(await verifyPassword(...)))` short-circuits, so an unknown email returns
+ * in a few milliseconds while a real one costs a ~100ms bcrypt comparison. The
+ * uniform error message is undone by timing the response.
+ *
+ * Comparing against this constant makes both paths do the same work. It is a
+ * genuine cost-10 hash, not a placeholder string, because bcrypt returns early
+ * on a malformed hash and the delay is the entire point.
+ */
+const DUMMY_HASH = "$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
+/**
+ * Verify a password against an account that may not exist.
+ *
+ * Always performs one bcrypt comparison. Returns false for a missing hash after
+ * doing the same work it would have done for a real one.
+ */
+export async function verifyPasswordConstantTime(
+  password: string,
+  hash: string | null | undefined
+): Promise<boolean> {
+  if (!hash) {
+    await bcrypt.compare(password, DUMMY_HASH);
+    return false;
+  }
+  return bcrypt.compare(password, hash);
+}
+
 export function verifyPassword(pw: string, hash: string): Promise<boolean> {
   return bcrypt.compare(pw, hash);
 }

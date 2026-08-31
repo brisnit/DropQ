@@ -9,6 +9,7 @@ import {
 } from "@/lib/customer-auth";
 import { sendEmail, customerMagicLinkEmail } from "@/lib/email";
 import { appUrl } from "@/lib/message-delivery";
+import { consume, requestIp } from "@/lib/rate-limit";
 
 export type MagicLinkState = { sent?: boolean; error?: string; devLink?: string };
 
@@ -32,6 +33,13 @@ export async function requestMagicLinkAction(
   const wantsFollow = String(formData.get("follow") ?? "") === "on";
 
   if (!email || !EMAIL_RE.test(email)) return { error: "Enter the email you used to order." };
+
+  // Consumed before the lookup so an unknown address costs the same budget as a
+  // real one. Over the limit returns the same `sent: true` as everything else —
+  // this response must never differ by whether an account exists.
+  const ip = await requestIp();
+  const gate = await consume("magicLink", { email, ip });
+  if (!gate.allowed) return { sent: true };
 
   const customer = await prisma.customer.findUnique({ where: { email } });
   if (!customer) return { sent: true };

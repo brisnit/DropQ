@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { consumeMagicLinkToken, createCustomerSession } from "@/lib/customer-auth";
 import { applyFirstTouch, recordRelationship } from "@/lib/attribution";
+import { consume } from "@/lib/rate-limit";
+import { clientIp } from "@/lib/client-ip";
 
 /**
  * Magic-link landing. Burns the token, opens a customer session, and forwards
@@ -13,6 +15,13 @@ export async function GET(request: Request) {
   const token = url.searchParams.get("token");
   const nextParam = url.searchParams.get("next") ?? "/messages";
   const next = nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/messages";
+
+  // Same bound as the vendor verify route. This one mints a customer session
+  // on success, so it is worth keeping cheap to hammer.
+  const gate = await consume("tokenVerify", { ip: clientIp(request.headers) });
+  if (!gate.allowed) {
+    return NextResponse.redirect(new URL("/messages/login?expired=1", url.origin));
+  }
 
   const consumed = await consumeMagicLinkToken(token);
   const customerId = consumed?.customerId ?? null;

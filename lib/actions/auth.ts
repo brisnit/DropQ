@@ -1,6 +1,7 @@
 "use server";
 
 import { headers } from "next/headers";
+import { consume, peek, requestIp } from "@/lib/rate-limit";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -9,7 +10,7 @@ import {
   createSession,
   destroySession,
   hashPassword,
-  verifyPassword,
+  verifyPasswordConstantTime,
   requireSeller,
 } from "@/lib/auth";
 import { slugify } from "@/lib/format";
@@ -17,6 +18,12 @@ import { createToken, consumeToken } from "@/lib/tokens";
 import { sendEmail, verificationEmail, resetEmail } from "@/lib/email";
 import { TERMS_VERSION } from "@/lib/terms";
 import { PARTNER_INVITE_CODE, partnerExpiryFrom } from "@/lib/plans";
+
+/**
+ * One message for every credential failure — wrong password, unknown email, or
+ * rate limited. Anything that varies by case is an account oracle.
+ */
+const WRONG_CREDENTIALS = "Wrong email or password.";
 import { CATEGORY_VALUES } from "@/lib/category";
 import { recordReferral } from "@/lib/referral";
 import { normalizeCode } from "@/lib/commission";
@@ -94,7 +101,19 @@ export async function signupAction(
     }
   }
 
+  // Every signup attempt costs budget, valid or not — the abuse here is the
+  // request itself: each one sends mail from our domain and, on success,
+  // publishes a storefront.
+  const ip = await requestIp();
+  const gate = await consume("signup", { email, ip });
+  if (!gate.allowed) {
+    return { error: "Too many sign-up attempts just now. Please try again a little later." };
+  }
+
   const existing = await prisma.seller.findUnique({ where: { email } });
+  // Deliberately explicit, and deliberately kept: it is a real UX win at
+  // signup, and with 3/hour per email and 5/hour per IP the oracle is no longer
+  // something you can query at speed. Reviewed and accepted 31 Aug 2026.
   if (existing) return { error: "An account with that email already exists." };
 
   const seller = await prisma.seller.create({
@@ -180,10 +199,24 @@ export async function loginAction(
 ): Promise<AuthState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
+  const ip = await requestIp();
+
+  // Checked BEFORE the password is compared, so a blocked caller never reaches
+  // bcrypt. The response is the ordinary wrong-credentials error: a distinct
+  // "you are rate limited" message would tell an attacker which emails are
+  // worth attacking, which is the leak this whole pass is closing.
+  const gate = await peek("login", { email, ip });
+  if (!gate.allowed) return { error: WRONG_CREDENTIALS };
 
   const seller = await prisma.seller.findUnique({ where: { email } });
-  if (!seller || !(await verifyPassword(password, seller.passwordHash))) {
-    return { error: "Wrong email or password." };
+  // Constant-time: an unknown email costs the same bcrypt comparison as a real
+  // one, so response timing stops being an account oracle.
+  const ok = await verifyPasswordConstantTime(password, seller?.passwordHash);
+  if (!seller || !ok) {
+    // Consumed on failure only, and consumed identically whether or not the
+    // account exists — an unknown email must cost the same budget as a real one.
+    await consume("login", { email, ip });
+    return { error: WRONG_CREDENTIALS };
   }
   if (seller.disabledAt) {
     return { error: "This account has been suspended. Contact support if you think this is a mistake." };
@@ -231,6 +264,13 @@ export async function requestPasswordResetAction(
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
     return { error: "Enter a valid email." };
+
+  // Consumed before the lookup, so an unknown address costs the same as a real
+  // one. Over the limit returns the SAME `sent: true` as success — the response
+  // must not become a way to discover which addresses have accounts.
+  const ip = await requestIp();
+  const gate = await consume("passwordReset", { email, ip });
+  if (!gate.allowed) return { sent: true };
 
   const seller = await prisma.seller.findUnique({ where: { email } });
   if (seller) {

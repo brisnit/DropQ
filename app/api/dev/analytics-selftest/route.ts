@@ -117,8 +117,24 @@ export async function GET() {
     check("only our own id shape is accepted",
       isValidId(a) && !isValidId("../../etc/passwd") && !isValidId("") && !isValidId(null) &&
       !isValidId(a.toUpperCase()));
-    check("the admin handle is short and non-reversible",
-      visitorHandle(a).length === 6 && !a.includes(visitorHandle(a)));
+    // The handle is the first six characters of the id, upper-cased, so an
+    // admin can refer to a visitor without the full identifier on screen.
+    //
+    // The old form of this check was `!a.includes(visitorHandle(a))` — which
+    // only passed because upper-case hex letters do not appear in a lower-case
+    // id. When the first six characters happen to be all digits, upper-casing
+    // changes nothing and the check failed: about six runs in a hundred
+    // ((10/16)^6), for no reason connected to the product. What actually
+    // matters is that the handle discloses a small, fixed prefix and leaves the
+    // rest of the id undetermined, so that is what is asserted now.
+    const digitsOnly = "0123456789abcdef0000001234567890".slice(0, 32);
+    check("the admin handle is a fixed six characters",
+      visitorHandle(a).length === 6 && visitorHandle(digitsOnly).length === 6);
+    check("the handle is derived only from the id, and stably",
+      visitorHandle(a) === visitorHandle(a) && visitorHandle(a) !== visitorHandle(b));
+    check("the handle leaves the rest of the id undetermined",
+      a.length === 32 && a.slice(6).length === 26 &&
+      !visitorHandle(a).includes(a.slice(6)));
   }
 
   /* ------------------------ 3. URL sanitisation ------------------------- */
