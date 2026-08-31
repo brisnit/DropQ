@@ -102,7 +102,6 @@ export type RecordInput = {
   identity?: RequestIdentity;
   /** Supplied by the sink for a beacon; otherwise read from the request. */
   userAgent?: string | null;
-  referrer?: string | null;
   search?: URLSearchParams | null;
   isBot?: boolean;
 };
@@ -146,13 +145,11 @@ export async function recordEvent(input: RecordInput): Promise<RecordResult> {
     }
 
     let userAgent = input.userAgent ?? null;
-    let referrer = input.referrer ?? null;
     let path = input.path ?? null;
-    if (userAgent === null || referrer === null || path === null) {
+    if (userAgent === null || path === null) {
       try {
         const h = await headers();
         userAgent ??= h.get("user-agent");
-        referrer ??= h.get("referer");
         path ??= h.get("x-invoke-path") ?? "/";
       } catch {
         /* not in a request scope — keep whatever the caller gave us */
@@ -171,7 +168,20 @@ export async function recordEvent(input: RecordInput): Promise<RecordResult> {
         customerId: input.customerId ?? null,
         dropId: input.dropId ?? null,
         path: sanitizePath(path ?? "/"),
-        referrerDomain: referrerDomain(referrer),
+        /**
+         * THE EXTERNAL DOMAIN THAT REFERRED THIS VISITOR INTO DROPQ, or null.
+         *
+         * Read from the attribution cookie, which middleware wrote from the
+         * DOCUMENT request's Referer with our own domain already excluded.
+         *
+         * Explicitly NOT the request's own Referer header. A `page_viewed`
+         * arrives as a beacon POST from the page being viewed, so its Referer
+         * is always a drop-q.com URL; a server action's Referer is the page
+         * that submitted it. Reading either recorded "drop-q.com referred this
+         * visitor to drop-q.com" on every single row — which it did, on the
+         * first day of live collection.
+         */
+        referrerDomain: touch?.last.referrerDomain ?? null,
         // Prefer the URL's own UTMs; fall back to the campaign that brought this
         // visitor, so a conversion event carries its acquisition without the
         // dashboard having to walk backwards through the session.

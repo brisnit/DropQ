@@ -80,7 +80,10 @@ export async function startApp({ port, env, verbose = false, onFail, distDir }) 
     stdio: verbose ? "inherit" : "ignore",
   });
 
-  const deadline = Date.now() + 180_000;
+  // Generous: the analytics spec runs three Next dev servers against one
+  // machine, each compiling its own build directory, and they contend. A tight
+  // deadline here presents as "app did not start" when the app is merely slow.
+  const deadline = Date.now() + 300_000;
   for (;;) {
     try {
       const r = await fetch(`${url}/login`, { redirect: "manual" });

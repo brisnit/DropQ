@@ -122,7 +122,9 @@ export async function POST(request: Request) {
         props,
         identity,
         userAgent,
-        referrer: request.headers.get("referer"),
+        // Deliberately no referrer: this request's Referer is the DropQ page
+        // that sent the beacon, never where the visitor came from. The writer
+        // takes the real one from the attribution cookie.
         isBot: false,
       })
     );

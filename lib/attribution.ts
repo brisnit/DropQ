@@ -78,16 +78,40 @@ export async function resolveTouchVendor(touch: FirstTouch) {
   if (touch.vendorId) {
     return prisma.seller.findUnique({
       where: { id: touch.vendorId },
-      select: { id: true, slug: true, storeName: true, logoUrl: true, accent: true },
+      select: { id: true, slug: true, storeName: true, logoUrl: true, accent: true, internalKind: true },
     });
   }
   if (touch.vendorSlug) {
     return prisma.seller.findUnique({
       where: { slug: touch.vendorSlug },
-      select: { id: true, slug: true, storeName: true, logoUrl: true, accent: true },
+      select: { id: true, slug: true, storeName: true, logoUrl: true, accent: true, internalKind: true },
     });
   }
   return null;
+}
+
+/**
+ * May this vendor be recorded as a customer's acquisition source?
+ *
+ * No, if the vendor is DropQ-controlled — the demo store, a founder or canary
+ * account, staff, the documentation fixture. Someone who looks at the marketing
+ * site's demo storefront has not been acquired by a vendor; crediting one would
+ * put our own storefront at the top of the customer-acquisition funnel.
+ *
+ * ⚠️ This check lives HERE, at the point the touch is consumed, and not in
+ * middleware. Middleware is edge runtime with no Prisma, so it cannot know a
+ * seller's classification without a network call on every storefront request.
+ * It records the slug; this decides whether the slug counts. That split also
+ * means the answer is always current: reclassifying a vendor changes future
+ * attributions without a migration.
+ *
+ * Uses the existing `internalKind` classification rather than naming any store.
+ * A hard-coded slug would be wrong the day a second demo account exists.
+ */
+export function isEligibleAcquisitionVendor<T extends { internalKind: string | null }>(
+  vendor: T | null
+): vendor is T {
+  return !!vendor && !vendor.internalKind;
 }
 
 export async function readTouch(): Promise<FirstTouch | null> {
@@ -141,6 +165,34 @@ export async function applyFirstTouch(
       resolveTouchVendor(touch),
       touch.dropId ? prisma.drop.findUnique({ where: { id: touch.dropId }, select: { id: true } }) : null,
     ]);
+
+    /**
+     * A DropQ-controlled vendor is not an acquisition source for a BROWSING
+     * touch. Someone who looked at the marketing site's demo storefront has not
+     * been acquired by a vendor, and crediting one poisons first-touch: it is
+     * write-once, so the demo store would permanently block the real vendor who
+     * later brings that customer in.
+     *
+     * ⚠️ AN AUTHORITATIVE TOUCH IS DIFFERENT, and the walk-up self-tests caught
+     * this the first time the rule was written too broadly. `authoritative` is
+     * set only by the walk-up payment path, where the customer was physically
+     * standing with the vendor and a real card was charged. That is a genuine
+     * acquisition however the vendor is classified — and the Walk-Up pilot
+     * cohort is *defined* by `internalKind`, so refusing internal vendors there
+     * would have silently dropped attribution for every walk-up sale DropQ has.
+     *
+     * The reporting layer still excludes those customers from business numbers
+     * through the seller's classification at query time. Recording what
+     * happened and excluding it in reports is the right split; blanking the
+     * data to achieve a reporting outcome is not.
+     */
+    if (!opts?.authoritative && !isEligibleAcquisitionVendor(vendor)) {
+      if (process.env.NODE_ENV !== "production") {
+        const why = vendor === null ? "no such vendor" : "vendor is DropQ-internal";
+        console.warn(`[attribution] ignoring browsing touch: ${why}`);
+      }
+      return;
+    }
 
     await prisma.customer.update({
       where: { id: customerId },

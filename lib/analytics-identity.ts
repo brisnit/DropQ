@@ -154,6 +154,77 @@ export function cookieOptions(maxAge: number, secure: boolean) {
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Speculative navigation                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Is this request a prefetch rather than a person going somewhere?
+ *
+ * Covers the markers that DO reach middleware: `purpose: prefetch` (Safari,
+ * Firefox) and `sec-purpose: prefetch;prerender` (speculation rules).
+ *
+ * ⚠️ It cannot see Next's own `next-router-prefetch` — see isRealNavigation().
+ */
+export function isSpeculativeRequest(headers: {
+  get(name: string): string | null;
+}): boolean {
+  const purpose = headers.get("purpose") ?? headers.get("x-purpose") ?? "";
+  if (/prefetch|preview/i.test(purpose)) return true;
+  const secPurpose = headers.get("sec-purpose") ?? "";
+  if (/prefetch|prerender/i.test(secPurpose)) return true;
+  return false;
+}
+
+/**
+ * Did a person actually navigate here, in a top-level browser navigation?
+ *
+ * THIS IS WHERE THE FIRST ATTEMPT AT THIS FIX WENT WRONG, so the measurements
+ * are recorded rather than the reasoning.
+ *
+ * On the wire, Chrome sends `next-router-prefetch: 1` and `rsc: 1` for a
+ * prefetch — which is what a browser-side capture shows, and what the first
+ * version of this guard keyed on. But Next lists both in FLIGHT_HEADERS and
+ * strips them (`stripFlightHeaders`, server/base-server.js) before user
+ * middleware runs. Measured at the middleware, with the request made three
+ * different ways:
+ *
+ *   header sent                    middleware sees
+ *   next-router-prefetch: 1        (nothing — stripped)
+ *   rsc: 1                         (nothing — stripped)
+ *   purpose: prefetch              purpose
+ *
+ * So a prefetch and a click are indistinguishable by Next's own headers here.
+ * What does survive, and separates them cleanly:
+ *
+ *   navigation type                sec-fetch-dest   sec-fetch-mode
+ *   typed URL / QR / external link document         navigate
+ *   any in-page fetch (prefetch,
+ *     and client-side link click)  empty            cors
+ *
+ * THE RULE, and its cost: dq_touch is created only on a top-level document
+ * navigation. That means an in-app CLICK through to a storefront no longer
+ * creates one. This is a deliberate trade, not an oversight:
+ *
+ *  - at this layer a click and a prefetch are the same request, so allowing
+ *    clicks means allowing prefetches, which is the bug;
+ *  - every acquisition path that matters — scanning a QR, opening a shared
+ *    link, following an external link — is a document navigation;
+ *  - an in-app click means the visitor was already on DropQ, which is a much
+ *    weaker claim to having acquired them. Honouring it is precisely how the
+ *    marketing site's demo storefront came to own the first touch of every
+ *    homepage visitor.
+ *
+ * A missing `sec-fetch-dest` is treated as a real navigation: only quite old
+ * browsers omit it, and they still deserve attribution.
+ */
+export function isRealNavigation(headers: { get(name: string): string | null }): boolean {
+  if (isSpeculativeRequest(headers)) return false;
+  const dest = headers.get("sec-fetch-dest");
+  if (dest === null) return true;
+  return dest === "document";
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Attribution                                                               */
 /* -------------------------------------------------------------------------- */
 
@@ -170,6 +241,14 @@ export type AcquisitionTouch = {
   channel: TouchChannel;
   /** Referrer domain, or the utm_source. Never a full URL. */
   source: string | null;
+  /**
+   * The EXTERNAL domain that referred this visitor into DropQ, or null.
+   *
+   * Null for a direct visit and null for internal navigation — drop-q.com is
+   * never its own referrer. Stored separately from `source` because `source`
+   * may hold a utm_source instead, and an event needs to know which it has.
+   */
+  referrerDomain: string | null;
   medium: string | null;
   campaign: string | null;
   content: string | null;
@@ -217,11 +296,46 @@ export function qualifiesAsTouch(input: {
   const { params, referrerDomain: ref, selfDomain, hasFirstTouch } = input;
   const hasUtm = Object.keys(params).some((k) => k.startsWith("utm_"));
   if (hasUtm || params.ref) return true;
+  // `ref` has already been normalised to external-only by nextAttributionEdge.
+  // The selfDomain comparison stays as a second line of defence for any future
+  // caller that forgets.
   if (ref && ref !== selfDomain) return true;
   return !hasFirstTouch; // the honest `direct` first touch
 }
 
-/** Classify a qualifying touch into one coarse channel. */
+/**
+ * THE CANONICAL ATTRIBUTION PRECEDENCE.
+ *
+ * One function decides what channel a touch is. Nothing else in the system may
+ * form its own opinion, because the whole point of a normalized channel is that
+ * every report means the same thing by "social".
+ *
+ *   1. QR            `?ref=qr` or `utm_source=qr`. A scan is a scan even when
+ *                    the link also carries campaign tags — it is the most
+ *                    specific thing we know about how someone arrived.
+ *   2. CAMPAIGN      any `utm_campaign` or `utm_source`. A tagged link is a
+ *                    deliberate act of marketing and outranks whatever site the
+ *                    browser happened to report, which is often wrong or absent.
+ *   3. EXTERNAL      a referrer from a domain that is not ours, classified as
+ *                    `search`, `social` or `referral`.
+ *   4. DIRECT        nothing known. Includes internal navigation, because
+ *                    DropQ is not its own referrer.
+ *
+ * WHAT THIS DOES NOT DECIDE. Vendor storefront attribution — which vendor
+ * brought a CUSTOMER — is a different question with a different vocabulary
+ * (`TouchSource` in lib/attribution.ts: storefront, drop, qr, dropmeet,
+ * checkout, in_person, direct, admin) stored on `Customer.signupSource`. This
+ * function's `TouchChannel` describes how a VISITOR reached the site at all and
+ * is stored on `Seller.signupSource`. Two subjects, two vocabularies, neither
+ * derived from the other — conflating them is how "storefront" ends up in a
+ * marketing-channel report.
+ *
+ * THE FIELD SPLIT, unchanged and canonical:
+ *   signupSource        normalized channel      "campaign"
+ *   signupSourceDetail  the specific source     "activation" (raw utm_source,
+ *                                                or the referrer domain)
+ *   signupCampaign      the campaign            "first-check"
+ */
 export function touchChannel(params: Record<string, string>, ref: string | null): TouchChannel {
   if (params.ref === "qr" || params.utm_source === "qr") return "qr";
   if (params.utm_campaign || params.utm_source) return "campaign";
@@ -233,6 +347,7 @@ export function touchChannel(params: Record<string, string>, ref: string | null)
 
 export function buildTouch(input: {
   params: Record<string, string>;
+  /** EXTERNAL referrer only — the caller must already have excluded our own. */
   referrerDomain: string | null;
   path: string;
   now?: Date;
@@ -241,6 +356,7 @@ export function buildTouch(input: {
   return {
     channel: touchChannel(params, ref),
     source: params.utm_source ?? params.ref ?? ref ?? null,
+    referrerDomain: ref,
     medium: params.utm_medium ?? null,
     campaign: params.utm_campaign ?? null,
     content: params.utm_content ?? null,
@@ -291,9 +407,24 @@ export function nextAttributionEdge(input: {
   path: string;
   now?: Date;
 }): AttributionCookie | null {
+  /**
+   * DropQ is not its own referrer.
+   *
+   * Normalised here, once, before anything downstream sees it. Without this,
+   * a visitor whose first analytics touch happened to be an internal navigation
+   * was recorded as a `referral` from `drop-q.com` — which is what one real
+   * production row said on the day analytics was switched on. Their true
+   * channel is `direct`: we do not know where they came from, and saying
+   * "ourselves" is worse than saying so.
+   */
+  const external =
+    input.referrerDomain && input.referrerDomain !== input.selfDomain
+      ? input.referrerDomain
+      : null;
+
   const qualifies = qualifiesAsTouch({
     params: input.params,
-    referrerDomain: input.referrerDomain,
+    referrerDomain: external,
     selfDomain: input.selfDomain,
     hasFirstTouch: !!input.existing,
   });
@@ -302,7 +433,7 @@ export function nextAttributionEdge(input: {
     input.existing,
     buildTouch({
       params: input.params,
-      referrerDomain: input.referrerDomain,
+      referrerDomain: external,
       path: input.path,
       now: input.now,
     })

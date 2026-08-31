@@ -38,7 +38,13 @@
     ".next-analytics-on/types/**/*.ts",
     ".next-analytics-on/dev/types/**/*.ts",
     ".next-analytics-preview/types/**/*.ts",
-    ".next-analytics-preview/dev/types/**/*.ts"
+    ".next-analytics-preview/dev/types/**/*.ts",
+    ".next-prefetch-dbg/types/**/*.ts",
+    ".next-prefetch-dbg/dev/types/**/*.ts",
+    ".next-dbg2/types/**/*.ts",
+    ".next-dbg2/dev/types/**/*.ts",
+    ".next-dbg3/types/**/*.ts",
+    ".next-dbg3/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

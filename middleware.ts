@@ -17,6 +17,7 @@ import {
   nextAttributionEdge,
 } from "@/lib/analytics-identity";
 import { isBot, referrerDomain, retainedParams, sanitizePath } from "@/lib/analytics-events";
+import { isRealNavigation } from "@/lib/analytics-identity";
 
 /**
  * Two jobs, both of which have to happen before the page renders and neither of
@@ -70,6 +71,23 @@ export function middleware(request: NextRequest) {
 function vendorFirstTouch(request: NextRequest, response: NextResponse, secure: boolean) {
   if (request.cookies.has(TOUCH_COOKIE)) return;
 
+  /**
+   * A prefetch is not a visit.
+   *
+   * The marketing homepage renders a "See a live store" link to the demo
+   * storefront, and Next prefetches it on render. Every homepage visitor was
+   * therefore first-touch attributed to the DEMO STORE without clicking
+   * anything — and because first-touch is write-once, a customer who later
+   * genuinely arrived through a real vendor's QR code was already claimed.
+   * Storefront pages prefetch their drop links too, so the same bug had a
+   * second layer: a `source: "drop"` touch for a drop nobody opened.
+   *
+   * The check is `sec-fetch-dest: document`, not Next's prefetch header —
+   * that one is stripped before middleware ever sees it. See
+   * isRealNavigation() for the measurements and for what this costs.
+   */
+  if (!isRealNavigation(request.headers)) return;
+
   const segments = request.nextUrl.pathname.split("/").filter(Boolean);
   // /s/<slug>            → storefront
   // /s/<slug>/<dropId>   → a specific drop
@@ -115,6 +133,12 @@ function visitorIdentity(request: NextRequest, response: NextResponse, secure: b
   // Crawlers get no identity. They would otherwise be the majority of
   // "visitors" and make the top-of-funnel number meaningless.
   if (isBot(request.headers.get("user-agent"))) return;
+
+  // Nor does a prefetch: nobody has looked at anything yet, and issuing a
+  // session on speculation starts a sitting the visitor never began. Same
+  // document-navigation test as above; the beacon that reports a page view
+  // goes to /api/track, which this matcher already excludes.
+  if (!isRealNavigation(request.headers)) return;
 
   const existingVisitor = request.cookies.get(VISITOR_COOKIE)?.value;
   const visitorId = isValidId(existingVisitor) ? existingVisitor : newId();

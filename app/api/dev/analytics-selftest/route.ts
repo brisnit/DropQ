@@ -28,12 +28,15 @@ import {
   nextAttributionEdge,
   parseAttribution,
   qualifiesAsTouch,
+  isRealNavigation,
+  isSpeculativeRequest,
   touchChannel,
   visitorHandle,
   writeRefusalReason,
   writesAllowed,
   type AttributionCookie,
 } from "@/lib/analytics-identity";
+import { isEligibleAcquisitionVendor } from "@/lib/attribution";
 import {
   INTERNAL_KINDS,
   analyticsWhere,
@@ -234,6 +237,119 @@ export async function GET() {
       (FORBIDDEN_PROPERTY_KEYS as readonly string[]).includes("ip"));
     check("harmless properties pass",
       forbiddenKeysIn({ plan: "starter", step: 3, zeroResults: true }).length === 0);
+  }
+
+  /* ------------- 6a. Prefetch, self-referrer, eligibility --------------- */
+  {
+    const h = (o: Record<string, string>) => ({ get: (n: string) => o[n.toLowerCase()] ?? null });
+
+    // Values measured AT THE MIDDLEWARE, not on the wire. Next strips
+    // next-router-prefetch and rsc before middleware runs, so keying on them —
+    // as the first version of this fix did — silently does nothing.
+    check("a top-level document navigation is a real navigation",
+      isRealNavigation(h({ "sec-fetch-dest": "document", "sec-fetch-mode": "navigate" })));
+    check("an in-page fetch is NOT — this is the prefetch case",
+      !isRealNavigation(h({ "sec-fetch-dest": "empty", "sec-fetch-mode": "cors" })));
+    check("an iframe or image request is not a navigation either",
+      !isRealNavigation(h({ "sec-fetch-dest": "iframe" })) &&
+      !isRealNavigation(h({ "sec-fetch-dest": "image" })));
+    check("a browser too old to send sec-fetch-dest still attributes",
+      isRealNavigation(h({})));
+    check("Safari/Firefox purpose: prefetch is refused even on a document",
+      !isRealNavigation(h({ purpose: "prefetch", "sec-fetch-dest": "document" })));
+    check("speculation-rules prerender is refused even on a document",
+      !isRealNavigation(h({ "sec-purpose": "prefetch;prerender", "sec-fetch-dest": "document" })));
+    check("the legacy x-purpose header is refused",
+      isSpeculativeRequest(h({ "x-purpose": "preview" })));
+    check("Next's own prefetch header is NOT relied upon — it never arrives",
+      !/next-router-prefetch/.test(readFileSync("lib/analytics-identity.ts", "utf8")
+        .split("export function isRealNavigation")[1] ?? ""));
+
+    const mw = readFileSync("middleware.ts", "utf8");
+    check("middleware requires a real navigation before writing dq_touch",
+      mw.indexOf("isRealNavigation") < mw.indexOf("TOUCH_COOKIE,\n"),
+      "guard must precede the cookie write");
+    check("middleware requires a real navigation before issuing identity",
+      (mw.match(/isRealNavigation/g) ?? []).length >= 2);
+
+    // DropQ is never its own referrer.
+    const internalNav = nextAttributionEdge({
+      existing: null, params: {}, referrerDomain: "drop-q.com",
+      selfDomain: "drop-q.com", path: "/pricing",
+    });
+    check("an internal navigation is direct, not a referral from ourselves",
+      internalNav?.first.channel === "direct", internalNav?.first.channel);
+    check("an internal navigation records no referrer domain",
+      internalNav?.first.referrerDomain === null, String(internalNav?.first.referrerDomain));
+    check("an internal navigation records no source",
+      internalNav?.first.source === null, String(internalNav?.first.source));
+
+    const external = nextAttributionEdge({
+      existing: null, params: {}, referrerDomain: "instagram.com",
+      selfDomain: "drop-q.com", path: "/",
+    });
+    check("an external referrer is captured as its domain",
+      external?.first.referrerDomain === "instagram.com" && external?.first.channel === "social");
+
+    const direct = nextAttributionEdge({
+      existing: null, params: {}, referrerDomain: null, selfDomain: "drop-q.com", path: "/",
+    });
+    check("a direct visit is direct with a null referrer",
+      direct?.first.channel === "direct" && direct?.first.referrerDomain === null);
+
+    const utm = nextAttributionEdge({
+      existing: null, params: { utm_source: "activation", utm_campaign: "attribution-fix" },
+      referrerDomain: "drop-q.com", selfDomain: "drop-q.com", path: "/",
+    });
+    check("UTM outranks an internal referrer",
+      utm?.first.channel === "campaign" && utm?.first.source === "activation" &&
+      utm?.first.campaign === "attribution-fix" && utm?.first.referrerDomain === null);
+
+    const qr = nextAttributionEdge({
+      existing: null, params: { ref: "qr", utm_campaign: "spring" },
+      referrerDomain: null, selfDomain: "drop-q.com", path: "/s/x",
+    });
+    check("QR outranks campaign — the most specific signal wins",
+      qr?.first.channel === "qr", qr?.first.channel);
+
+    // First touch survives later internal navigation.
+    const later = nextAttributionEdge({
+      existing: external, params: {}, referrerDomain: "drop-q.com",
+      selfDomain: "drop-q.com", path: "/signup",
+    });
+    check("internal navigation never rewrites first touch",
+      later?.first.referrerDomain === "instagram.com" && later?.last.referrerDomain === "instagram.com");
+
+    // The writer must not read a Referer header.
+    const server = readFileSync("lib/analytics-server.ts", "utf8");
+    check("the writer takes referrerDomain from the attribution cookie",
+      /referrerDomain: touch\?\.last\.referrerDomain/.test(server));
+    check("the writer no longer reads a Referer header",
+      !/h\.get\("referer"\)/.test(server));
+    const sink = readFileSync("app/api/track/route.ts", "utf8");
+    check("the sink no longer passes its own Referer to the writer",
+      !/referrer: request\.headers\.get\("referer"\)/.test(sink));
+
+    // Internal sellers can never be an acquisition source.
+    check("a DropQ-internal vendor is not an eligible acquisition source",
+      !isEligibleAcquisitionVendor({ internalKind: "demo" }) &&
+      !isEligibleAcquisitionVendor({ internalKind: "founder" }) &&
+      !isEligibleAcquisitionVendor({ internalKind: "canary" }) &&
+      !isEligibleAcquisitionVendor({ internalKind: "staff" }) &&
+      !isEligibleAcquisitionVendor({ internalKind: "docs" }) &&
+      !isEligibleAcquisitionVendor(null));
+    check("a real vendor IS an eligible acquisition source",
+      isEligibleAcquisitionVendor({ internalKind: null }));
+    const attr = readFileSync("lib/attribution.ts", "utf8");
+    check("applyFirstTouch checks eligibility before writing",
+      attr.indexOf("isEligibleAcquisitionVendor(vendor)") < attr.indexOf("prisma.customer.update"));
+    // An in-person walk-up sale is a real acquisition whatever the vendor's
+    // classification — and the Walk-Up pilot cohort IS internalKind, so a
+    // blanket rule would drop attribution for every walk-up sale.
+    check("an authoritative in-person touch bypasses the eligibility rule",
+      /!opts\?\.authoritative && !isEligibleAcquisitionVendor\(vendor\)/.test(attr));
+    check("eligibility uses the classification, not a hard-coded slug",
+      !/marble-crumb/.test(attr.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")));
   }
 
   /* -------------------------- 7. Attribution ---------------------------- */

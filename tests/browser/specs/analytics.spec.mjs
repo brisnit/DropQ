@@ -21,7 +21,7 @@ import prismaModule from "../../../app/generated/prisma/index.js";
 import { launch, recorder } from "../support/browser.mjs";
 import { assertVerifyDatabase, APP_URL } from "../support/guard.mjs";
 import { startApp } from "../support/stack.mjs";
-import { openClient } from "../seed/vendor.mjs";
+import { openClient, seedFresh, silenceGuidance, VENDOR_SLUG } from "../seed/vendor.mjs";
 
 const DB = assertVerifyDatabase();
 const r = recorder("analytics");
@@ -344,6 +344,101 @@ r.section("ATTRIBUTION");
     await db.seller.delete({ where: { id: seller.id } }).catch(() => {});
   }
   await ctx.close();
+}
+
+/* ===================== 6a. Attribution defects =========================== */
+/**
+ * The two defects live production exposed on activation day.
+ *
+ * 1. The homepage prefetches its "See a live store" link, so every visitor was
+ *    first-touch attributed to the DEMO STORE without clicking anything.
+ * 2. `referrerDomain` was read from the beacon's own Referer, so every row said
+ *    drop-q.com referred the visitor to drop-q.com.
+ */
+r.section("ATTRIBUTION: PREFETCH AND REFERRER");
+{
+  await clean();
+
+  // ---- prefetch must not create dq_touch ----
+  // Driven by the exact headers measured against production rather than by
+  // whether a particular page happens to render a prefetchable link: the
+  // contract is "a request carrying a prefetch marker is not a visit", and that
+  // is what the middleware promises.
+  const { readFileSync: rf } = await import("node:fs");
+  const TERMS_V = rf("lib/terms.ts", "utf8").match(/TERMS_VERSION = "([^"]+)"/)[1];
+  const vendor = await seedFresh(prismaModule, DB, TERMS_V);
+  await silenceGuidance(prismaModule, DB, vendor.id);
+
+  const ctx = await humanContext();
+  const page = await ctx.newPage();
+  await page.goto(`${ON.url}/pricing`, { waitUntil: "networkidle" });
+
+  // A real in-page fetch, exactly as a Next prefetch arrives at the middleware:
+  // sec-fetch-dest: empty. The browser sets that itself and it cannot be forged
+  // from script, which is why this test uses a genuine fetch rather than
+  // hand-set headers — the header the browser sends on the wire
+  // (next-router-prefetch) is stripped by Next before middleware sees it.
+  const prefetchStatus = await page.evaluate(
+    ([slug]) => fetch(`/s/${slug}`).then((res) => res.status),
+    [VENDOR_SLUG]
+  );
+  await settle(800);
+  r.ok("the in-page fetch itself succeeds", prefetchStatus < 500, `status ${prefetchStatus}`);
+  r.ok("an in-page fetch of a storefront does NOT create dq_touch",
+    !(await ctx.cookies()).find((c) => c.name === "dq_touch"),
+    JSON.stringify((await ctx.cookies()).map((c) => c.name)));
+
+  // ---- an actual navigation does ----
+  await visit(ON.url, `/s/${VENDOR_SLUG}`, { context: ctx, keep: true });
+  const afterVisit = await ctx.cookies();
+  const touch = afterVisit.find((c) => c.name === "dq_touch");
+  r.ok("a real storefront visit DOES create dq_touch", !!touch);
+  r.ok("it names the vendor actually visited",
+    touch && JSON.parse(decodeURIComponent(touch.value)).vendorSlug === VENDOR_SLUG,
+    touch ? JSON.parse(decodeURIComponent(touch.value)).vendorSlug : "(none)");
+  await ctx.close();
+
+  // ---- referrerDomain semantics ----
+  await clean();
+  const direct = await humanContext();
+  await visit(ON.url, "/pricing", { context: direct, keep: true });
+  let row = await db.analyticsEvent.findFirst({ orderBy: { at: "desc" } });
+  r.ok("a direct visit records no referrer", row?.referrerDomain === null,
+    String(row?.referrerDomain));
+  // …then navigate internally. Our own domain must never appear.
+  await visit(ON.url, "/help", { context: direct, keep: true });
+  const rows = await db.analyticsEvent.findMany({});
+  r.ok("internal navigation never records drop-q.com as a referrer",
+    rows.every((x) => x.referrerDomain === null),
+    rows.map((x) => `${x.path}:${x.referrerDomain}`).join(", "));
+  r.ok("internal navigation does not invent a source",
+    rows.every((x) => x.utmSource === null));
+  await direct.close();
+
+  await clean();
+  const referred = await humanContext();
+  await visit(ON.url, "/pricing", { context: referred, keep: true, referer: "https://www.instagram.com/p/abc" });
+  row = await db.analyticsEvent.findFirst({ orderBy: { at: "desc" } });
+  r.ok("an external referrer is captured as its bare domain",
+    row?.referrerDomain === "instagram.com", String(row?.referrerDomain));
+  r.ok("the full referrer URL is never stored",
+    !JSON.stringify(row ?? {}).includes("/p/abc"));
+  // A later internal hop must not overwrite it.
+  await visit(ON.url, "/help", { context: referred, keep: true, referer: `${ON.url}/pricing` });
+  const after = await db.analyticsEvent.findMany({ orderBy: { at: "asc" } });
+  r.ok("first touch survives internal navigation",
+    after.every((x) => x.referrerDomain === "instagram.com"),
+    after.map((x) => x.referrerDomain).join(", "));
+  await referred.close();
+
+  await clean();
+  const utm = await humanContext();
+  await visit(ON.url, "/?utm_source=activation&utm_campaign=attribution-fix", { context: utm, keep: true });
+  row = await db.analyticsEvent.findFirst({ orderBy: { at: "desc" } });
+  r.ok("UTM attribution is unchanged",
+    row?.utmSource === "activation" && row?.utmCampaign === "attribution-fix",
+    `${row?.utmSource}/${row?.utmCampaign}`);
+  await utm.close();
 }
 
 /* ======================= 7. Bots and exclusions ========================== */
