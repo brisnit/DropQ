@@ -6,7 +6,16 @@ import { prisma } from "@/lib/db";
 import { getStripe, calcFeeCents } from "@/lib/stripe";
 import { upsertCustomer } from "@/lib/customer-auth";
 import { applyFirstTouch } from "@/lib/attribution";
-import { buildCheckoutSessionParams, defaultExpiresAt } from "@/lib/checkout-session";
+import {
+  MINIMUM_TOTAL_ERROR,
+  UNSELLABLE_ITEM_ERROR,
+  belowStripeMinimum,
+  hasBelowMinimumUnitPrice,
+  buildCheckoutSessionParams,
+  checkoutSessionTotalCents,
+  defaultExpiresAt,
+} from "@/lib/checkout-session";
+import { closeUnpayableOrder, stripeSetupError } from "@/lib/checkout";
 import {
   isWalkUpEnabled,
   walkUpMode,
@@ -93,10 +102,32 @@ export async function payWalkUpSaleAction(
     return { error: "Something in this sale is no longer available. Ask the vendor to redo it." };
   }
 
+  // Same unit-price rule as online checkout. A walk-up sale is still a DropQ
+  // sale, and a vendor ringing up a legacy 20c item at the market must hit the
+  // same wall the storefront does.
+  if (hasBelowMinimumUnitPrice(lines)) {
+    return { error: UNSELLABLE_ITEM_ERROR };
+  }
+
   const itemsCents = walkUpTotalCents(lines);
   const feeCents = calcFeeCents(itemsCents, existing.seller);
   const passFee = existing.seller.feeMode === "pass";
   const totalCents = passFee ? itemsCents + feeCents : itemsCents;
+
+  // ----- Stripe's $0.50 floor, checked BEFORE anything is written -----------
+  //
+  // Same guard as online checkout, and it matters more here: below this line
+  // the transaction both creates an Order and CLAIMS the WalkUpSale, so a
+  // Stripe refusal after that point would strand the vendor's sale as well as
+  // the order. Nothing is created above this line.
+  const stripeTotalCents = checkoutSessionTotalCents({
+    lines: lines.map((l) => ({ priceCents: l.priceCents, quantity: l.quantity, name: l.name })),
+    feeCents,
+    passFee,
+  });
+  if (belowStripeMinimum(stripeTotalCents)) {
+    return { error: MINIMUM_TOTAL_ERROR };
+  }
 
   // Durable identity, exactly as online checkout does it. Email-keyed, no
   // password, no account required before paying.
@@ -183,9 +214,22 @@ export async function payWalkUpSaleAction(
     expiresAt: defaultExpiresAt(),
   });
 
-  const session = await stripe.checkout.sessions.create(params, {
-    stripeAccount: existing.seller.stripeAccountId,
-  });
+  let session;
+  try {
+    session = await stripe.checkout.sessions.create(params, {
+      stripeAccount: existing.seller.stripeAccountId,
+    });
+  } catch (e) {
+    await closeUnpayableOrder(orderId, e, "walkup");
+    // Release the claim so the vendor can retry this sale. Guarded on THIS
+    // order id, so it can never release a claim someone else won: without it a
+    // Stripe refusal would brick the walk-up sale permanently, since the claim
+    // is what stops a second attempt.
+    await prisma.walkUpSale
+      .updateMany({ where: { id: existing.id, orderId }, data: { orderId: null } })
+      .catch(() => {});
+    return { error: stripeSetupError(e) };
+  }
   await prisma.order.update({
     where: { id: orderId },
     data: { stripeSessionId: session.id },

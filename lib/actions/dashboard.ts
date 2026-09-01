@@ -27,6 +27,7 @@ import { geocode } from "@/lib/geofence";
 import { canCreateDrop } from "@/lib/plans";
 import { ORDER_STATUSES } from "@/lib/orders";
 import { resolveDropStatus } from "@/lib/payments";
+import { MIN_PRODUCT_PRICE_CENTS, belowProductMinimum } from "@/lib/checkout-session";
 import { assertValidDropSchedule } from "@/lib/drop-schedule";
 import { SOCIALS, normalizeSocialUrl } from "@/lib/social";
 
@@ -396,13 +397,21 @@ export async function createDropAction(formData: FormData) {
   // this is what holds if the client is bypassed.
   assertValidDropSchedule({ opensAt, closesAt, ...pickup });
 
+  // Price gate, in the same shape as the Stripe gate above: a drop carrying an
+  // item Stripe cannot charge for is SAVED but not PUBLISHED. Nothing the
+  // vendor typed is lost and no price is silently rewritten — the drop simply
+  // stays a draft until they fix it. Publishing it would sell an item whose
+  // checkout fails at the payment step for whoever buys it alone.
+  const priceBlocked = status === "live" && products.some((p) => belowProductMinimum(p.priceCents));
+  const finalStatus = priceBlocked ? "draft" : status;
+
   const drop = await prisma.drop.create({
     data: {
       sellerId: seller.id,
       title,
       description: String(formData.get("description") ?? "").trim() || null,
       mode: liveMode ? "live" : "preorder",
-      status,
+      status: finalStatus,
       fulfillment: String(formData.get("fulfillment") ?? "pickup"),
       pickupInfo: String(formData.get("pickupInfo") ?? "").trim() || null,
       opensAt,
@@ -425,7 +434,10 @@ export async function createDropAction(formData: FormData) {
   });
 
   revalidatePath("/dashboard/drops");
-  redirect(`/dashboard/drops/${drop.id}${stripeBlocked ? "?stripe_required=1" : ""}`);
+  redirect(
+    `/dashboard/drops/${drop.id}` +
+      (stripeBlocked ? "?stripe_required=1" : priceBlocked ? "?price_minimum=1" : "")
+  );
 }
 
 // Full edit: updates the drop in place (never duplicates) and syncs its items.
@@ -450,6 +462,19 @@ export async function updateDropFullAction(formData: FormData) {
   // is refused; nothing is rewritten and the vendor is required to correct it.
   assertValidDropSchedule({ opensAt, closesAt, ...pickup });
 
+  // Price gate, same shape as the Stripe gate: publishing is held back when any
+  // submitted item is under Stripe's floor. The drop still saves — including
+  // the offending price, unrewritten — it just stays a draft until fixed.
+  // Reads the SUBMITTED prices, not the stored ones, so an edit that fixes the
+  // price publishes in the same save.
+  const submittedPrices = formData.getAll("p_price").map((v) => dollarsToCents(String(v)));
+  const priceBlocked =
+    status === "live" &&
+    (submittedPrices.length
+      ? submittedPrices.some((c) => belowProductMinimum(c))
+      : drop.products.some((p) => belowProductMinimum(p.priceCents)));
+  const finalStatus = priceBlocked ? "draft" : status;
+
   // Detect a pickup-detail change so we can notify customers who already ordered.
   const pickupChanged =
     drop.pickupStartAt?.getTime() !== pickup.pickupStartAt?.getTime() ||
@@ -465,7 +490,7 @@ export async function updateDropFullAction(formData: FormData) {
       description: String(formData.get("description") ?? "").trim() || null,
       fulfillment: String(formData.get("fulfillment") ?? drop.fulfillment) || drop.fulfillment,
       pickupInfo: String(formData.get("pickupInfo") ?? "").trim() || null,
-      status,
+      status: finalStatus,
       opensAt,
       closesAt,
       ...pickup,
@@ -561,7 +586,10 @@ export async function updateDropFullAction(formData: FormData) {
   revalidatePath("/dashboard/drops");
   revalidatePath(`/s/${seller.slug}`);
   revalidatePath(`/s/${seller.slug}/${dropId}`);
-  redirect(`/dashboard/drops/${dropId}${stripeBlocked ? "?stripe_required=1" : ""}`);
+  redirect(
+    `/dashboard/drops/${dropId}` +
+      (stripeBlocked ? "?stripe_required=1" : priceBlocked ? "?price_minimum=1" : "")
+  );
 }
 
 export async function updateDropStatusAction(formData: FormData) {
@@ -575,6 +603,15 @@ export async function updateDropStatusAction(formData: FormData) {
   const { status, blocked: stripeBlocked } = resolveDropStatus(statusRaw, drop.status, seller);
   if (stripeBlocked) {
     redirect(`/dashboard/drops/${dropId}?stripe_required=1`);
+  }
+  // The other way a drop goes live. Same rule as the editor: an item Stripe
+  // cannot charge for keeps the drop off sale until it is repriced. Taking a
+  // drop DOWN is never blocked — only going live is.
+  if (status === "live") {
+    const underMinimum = await prisma.product.count({
+      where: { dropId, priceCents: { lt: MIN_PRODUCT_PRICE_CENTS } },
+    });
+    if (underMinimum > 0) redirect(`/dashboard/drops/${dropId}?price_minimum=1`);
   }
   if (status === drop.status) return;
   await prisma.drop.update({ where: { id: dropId }, data: { status } });

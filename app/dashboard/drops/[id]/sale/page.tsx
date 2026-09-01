@@ -102,7 +102,15 @@ export default async function WalkUpSalePage({
 
         {walkUpError && (
           <p className="mb-4 text-sm text-brand-dark bg-brand-tint rounded-lg px-3 py-2">
-            Couldn&apos;t start that sale ({walkUpError}). Nothing was created — try again.
+            {walkUpError === "below_minimum_price" ? (
+              <>
+                Couldn&apos;t start that sale: every item must cost at least $0.50
+                — payments can&apos;t be processed below that. Raise the price in
+                the drop, then try again. Nothing was created.
+              </>
+            ) : (
+              <>Couldn&apos;t start that sale ({walkUpError}). Nothing was created — try again.</>
+            )}
           </p>
         )}
 

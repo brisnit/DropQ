@@ -152,7 +152,16 @@ function ProductForm({
         <Field label="Default price" hint="You can override this per drop.">
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm">$</span>
-            <Input name="price" defaultValue={product?.priceDollars ?? ""} inputMode="decimal" placeholder="0.00" className="pl-7" />
+            <Input
+              name="price"
+              defaultValue={product?.priceDollars ?? ""}
+              inputMode="decimal"
+              type="number"
+              min="0.50"
+              step="0.01"
+              placeholder="0.00"
+              className="pl-7"
+            />
           </div>
         </Field>
       </div>

@@ -34,6 +34,7 @@ type Result = { name: string; pass: boolean; detail?: string };
 /** Routes that create application records and must therefore be guarded. */
 const FIXTURE_ROUTES = [
   "attribution-selftest",
+  "checkout-minimum-selftest",
   "date-picker-selftest",
   "messaging-selftest",
   "rate-limit-selftest",

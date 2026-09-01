@@ -37,11 +37,12 @@ export default async function DropDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ stripe_required?: string }>;
+  searchParams: Promise<{ stripe_required?: string; price_minimum?: string }>;
 }) {
   const { id } = await params;
   const {
     stripe_required: stripeRequired,
+    price_minimum: priceMinimum,
   } = await searchParams;
   const seller = await requireSeller();
 
@@ -128,6 +129,18 @@ export default async function DropDetailPage({
           transient post-blocked-publish notice wins; otherwise the inline
           publish gate; otherwise the generic banner (which renders nothing for
           a charge-ready vendor anyway). */}
+      {/* Held back because an item is priced under what Stripe can charge. The
+          drop and every price the vendor typed are saved exactly as entered —
+          nothing is rounded up — it simply stays a draft until repriced. */}
+      {priceMinimum && (
+        <div className="mb-6 rounded-card bg-brand-tint border border-brand/40 px-4 py-3">
+          <p className="text-sm text-brand-dark max-w-xl">
+            <b>Saved as a draft.</b> Every item needs to cost at least $0.50 —
+            payments can&apos;t be processed below that. Raise the prices marked
+            below and publish again. Nothing you entered has been changed.
+          </p>
+        </div>
+      )}
       {stripeRequired && gate ? (
         <div className="mb-6 rounded-card bg-brand-tint border border-brand/40 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-brand-dark max-w-xl">
