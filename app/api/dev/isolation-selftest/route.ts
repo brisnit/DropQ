@@ -37,13 +37,14 @@ const FIXTURE_ROUTES = [
   "date-picker-selftest",
   "messaging-selftest",
   "rate-limit-selftest",
+  "security-headers-selftest",
   "walkup-pay-selftest",
   "walkup-route-selftest",
 ];
 
 /** Prisma models whose creation makes a route fixture-producing. */
 const RECORD_MODELS =
-  /prisma\.(seller|customer|customerAccount|drop|product|order|orderItem|walkUpSale|customerVendor|vendorProduct|subscriber|rateLimit)\.(create|createMany|upsert)/;
+  /prisma\.(seller|customer|customerAccount|drop|product|order|orderItem|walkUpSale|customerVendor|vendorProduct|subscriber|rateLimit|cspReport)\.(create|createMany|upsert)/;
 
 const PRODUCTION_URL =
   "postgresql://user:pw@ep-rough-cake-atlwek15.c-9.us-east-1.aws.neon.tech/neondb?sslmode=require";

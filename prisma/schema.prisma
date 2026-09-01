@@ -1599,3 +1599,37 @@ model RateLimit {
   @@unique([bucket, key, windowAt])
   @@index([expiresAt])
 }
+
+/// A distinct CSP violation shape, not a log of who saw it.
+///
+/// Rows are UPSERTED on the unique key below, so a page emitting the same
+/// violation on every load produces one row with a rising count rather than a
+/// row per view. That is what makes a public-write endpoint safe to expose:
+/// the table's size is bounded by how many distinct ways the policy is
+/// violated, not by traffic.
+///
+/// Nothing here identifies a person. No IP, no cookie, no user agent, no
+/// headers, no query strings, no script samples. See app/api/csp-report.
+model CspReport {
+  id                 String   @id @default(cuid())
+  /// Path only — query string and fragment stripped before storage.
+  documentPath       String
+  effectiveDirective String
+  /// A keyword ("inline", "eval") or an origin/path — never a full URL.
+  blockedUri         String
+  /// Empty string rather than null: a NULL never equals a NULL in a unique
+  /// index, which would silently defeat the deduplication above.
+  sourceFile         String   @default("")
+  lineNumber         Int      @default(0)
+  columnNumber       Int      @default(0)
+  disposition        String   @default("report")
+  count              Int      @default(1)
+  firstSeenAt        DateTime @default(now())
+  lastSeenAt         DateTime @default(now())
+  /// 90 days past the most recent sighting. Purged by the reminders cron.
+  expiresAt          DateTime
+
+  @@unique([documentPath, effectiveDirective, blockedUri, sourceFile, lineNumber, columnNumber])
+  @@index([expiresAt])
+  @@index([lastSeenAt])
+}
