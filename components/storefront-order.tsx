@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { belowProductMinimum } from "@/lib/checkout-limits";
 import { useFormStatus } from "react-dom";
 import { formatMoney } from "@/lib/format";
 import { vendorPalette, darkenColor } from "@/lib/color";
@@ -154,12 +155,20 @@ export function StorefrontOrder({
     };
   }, [dropId]);
 
-  const setItem = (id: string, n: number, max: number) =>
+  const setItem = (id: string, n: number, max: number) => {
+    // Belt as well as braces. The Add and + controls are not rendered for a
+    // sub-minimum item, but a quantity could still arrive from a stale render
+    // or a poked-at handler — and a cart that silently contains one is a
+    // checkout that fails at submit for reasons the customer cannot see.
+    const product = products.find((x) => x.id === id);
+    if (product && belowProductMinimum(product.priceCents)) return;
     setQty((q) => ({ ...q, [id]: Math.max(0, Math.min(n, max)) }));
+  };
 
   const lines = products
     .map((p) => ({ p, n: qty[p.id] ?? 0 }))
-    .filter((l) => l.n > 0);
+    // Never priced into a subtotal, never submitted, never counted.
+    .filter((l) => l.n > 0 && !belowProductMinimum(l.p.priceCents));
   const subtotal = lines.reduce((s, l) => s + l.p.priceCents * l.n, 0);
   const passFee = feeMode === "pass";
   const feeCents = passFee ? Math.round((subtotal * feePercent) / 100) : 0;
@@ -224,6 +233,14 @@ export function StorefrontOrder({
           const n = qty[p.id] ?? 0;
           const remaining = remainingOf(p.id);
           const soldOut = remaining <= 0;
+          // A legacy item priced under $0.50. Stripe cannot charge for it on
+          // its own, so DropQ will not sell it at any quantity — the server
+          // refuses the line regardless, and this is what stops a customer
+          // building a cart that was always going to be rejected. Presented
+          // like "Sold out": a plain statement of unavailability, with no
+          // vendor-facing pricing detail leaking onto a storefront.
+          const belowMinimum = belowProductMinimum(p.priceCents);
+          const unavailable = soldOut || belowMinimum;
           return (
             <div
               key={p.id}
@@ -233,7 +250,7 @@ export function StorefrontOrder({
                  image were both `shrink-0`, so at 320px the details column was
                  squeezed to ~77px and the description wrapped almost per word. */
               className={`bg-paper border rounded-card p-3 sm:p-4 grid grid-cols-[auto_1fr] sm:grid-cols-[auto_1fr_auto] gap-x-3 sm:gap-x-4 gap-y-3 items-center ${
-                soldOut ? "border-line opacity-60" : "border-line"
+                unavailable ? "border-line opacity-60" : "border-line"
               }`}
             >
               {p.images.length > 0 ? (
@@ -278,7 +295,14 @@ export function StorefrontOrder({
                   )}
                 </p>
               </div>
-              {soldOut ? (
+              {belowMinimum ? (
+                <span
+                  className="col-start-2 sm:col-start-3 justify-self-start text-xs font-medium text-muted max-w-[16rem]"
+                  role="note"
+                >
+                  Unavailable — its price is below the $0.50 minimum.
+                </span>
+              ) : soldOut ? (
                 <span className="col-start-2 sm:col-start-3 justify-self-start text-xs font-semibold uppercase tracking-wide text-muted">
                   Sold out
                 </span>

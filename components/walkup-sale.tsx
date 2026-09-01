@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { belowProductMinimum } from "@/lib/checkout-limits";
 import { useRouter } from "next/navigation";
 import { useFormStatus } from "react-dom";
 import { formatMoney } from "@/lib/format";
@@ -49,8 +50,14 @@ export function WalkUpCart({
 }) {
   const [qty, setQty] = useState<Record<string, number>>({});
   const get = (id: string) => qty[id] ?? 0;
-  const set = (id: string, n: number, max: number) =>
+  const set = (id: string, n: number, max: number) => {
+    // Same rule the vendor's own storefront enforces. Ringing up a legacy 20c
+    // item at a market would fail at Stripe exactly as it does online, and
+    // failing there — in front of a waiting customer — is worse.
+    const product = products.find((x) => x.id === id);
+    if (product && belowProductMinimum(product.priceCents)) return;
     setQty((q) => ({ ...q, [id]: Math.max(0, Math.min(n, max)) }));
+  };
 
   const count = products.reduce((n, p) => n + get(p.id), 0);
   const total = products.reduce((s, p) => s + p.priceCents * get(p.id), 0);
@@ -61,7 +68,8 @@ export function WalkUpCart({
       <div className="space-y-1">
         {products.map((p) => {
           const n = get(p.id);
-          const out = p.remaining <= 0;
+          const belowMinimum = belowProductMinimum(p.priceCents);
+          const out = p.remaining <= 0 || belowMinimum;
           return (
             <div
               key={p.id}
@@ -70,7 +78,12 @@ export function WalkUpCart({
               <div className="min-w-0">
                 <p className={`font-medium truncate ${out ? "text-muted" : ""}`}>{p.name}</p>
                 <p className="text-xs text-muted">
-                  {formatMoney(p.priceCents)} · {out ? "sold out" : `${p.remaining} left`}
+                  {formatMoney(p.priceCents)} ·{" "}
+                  {belowMinimum
+                    ? "unavailable — under the $0.50 minimum"
+                    : out
+                      ? "sold out"
+                      : `${p.remaining} left`}
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -79,7 +92,7 @@ export function WalkUpCart({
                   type="button"
                   aria-label={`Remove one ${p.name}`}
                   onClick={() => set(p.id, n - 1, p.remaining)}
-                  disabled={n === 0}
+                  disabled={n === 0 || belowMinimum}
                   className="w-12 h-12 rounded-xl border border-line-strong bg-paper text-2xl leading-none disabled:opacity-40 active:scale-95 transition"
                 >
                   −

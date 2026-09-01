@@ -1,6 +1,19 @@
 import "server-only";
 import type Stripe from "stripe";
 
+// The plain limits live in a module the browser can import too, so the drop
+// editor and this file cannot drift apart on what the floor is.
+export {
+  MINIMUM_TOTAL_ERROR,
+  MIN_PRODUCT_PRICE_CENTS,
+  PRODUCT_MINIMUM_ERROR,
+  STRIPE_MIN_TOTAL_CENTS,
+  UNSELLABLE_ITEM_ERROR,
+  belowProductMinimum,
+  belowStripeMinimum,
+  hasBelowMinimumUnitPrice,
+} from "@/lib/checkout-limits";
+
 /**
  * The Stripe Checkout Session parameters for a DropQ order — built in one place
  * so online checkout and the future walk-up flow cannot drift apart.
@@ -50,6 +63,21 @@ export type CheckoutSessionInput = {
    */
   expiresAt: number;
 };
+
+/**
+ * The amount Stripe will actually charge for these params.
+ *
+ * Deliberately derived from the SAME inputs buildCheckoutSessionParams uses,
+ * not from a caller's running total, so the number that gets validated is the
+ * number that gets sent. A self-test sums the built `line_items` and asserts it
+ * equals this, so the two cannot drift apart unnoticed.
+ */
+export function checkoutSessionTotalCents(
+  input: Pick<CheckoutSessionInput, "lines" | "feeCents" | "passFee">
+): number {
+  const items = input.lines.reduce((sum, l) => sum + l.priceCents * l.quantity, 0);
+  return input.passFee ? items + input.feeCents : items;
+}
 
 /**
  * How long a Checkout Session stays payable. Bounds how long an order can sit

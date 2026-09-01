@@ -1,5 +1,6 @@
 import "server-only";
 import { randomBytes } from "crypto";
+import { belowProductMinimum } from "@/lib/checkout-limits";
 
 /**
  * Walk-up (in-person) sales — Phase D: the vendor-side temporary cart.
@@ -148,7 +149,9 @@ export type WalkUpValidationError =
   | "unknown_product"
   | "bad_quantity"
   | "insufficient_stock"
-  | "too_many_lines";
+  | "too_many_lines"
+  /** An item priced under DropQ's $0.50 unit minimum — not sellable anywhere. */
+  | "below_minimum_price";
 
 /**
  * Turn a client request into an authoritative snapshot.
@@ -188,6 +191,12 @@ export function validateWalkUpLines(
 
     const remaining = Math.max(0, p.inventory - p.sold);
     if (l.quantity > remaining) return { ok: false, reason: "insufficient_stock" };
+
+    // A legacy item priced under DropQ's $0.50 unit minimum is not sellable by
+    // any route — storefront, walk-up, or a hand-built form post. Refused here
+    // rather than at the Stripe call, so no WalkUpSale is created for a sale
+    // that could never be paid for.
+    if (belowProductMinimum(p.priceCents)) return { ok: false, reason: "below_minimum_price" };
 
     lines.push({
       productId: p.id,

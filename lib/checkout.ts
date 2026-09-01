@@ -9,6 +9,7 @@ import { createCommissionForOrder } from "@/lib/commission";
 import { recordRelationship } from "@/lib/attribution";
 import { formatPickupWindow, pickupLocation, pickupSummary } from "@/lib/pickup";
 import { dropMapsUrl } from "@/lib/maps";
+import { MINIMUM_TOTAL_ERROR } from "@/lib/checkout-session";
 
 // Header-free base URL — finalizePaidOrder runs from webhooks and cron sweeps
 // that have no request context, so we can't rely on headers().
@@ -237,6 +238,72 @@ async function refundOversoldOrder(orderId: string) {
   }
 }
 
+/* ------------------------------------------------ failed checkout setup -- */
+
+/**
+ * What a buyer is told when Stripe refuses to create the Checkout Session.
+ *
+ * Deliberately NOT Stripe's own message. Stripe's text is written for the
+ * integrator, not the shopper — it can name account states, parameters and
+ * limits that are none of a customer's business, and it changes without notice.
+ * One exception: the amount floor, which is genuinely the buyer's problem and
+ * which they can act on.
+ */
+export function stripeSetupError(e: unknown): string {
+  const code = stripeErrorCode(e);
+  if (code === "amount_too_small") return MINIMUM_TOTAL_ERROR;
+  return "We couldn't start checkout just now. Please try again in a moment.";
+}
+
+/** The Stripe error code, if this is a Stripe error at all. */
+function stripeErrorCode(e: unknown): string | null {
+  const raw = e as { code?: unknown; type?: unknown } | null;
+  if (raw && typeof raw.code === "string") return raw.code;
+  return null;
+}
+
+/**
+ * Mark an order that can never be paid.
+ *
+ * REUSES THE EXISTING VOCABULARY — `status: "canceled"`, `paymentStatus:
+ * "expired"` — which is exactly what reconcilePendingOrders already writes for
+ * a checkout that can no longer be paid. A session that was never created and a
+ * session that expired are the same thing to every consumer of this data: the
+ * payment window is gone and never opened. Inventing a "failed" status would
+ * mean auditing every reporting query, dashboard filter and vendor view for a
+ * value they have never seen.
+ *
+ * Guarded on `status: "pending"` so it can never touch an order that has since
+ * been paid — a webhook landing between the failed create and this update is
+ * unlikely but not impossible, and a paid order must win.
+ *
+ * Writes NO OrderEvent: nothing about a payment happened. Touches NO inventory:
+ * inventory moves in finalizePaidOrder, which never ran.
+ */
+export async function closeUnpayableOrder(
+  orderId: string,
+  cause: unknown,
+  where: "checkout" | "walkup"
+): Promise<void> {
+  const err = cause as { type?: string; code?: string; requestId?: string } | null;
+  // Code, type and request id only — never the message, which can carry
+  // parameter values, and never anything from the buyer or the card.
+  console.error(
+    `[${where}] Stripe session create failed: ` +
+      `type=${err?.type ?? "unknown"} code=${err?.code ?? "none"} requestId=${err?.requestId ?? "none"}`
+  );
+  try {
+    await prisma.order.updateMany({
+      where: { id: orderId, status: "pending" },
+      data: { status: "canceled", paymentStatus: "expired" },
+    });
+  } catch (e) {
+    // Never let cleanup bury the original failure — the buyer still needs an
+    // answer, and reconcilePendingOrders will sweep this row shortly anyway.
+    console.error(`[${where}] could not close unpayable order:`, e instanceof Error ? e.message : e);
+  }
+}
+
 /**
  * Backstop for orders that paid but never finalized (buyer bounced before the
  * success-page redirect, and the webhook didn't land). Checks Stripe truth for
@@ -247,11 +314,38 @@ export async function reconcilePendingOrders(maxAgeMinutes = 15): Promise<{
   finalized: number;
   expired: number;
   checked: number;
+  orphaned: number;
 }> {
-  const stripe = getStripe();
-  if (!stripe) return { finalized: 0, expired: 0, checked: 0 };
-
   const cutoff = new Date(Date.now() - maxAgeMinutes * 60 * 1000);
+
+  // ---- Orders that never got a Stripe session at all ----------------------
+  //
+  // The sweep below keys off `stripeSessionId`, so before this existed an order
+  // whose session creation failed was invisible to it and stayed `pending`
+  // forever. One such row was produced on 31 Aug 2026 by a $0.30 cart.
+  //
+  // These need no Stripe call to resolve: no session means no way to pay, ever.
+  // Runs BEFORE the `!stripe` guard so a missing platform key cannot silently
+  // disable the only cleanup these rows have. Same cutoff as the rest — a
+  // request cannot still be in flight fifteen minutes later.
+  //
+  // Same status pair reconciliation already writes for an unpayable checkout,
+  // guarded on `status: "pending"` so a paid order can never be caught. No
+  // OrderEvent is written and no inventory moves: nothing about a payment
+  // happened, and inventory only ever moves in finalizePaidOrder.
+  const { count: orphaned } = await prisma.order.updateMany({
+    where: {
+      status: "pending",
+      paymentStatus: { not: "paid" },
+      stripeSessionId: null,
+      createdAt: { lt: cutoff },
+    },
+    data: { status: "canceled", paymentStatus: "expired" },
+  });
+
+  const stripe = getStripe();
+  if (!stripe) return { finalized: 0, expired: 0, checked: 0, orphaned };
+
   const stale = await prisma.order.findMany({
     where: { status: "pending", stripeSessionId: { not: null }, createdAt: { lt: cutoff } },
     select: {
@@ -287,5 +381,5 @@ export async function reconcilePendingOrders(maxAgeMinutes = 15): Promise<{
       console.error("Reconcile order failed:", o.id, e);
     }
   }
-  return { finalized, expired, checked: stale.length };
+  return { finalized, expired, checked: stale.length, orphaned };
 }

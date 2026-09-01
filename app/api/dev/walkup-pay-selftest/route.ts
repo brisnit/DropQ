@@ -167,8 +167,19 @@ export async function GET() {
       check("Order was created", !!order, order ? order.id : "none");
       if (order) {
         check('Order.source === "in_person"', order.source === "in_person", order.source);
-        check('Order.paymentStatus === "pending"', order.paymentStatus === "pending", order.paymentStatus);
-        check('Order.status === "pending"', order.status === "pending", order.status);
+        // The harness uses a fake connected account, so the Stripe session
+        // create ALWAYS fails here. That used to throw and leave the order
+        // pending forever; since the $0.50 checkout fix it is caught and the
+        // order is closed with the same canceled/expired pair reconciliation
+        // uses. These two assertions therefore describe the FAILURE path — the
+        // one this environment can actually reach — not a successful sale.
+        check('a failed Stripe setup closes the order (paymentStatus "expired")',
+          order.paymentStatus === "expired", order.paymentStatus);
+        check('a failed Stripe setup closes the order (status "canceled")',
+          order.status === "canceled", order.status);
+        check("no order is left pending after a failed Stripe setup",
+          order.status !== "pending" && order.paymentStatus !== "pending",
+          `${order.status}/${order.paymentStatus}`);
         check("Order.feeCents === 2 for a $1.00 sale", order.feeCents === 2, String(order.feeCents));
         check("Order.totalCents === 100", order.totalCents === 100, String(order.totalCents));
         check("exactly one OrderItem, quantity 1", order.items.length === 1 && order.items[0].quantity === 1,
@@ -181,8 +192,11 @@ export async function GET() {
         const claimed = await prisma.walkUpSale.findUnique({
           where: { id: sale.id }, select: { orderId: true },
         });
-        check("WalkUpSale claimed by exactly this Order", claimed?.orderId === order.id,
-          `${claimed?.orderId ?? "null"} vs ${order.id}`);
+        // The claim is RELEASED when Stripe setup fails, so the vendor can
+        // retry the sale. Without that, a Stripe hiccup would brick the sale
+        // permanently — the claim is exactly what stops a second attempt.
+        check("a failed Stripe setup releases the claim so the sale can be retried",
+          claimed?.orderId === null, claimed?.orderId ?? "null");
       }
 
       const orderCount = await prisma.order.count({ where: { sellerId: seller.id } });

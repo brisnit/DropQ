@@ -7,7 +7,16 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getStripe, calcFeeCents } from "@/lib/stripe";
 import { isVendorSellable } from "@/lib/payments";
-import { buildCheckoutSessionParams, defaultExpiresAt } from "@/lib/checkout-session";
+import {
+  MINIMUM_TOTAL_ERROR,
+  UNSELLABLE_ITEM_ERROR,
+  belowProductMinimum,
+  belowStripeMinimum,
+  buildCheckoutSessionParams,
+  checkoutSessionTotalCents,
+  defaultExpiresAt,
+} from "@/lib/checkout-session";
+import { closeUnpayableOrder, stripeSetupError } from "@/lib/checkout";
 import { sendEmail, orderReceivedEmail } from "@/lib/email";
 import { orderMailPickup, pickupSummary } from "@/lib/pickup";
 import { dropMapsUrl } from "@/lib/maps";
@@ -84,6 +93,18 @@ export async function placeOrderAction(
     if (qty > remaining) {
       return { error: `Only ${remaining} left of ${p.name}. Adjust your cart.` };
     }
+    // A DropQ rule, stricter than Stripe's: every UNIT must clear $0.50, not
+    // just the cart total. Three 20c items would satisfy Stripe and still be a
+    // listing nobody can buy singly. Checked per line, inside the same loop
+    // that builds them, so a sub-minimum item is refused however many are in
+    // the cart and whatever else is alongside it.
+    //
+    // This is where a LEGACY product is caught. Existing sub-minimum rows are
+    // left in the database untouched; they simply stop being purchasable until
+    // the vendor reprices them.
+    if (belowProductMinimum(p.priceCents)) {
+      return { error: UNSELLABLE_ITEM_ERROR };
+    }
     lines.push({ product: p, qty });
   }
   if (lines.length === 0) return { error: "Add at least one item to your order." };
@@ -106,6 +127,31 @@ export async function placeOrderAction(
   const stripe = getStripe();
   const useStripe =
     !!stripe && drop.seller.stripeChargesEnabled && !!drop.seller.stripeAccountId;
+
+  // ----- Stripe's $0.50 floor, checked BEFORE anything is written -----------
+  //
+  // Placed here on purpose: above this line nothing has been created, so a cart
+  // under the floor produces no Order, no OrderItem, no Customer upsert, no
+  // attribution touch, no inventory movement, and no Stripe call. Below this
+  // line all of those happen.
+  //
+  // Previously Stripe was the first thing to notice, and by then an Order row
+  // existed. The buyer saw "A server error occurred"; the row stayed pending
+  // forever. Now the buyer is told what is actually wrong, and nothing is left
+  // behind. Only gated on useStripe because the local-dev branch never calls
+  // Stripe and so has no floor to respect.
+  const stripeTotalCents = checkoutSessionTotalCents({
+    lines: lines.map((l) => ({
+      priceCents: l.product.priceCents,
+      quantity: l.qty,
+      name: l.product.name,
+    })),
+    feeCents,
+    passFee,
+  });
+  if (useStripe && belowStripeMinimum(stripeTotalCents)) {
+    return { error: MINIMUM_TOTAL_ERROR };
+  }
 
   // Give the buyer a durable Customer identity at checkout so messaging works
   // from their very first order. Never blocks the sale — if this fails the
@@ -195,11 +241,22 @@ export async function placeOrderAction(
       cancelUrl: `${base}/s/${drop.seller.slug}/${drop.id}?canceled=1`,
       expiresAt: defaultExpiresAt(),
     });
-    const session = await stripe.checkout.sessions.create(
-      params,
-      // Direct charge: create the Checkout Session on the vendor's connected account.
-      { stripeAccount: drop.seller.stripeAccountId! }
-    );
+    // The Order row already exists at this point — it has to, because its id is
+    // embedded in success_url, cancel_url and the PaymentIntent metadata. So if
+    // Stripe refuses, the row must not be left pending: nothing downstream can
+    // ever pay it, and reconcilePendingOrders keys off a session id it will
+    // never have.
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create(
+        params,
+        // Direct charge: create the Checkout Session on the vendor's connected account.
+        { stripeAccount: drop.seller.stripeAccountId! }
+      );
+    } catch (e) {
+      await closeUnpayableOrder(order.id, e, "checkout");
+      return { error: stripeSetupError(e) };
+    }
 
     await prisma.order.update({
       where: { id: order.id },

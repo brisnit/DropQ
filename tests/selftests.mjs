@@ -41,6 +41,7 @@ const SUITES = [
   { name: "activation", productionData: true },
   { name: "analytics" },
   { name: "attribution", fixtures: true },
+  { name: "checkout-minimum", fixtures: true },
   { name: "date-picker", fixtures: true },
   { name: "drop-items" },
   { name: "guidance" },

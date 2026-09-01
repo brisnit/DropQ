@@ -6,6 +6,22 @@ import { Button, Field, Input, Textarea, Select } from "@/components/ui";
 import { vocab, showItemMeta, isFood } from "@/lib/category";
 import { uploadImage, ImageTooLargeError } from "@/lib/upload-client";
 import { DateRangePicker } from "@/components/date-range-picker";
+import { MIN_PRODUCT_PRICE_CENTS } from "@/lib/checkout-limits";
+
+/**
+ * A typed price that Stripe could not charge for.
+ *
+ * Empty and half-typed values are NOT flagged — nagging someone mid-keystroke
+ * is worse than letting the server answer. Only a complete, parseable number
+ * under the floor lights up.
+ */
+function belowMinimum(price: string): boolean {
+  const trimmed = price.trim();
+  if (!trimmed) return false;
+  const n = Number(trimmed);
+  if (!isFinite(n) || n <= 0) return false;
+  return Math.round(n * 100) < MIN_PRODUCT_PRICE_CENTS;
+}
 import { AddressAutocomplete } from "@/components/address-autocomplete";
 import { firstScheduleError } from "@/lib/drop-schedule";
 import { removalWarning } from "@/lib/drop-items";
@@ -765,9 +781,25 @@ export function DropEditor({
                             onChange={(e) => update(row.key, { price: e.target.value })}
                             inputMode="decimal"
                             placeholder="0.00"
-                            className="w-full bg-paper border border-line-strong rounded-lg pl-7 pr-3 py-2 text-ink placeholder:text-muted/70 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                            aria-describedby={
+                              belowMinimum(row.price) ? `${fieldId}-price-${i}-min` : undefined
+                            }
+                            aria-invalid={belowMinimum(row.price) || undefined}
+                            className={`w-full bg-paper border rounded-lg pl-7 pr-3 py-2 text-ink placeholder:text-muted/70 focus:outline-none focus:ring-2 ${
+                              belowMinimum(row.price)
+                                ? "border-brand focus:border-brand focus:ring-brand/20"
+                                : "border-line-strong focus:border-brand focus:ring-brand/20"
+                            }`}
                           />
                         </div>
+                        {/* Immediate feedback. The server refuses to publish
+                            regardless — this only saves the vendor the round
+                            trip. */}
+                        {belowMinimum(row.price) && (
+                          <p id={`${fieldId}-price-${i}-min`} className="mt-1 text-xs text-brand-dark">
+                            Minimum $0.50 — payments can&apos;t be processed below that.
+                          </p>
+                        )}
                       </div>
                       <div
                         className="flex-1 min-w-0 flex flex-col"

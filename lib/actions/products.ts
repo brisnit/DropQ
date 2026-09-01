@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireSeller } from "@/lib/auth";
 import { dollarsToCents } from "@/lib/format";
+import { PRODUCT_MINIMUM_ERROR, belowProductMinimum } from "@/lib/checkout-session";
 
 export type ProductSaveState = { saved?: boolean; error?: string };
 
@@ -34,6 +35,11 @@ export async function createVendorProductAction(
   const seller = await requireSeller();
   const data = parseProduct(formData);
   if (!data.name) return { error: "Give your product a name." };
+  // Stripe cannot charge less than $0.50, so a product priced below it can only
+  // ever be sold in a bundle — and on its own it produces a checkout that fails
+  // at the payment step for the buyer. Rejected, never rounded up: a silently
+  // adjusted price is a vendor discovering their own listing lied to them.
+  if (belowProductMinimum(data.priceCents)) return { error: PRODUCT_MINIMUM_ERROR };
   try {
     await prisma.vendorProduct.create({ data: { sellerId: seller.id, ...data } });
     revalidatePath("/dashboard/products");
@@ -53,6 +59,11 @@ export async function updateVendorProductAction(
   const id = String(formData.get("id") ?? "");
   const data = parseProduct(formData);
   if (!data.name) return { error: "Give your product a name." };
+  // Stripe cannot charge less than $0.50, so a product priced below it can only
+  // ever be sold in a bundle — and on its own it produces a checkout that fails
+  // at the payment step for the buyer. Rejected, never rounded up: a silently
+  // adjusted price is a vendor discovering their own listing lied to them.
+  if (belowProductMinimum(data.priceCents)) return { error: PRODUCT_MINIMUM_ERROR };
   try {
     // updateMany scoped to sellerId so a crafted id can't touch another's item.
     const res = await prisma.vendorProduct.updateMany({
