@@ -98,8 +98,9 @@ const page = await context.newPage();
   const refused = seen.slice(5).map((s) => s.ms);
   console.log(`  · ${`attempts 1–5 ${bcryptRuns.join("/")}ms · attempts 6–7 ${refused.join("/")}ms`}`);
 
-  const rows = await db.$queryRawUnsafe('SELECT COUNT(*)::int AS n FROM "RateLimit"');
-  r.ok("counters were written", rows[0].n > 0, `${rows[0].n} rows`);
+  const rows = await db.$queryRawUnsafe(
+    `SELECT COUNT(*)::int AS n FROM "RateLimit" WHERE "bucket" LIKE 'login:%'`);
+  r.ok("login counters were written", rows[0].n > 0, `${rows[0].n} rows`);
   await screenshot(page, "auth-rate-limit-throttled");
 }
 
@@ -128,8 +129,13 @@ const page = await context.newPage();
     await attempt(page, REAL_EMAIL, REAL_PASSWORD);
     await context.clearCookies();
   }
-  const rows = await db.$queryRawUnsafe('SELECT COUNT(*)::int AS n FROM "RateLimit"');
-  r.ok("three successful logins consume nothing", rows[0].n === 0, `${rows[0].n} rows`);
+  // Counted by BUCKET, not by table. The CSP collector shares this table and
+  // consumes its own budget on every violation report, and loading a page now
+  // produces those — so "the table is empty" stopped being the same claim as
+  // "the login rule counted nothing".
+  const rows = await db.$queryRawUnsafe(
+    `SELECT COUNT(*)::int AS n FROM "RateLimit" WHERE "bucket" LIKE 'login:%'`);
+  r.ok("three successful logins consume no login budget", rows[0].n === 0, `${rows[0].n} rows`);
 }
 
 /* ---- 4. Unknown accounts cost the same as real ones --------------------- */

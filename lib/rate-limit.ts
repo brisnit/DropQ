@@ -76,6 +76,28 @@ export const RULES = {
     { dimension: "ip", max: 15, windowMs: HOUR },
   ],
   tokenVerify: [{ dimension: "ip", max: 30, windowMs: 15 * MIN }],
+  /**
+   * CSP violation ingestion — a PUBLIC WRITE endpoint, so it needs a ceiling,
+   * but nothing like an auth ceiling.
+   *
+   * The auth numbers are wrong here in both directions. A failed login is
+   * suspicious; a violation report is the browser doing its job. One page view
+   * under the current Report-Only policy emits roughly twenty reports, because
+   * Next writes about that many inline scripts and `script-src 'self'` permits
+   * none of them — so a vendor working through the dashboard legitimately
+   * produces hundreds of reports in minutes, and an auth-shaped limit would
+   * throw away the very evidence this stage exists to collect.
+   *
+   * 300 per five minutes is about fifteen page views from one address, which
+   * no real session exceeds while still capping a flooder hard. The daily
+   * ceiling stops a slow drip from adding up. The real protection against
+   * table growth is not this limit at all — it is the dedup upsert, which
+   * bounds rows by DISTINCT violations rather than by traffic.
+   */
+  cspReport: [
+    { dimension: "ip", max: 300, windowMs: 5 * MIN },
+    { dimension: "ip", max: 5000, windowMs: DAY },
+  ],
 } as const satisfies Record<string, readonly Limit[]>;
 
 export type RuleName = keyof typeof RULES;
