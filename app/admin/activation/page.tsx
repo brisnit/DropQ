@@ -187,7 +187,7 @@ export default async function AdminActivationPage({
         </Link>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 min-[400px]:grid-cols-3 gap-3 sm:gap-4 mb-8">
         <Stat label="Needs help" value={String(nNeedsHelp)} sub="Built a drop, no Stripe" />
         <Stat label="Selling paused" value={String(nPaused)} sub="Stripe restricted" />
         <Stat label="Ready to sell" value={String(nReady)} sub="Charge-ready" />

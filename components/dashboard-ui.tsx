@@ -33,11 +33,13 @@ export function Stat({
   sub?: string;
 }) {
   return (
-    <div className="bg-paper border border-line rounded-card p-5">
+    <div className="bg-paper border border-line rounded-card p-4 sm:p-5 min-w-0">
       <p className="text-xs font-medium uppercase tracking-wide text-muted">
         {label}
       </p>
-      <p className="font-display text-3xl font-semibold mt-1.5">{value}</p>
+      <p className="font-display text-2xl sm:text-3xl font-semibold mt-1.5 tabular-nums [overflow-wrap:anywhere]">
+        {value}
+      </p>
       {sub && <p className="text-xs text-muted mt-1">{sub}</p>}
     </div>
   );
