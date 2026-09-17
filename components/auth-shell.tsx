@@ -11,7 +11,7 @@ export function AuthShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
+    <div className="min-h-screen grid grid-cols-1 lg:grid-cols-2">
       {/* Brand panel */}
       <div className="relative hidden lg:flex flex-col justify-between bg-ink text-cream p-12 overflow-hidden">
         <div className="absolute inset-0 hero-glow opacity-80" />
@@ -35,7 +35,7 @@ export function AuthShell({
       </div>
 
       {/* Form panel */}
-      <div className="flex flex-col p-6 sm:p-10">
+      <div className="flex flex-col min-w-0 p-6 sm:p-10">
         <div className="lg:hidden mb-10">
           <Logo href="/" />
         </div>

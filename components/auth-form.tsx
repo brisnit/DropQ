@@ -50,7 +50,7 @@ export function AuthForm({
           <span className="block text-sm font-medium text-ink-soft mb-1.5">Choose your plan</span>
           <div className="grid grid-cols-2 gap-2">
             {PLAN_OPTIONS.map((opt) => (
-              <label key={opt.v} className="cursor-pointer">
+              <label key={opt.v} className="cursor-pointer min-w-0">
                 <input
                   type="radio"
                   name="plan"
@@ -60,9 +60,9 @@ export function AuthForm({
                   className="peer sr-only"
                 />
                 <div className="h-full rounded-xl border border-line-strong p-3 peer-checked:border-brand peer-checked:bg-brand-tint/40 transition">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-x-2">
                     <span className="font-semibold text-sm">{opt.name}</span>
-                    <span className="text-xs font-semibold text-brand">{opt.price}</span>
+                    <span className="text-xs font-semibold text-brand whitespace-nowrap">{opt.price}</span>
                   </div>
                   <p className="text-xs text-muted mt-0.5">{opt.desc}</p>
                 </div>

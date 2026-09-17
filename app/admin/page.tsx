@@ -136,14 +136,14 @@ export default async function AdminHome({
       {/* Email delivery status + test button */}
       <div className="mb-8 rounded-card border border-line bg-paper p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <h2 className="font-semibold text-lg">Email &amp; SMS delivery</h2>
             <p className="text-sm text-muted mt-0.5">
               How DropQ sends order confirmations, status updates, and alerts.
             </p>
             <dl className="mt-3 space-y-2 text-sm">
               <div className="flex items-center gap-3">
-                <dt className="text-muted w-28">Email</dt>
+                <dt className="text-muted w-28 shrink-0">Email</dt>
                 <dd className="flex items-center gap-2">
                   {emailConfig.resendKeySet ? (
                     <Badge className="bg-sage-tint text-sage">Live</Badge>
@@ -154,15 +154,15 @@ export default async function AdminHome({
                 </dd>
               </div>
               <div className="flex items-center gap-3">
-                <dt className="text-muted w-28">Email sender</dt>
-                <dd>
+                <dt className="text-muted w-28 shrink-0">Email sender</dt>
+                <dd className="min-w-0 [overflow-wrap:anywhere]">
                   {emailConfig.from ?? (
                     <span className="text-brand-dark">Not set — emails may not reach customers</span>
                   )}
                 </dd>
               </div>
               <div className="flex items-center gap-3 pt-2 mt-1 border-t border-line">
-                <dt className="text-muted w-28">Text messages</dt>
+                <dt className="text-muted w-28 shrink-0">Text messages</dt>
                 <dd className="flex items-center gap-2">
                   {smsConfig.enabled ? (
                     <Badge className="bg-sage-tint text-sage">Live</Badge>
@@ -173,26 +173,26 @@ export default async function AdminHome({
                 </dd>
               </div>
               <div className="flex items-center gap-3">
-                <dt className="text-muted w-28">Text sender</dt>
-                <dd>{smsConfig.sender ?? <span className="text-brand-dark">Not set</span>}</dd>
+                <dt className="text-muted w-28 shrink-0">Text sender</dt>
+                <dd className="min-w-0 [overflow-wrap:anywhere]">{smsConfig.sender ?? <span className="text-brand-dark">Not set</span>}</dd>
               </div>
             </dl>
           </div>
           {/* Each test sits on one line — its context to the left, its action
               right-aligned so the two buttons stack in a clean column. */}
-          <div className="shrink-0 space-y-3">
+          <div className="w-full sm:w-auto sm:shrink-0 space-y-3">
             <form
               action={sendTestEmailAction}
-              className="flex flex-wrap items-center justify-end gap-3"
+              className="flex flex-wrap items-center sm:justify-end gap-3"
             >
-              <p className="text-sm text-muted">Sends to {me.email}.</p>
-              <Button type="submit" variant="dark" className="w-56">Send test email to me</Button>
+              <p className="text-sm text-muted min-w-0 [overflow-wrap:anywhere]">Sends to {me.email}.</p>
+              <Button type="submit" variant="dark" className="w-full sm:w-56">Send test email to me</Button>
             </form>
 
             <div>
               <form
                 action={sendTestSmsAction}
-                className="flex flex-wrap items-center justify-end gap-3"
+                className="flex flex-wrap items-center sm:justify-end gap-3"
               >
                 <input
                   name="phone"
@@ -200,9 +200,9 @@ export default async function AdminHome({
                   required
                   placeholder="+1 555 000 1234"
                   aria-label="Phone number for the test message"
-                  className="w-48 bg-paper border border-line-strong rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition"
+                  className="w-full sm:w-48 min-w-0 bg-paper border border-line-strong rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition"
                 />
-                <Button type="submit" variant="secondary" className="w-56">Send test SMS</Button>
+                <Button type="submit" variant="secondary" className="w-full sm:w-56">Send test SMS</Button>
               </form>
               <p className="text-sm text-muted mt-1.5">Texts that number via Twilio.</p>
             </div>
@@ -237,7 +237,7 @@ export default async function AdminHome({
       </div>
 
       {/* Platform totals */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-8">
         <Stat label="Vendors" value={String(sellers.length)} />
         <Stat label="GMV" value={formatMoney(gmv)} sub="Total sales" />
         <Stat label="DropQ revenue" value={formatMoney(dropqRevenue)} sub="Platform fees" />
@@ -246,14 +246,14 @@ export default async function AdminHome({
       </div>
 
       {/* Plans overview */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <Stat label="Free" value={String(planCount.starter)} sub={`${starterNearLimit.length} near limit`} />
         <Stat label="Basic" value={String(planCount.growth)} sub={`${growthSubs.length} paying`} />
         <Stat label="Partner" value={String(planCount.partner)} sub="Early Partner Program" />
         <Stat label="Pro waitlist" value={String(proWaitlist.length)} sub="Coming soon" />
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
         {/* Partner expirations */}
         <div className="bg-paper border border-line rounded-card p-5">
           <h2 className="font-semibold mb-3">Partner plans <span className="text-muted font-normal">({partners.length})</span></h2>
@@ -263,8 +263,8 @@ export default async function AdminHome({
             <ul className="space-y-2 text-sm">
               {partners.map((p) => (
                 <li key={p.id} className="flex items-center justify-between gap-2">
-                  <Link href={`/admin/${p.id}`} className="font-medium hover:underline truncate">{p.storeName}</Link>
-                  <span className={isPartnerExpired(p) ? "text-brand-dark" : "text-muted"}>
+                  <Link href={`/admin/${p.id}`} className="font-medium hover:underline truncate min-w-0">{p.storeName}</Link>
+                  <span className={`shrink-0 whitespace-nowrap ${isPartnerExpired(p) ? "text-brand-dark" : "text-muted"}`}>
                     {p.partnerExpiresAt ? (isPartnerExpired(p) ? `expired ${formatDate(p.partnerExpiresAt)}` : `until ${formatDate(p.partnerExpiresAt)}`) : "—"}
                   </span>
                 </li>
@@ -282,8 +282,8 @@ export default async function AdminHome({
             <ul className="space-y-2 text-sm">
               {starterNearLimit.map((s) => (
                 <li key={s.id} className="flex items-center justify-between gap-2">
-                  <Link href={`/admin/${s.id}`} className="font-medium hover:underline truncate">{s.storeName}</Link>
-                  <span className="text-muted">{s.dropsCreated}/{STARTER_DROP_LIMIT} used</span>
+                  <Link href={`/admin/${s.id}`} className="font-medium hover:underline truncate min-w-0">{s.storeName}</Link>
+                  <span className="text-muted shrink-0 whitespace-nowrap">{s.dropsCreated}/{STARTER_DROP_LIMIT} used</span>
                 </li>
               ))}
             </ul>
