@@ -233,8 +233,17 @@ export async function GET(req: Request) {
     const storeDay = Number(new Intl.DateTimeFormat("en-US", {
       timeZone: "Pacific/Kiritimati", day: "numeric",
     }).format(new Date()));
-    check("every day before today is disabled on a fresh drop", past.length === storeDay - 1,
-      `disabled cells=${past.length}, store day-of-month=${storeDay}`);
+    // ...times the number of calendars on the page. /dashboard/drops/new renders
+    // TWO DateRangePickers — the order window and the pickup window — so the
+    // count is per picker, not per page. Asserting the flat figure passed only
+    // on the store's 1st, when both sides are zero, and failed on every other
+    // day of the month. Derived from the page rather than hard-coded, so adding
+    // a third window changes the expectation instead of breaking the test.
+    const calendarCount = (newPage.body.match(/aria-label="Month"/g) ?? []).length;
+    check("the new-drop page really does render two date pickers", calendarCount === 2, `${calendarCount}`);
+    check("every day before today is disabled on a fresh drop",
+      past.length === (storeDay - 1) * calendarCount,
+      `disabled cells=${past.length}, expected ${(storeDay - 1) * calendarCount} (day ${storeDay} × ${calendarCount} calendars)`);
     check("past days are ghosted rather than hidden",
       past.every((c) => /text-ink\/25/.test(c)), past[0]?.slice(0, 160));
     check("past days say so to a screen reader",

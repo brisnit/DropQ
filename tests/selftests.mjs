@@ -52,6 +52,7 @@ const SUITES = [
   { name: "pricing" },
   { name: "rate-limit", fixtures: true },
   { name: "security-headers", fixtures: true },
+  { name: "vendor-demo" },
   { name: "walkup-pay", fixtures: true },
   { name: "walkup-route", fixtures: true },
   { name: "webhook" },

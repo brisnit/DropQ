@@ -104,6 +104,7 @@ export const ROUTE_PATTERNS = [
   "/signup",
   "/sms",
   "/terms",
+  "/vendor-demo",
   "/vendor/signup",
 ] as const;
 
