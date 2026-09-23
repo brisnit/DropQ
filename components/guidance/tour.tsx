@@ -134,7 +134,7 @@ export function GuidanceTour({
           <button
             type="button"
             onClick={next}
-            className="inline-flex items-center justify-center min-h-11 px-5 rounded-xl text-sm font-semibold bg-ink text-cream hover:bg-ink-soft transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+            className="inline-flex items-center justify-center min-h-11 px-5 rounded-xl text-sm font-semibold bg-tertiary text-ink hover:bg-tertiary-dark transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tertiary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
           >
             {isLast ? "Done" : "Next"}
           </button>
