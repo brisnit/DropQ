@@ -306,7 +306,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
     key: "drops",
     anchor: "nav.drops",
     title: "Two kinds of drop",
-    body: "A regular drop takes preorders in a window you set. A live selling drop opens straight away for people standing in front of you. You choose once, when you create it.",
+    body: "A regular drop takes preorders in a specific window of time you set. A live selling drop opens straight away for people standing in front of you. You choose once, when you create it.",
     dockedNote: "Your drops live under Drops. Tap \u2630 at the top right to open your menu.",
   },
   {
