@@ -160,8 +160,8 @@ export function AppearanceForm({ drops }: { drops: DropOption[] }) {
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <label className="block">
+      <div className="grid grid-cols-2 min-[420px]:grid-cols-3 gap-2">
+        <label className="block col-span-2 min-[420px]:col-span-1 min-w-0">
           <span className="block text-sm font-medium text-ink-soft mb-1.5">Date</span>
           <input name="date" type="date" required className={input} />
         </label>

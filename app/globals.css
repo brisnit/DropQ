@@ -132,6 +132,27 @@ body {
 }
 
 /* Hide number input spinners for cleaner qty steppers */
+/* Native date and time inputs carry an INTRINSIC MINIMUM WIDTH in Safari —
+   roughly the width of "mm/dd/yyyy" plus the picker glyph — and it ignores
+   `width: 100%`. Inside any narrow column the input keeps its own width and
+   pushes its container past the edge of the screen, which is why the Where
+   I'll Be time row and the admin commissions date filter ran off an iPhone
+   while looking fine in a desktop browser.
+
+   `min-width: 0` lets the input shrink to its column; `appearance: none`
+   stops iOS reserving space for its own chrome on top. Applied centrally
+   because the app has eight of these and the next one would have the bug
+   too. */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"] {
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 

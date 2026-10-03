@@ -240,7 +240,7 @@ export function ProductLibrary({ products }: { products: LibProduct[] }) {
             ) : (
               <div
                 key={p.id}
-                className={`bg-paper border border-line rounded-card p-4 flex items-center gap-4 ${
+                className={`bg-paper border border-line rounded-card p-4 flex flex-wrap items-center gap-3 sm:gap-4 ${
                   p.isActive ? "" : "opacity-60"
                 }`}
               >
@@ -250,7 +250,7 @@ export function ProductLibrary({ products }: { products: LibProduct[] }) {
                 ) : (
                   <span className="w-14 h-14 rounded-xl bg-cream grid place-items-center text-2xl shrink-0">{p.emoji}</span>
                 )}
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-[7rem]">
                   <p className="font-medium truncate">
                     {p.name}
                     {!p.isActive && <span className="ml-2 text-xs text-muted">(inactive)</span>}
@@ -261,7 +261,7 @@ export function ProductLibrary({ products }: { products: LibProduct[] }) {
                       .join(" · ")}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="w-full sm:w-auto flex items-center justify-end gap-2 sm:shrink-0">
                   <button
                     onClick={() => setEditingId(p.id)}
                     className="text-xs font-medium px-3 py-1.5 rounded-lg border border-line-strong bg-paper hover:border-ink/30 transition"

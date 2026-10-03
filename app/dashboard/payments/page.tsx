@@ -88,7 +88,7 @@ export default async function PaymentsPage({
       )}
 
       {/* Payout stats */}
-      <div className="grid grid-cols-3 gap-4 mb-7">
+      <div className="grid grid-cols-2 min-[420px]:grid-cols-3 gap-3 sm:gap-4 mb-7 [&>*:last-child]:col-span-2 min-[420px]:[&>*:last-child]:col-span-1">
         <Stat label="Paid orders" value={String(paid._count)} />
         <Stat label="Gross sales" value={formatMoney(gross)} sub="Before fees" />
         <Stat label={`DropQ fee (${fee}%)`} value={formatMoney(fees)} sub="Total to date" />
@@ -129,8 +129,10 @@ export default async function PaymentsPage({
                 </p>
               </div>
             </div>
-            <form action={stripeDashboardAction} className="shrink-0">
-              <Button type="submit" size="lg">Open Stripe Dashboard ↗</Button>
+            <form action={stripeDashboardAction} className="w-full sm:w-auto sm:shrink-0">
+              <Button type="submit" size="lg" className="w-full sm:w-auto">
+                Open Stripe Dashboard ↗
+              </Button>
             </form>
           </div>
         </div>
