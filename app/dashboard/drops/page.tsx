@@ -111,7 +111,7 @@ export default async function DropsPage() {
               (orderCount ? ` and its ${orderCount} order${orderCount !== 1 ? "s" : ""}` : "") +
               `? This can't be undone.`;
             return (
-              <div key={d.id} className="flex items-stretch gap-2">
+              <div key={d.id} className="flex flex-col sm:flex-row sm:items-stretch gap-2">
                 <Link
                   href={`/dashboard/drops/${d.id}`}
                   className="flex-1 min-w-0 block bg-paper border border-line rounded-card p-5 hover:border-ink/25 hover:shadow-[var(--shadow-soft)] transition"
@@ -137,7 +137,7 @@ export default async function DropsPage() {
                         </p>
                       )}
                     </div>
-                    <div className="flex items-center gap-6 text-right">
+                    <div className="flex items-center gap-4 sm:gap-6 text-right flex-wrap">
                       <div>
                         <p className="text-xs text-muted">Sold</p>
                         <p className="font-semibold">{sold}/{stock}</p>
@@ -154,7 +154,8 @@ export default async function DropsPage() {
                   </div>
                 </Link>
 
-                <form action={duplicateDropAction} className="flex">
+                <div className="flex gap-2 sm:contents">
+                <form action={duplicateDropAction} className="flex flex-1 sm:flex-none">
                   <input type="hidden" name="dropId" value={d.id} />
                   <button
                     type="submit"
@@ -166,7 +167,7 @@ export default async function DropsPage() {
                   </button>
                 </form>
 
-                <form action={deleteDropAction} className="flex">
+                <form action={deleteDropAction} className="flex flex-1 sm:flex-none">
                   <input type="hidden" name="dropId" value={d.id} />
                   <ConfirmSubmit
                     message={confirmMsg}
@@ -175,6 +176,7 @@ export default async function DropsPage() {
                     <span aria-label="Delete drop" title="Delete drop">🗑</span>
                   </ConfirmSubmit>
                 </form>
+                </div>
               </div>
             );
           })}

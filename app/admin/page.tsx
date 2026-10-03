@@ -144,7 +144,7 @@ export default async function AdminHome({
             <dl className="mt-3 space-y-2 text-sm">
               <div className="flex items-center gap-3">
                 <dt className="text-muted w-28 shrink-0">Email</dt>
-                <dd className="flex items-center gap-2">
+                <dd className="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1">
                   {emailConfig.resendKeySet ? (
                     <Badge className="bg-sage-tint text-sage">Live</Badge>
                   ) : (
@@ -163,7 +163,7 @@ export default async function AdminHome({
               </div>
               <div className="flex items-center gap-3 pt-2 mt-1 border-t border-line">
                 <dt className="text-muted w-28 shrink-0">Text messages</dt>
-                <dd className="flex items-center gap-2">
+                <dd className="min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1">
                   {smsConfig.enabled ? (
                     <Badge className="bg-sage-tint text-sage">Live</Badge>
                   ) : (
