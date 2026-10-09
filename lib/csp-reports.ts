@@ -59,6 +59,7 @@ export const ROUTE_PATTERNS = [
   "/dashboard/billing",
   "/dashboard/customers",
   "/dashboard/discoverability",
+  "/dashboard/dropmeet",
   "/dashboard/drops",
   "/dashboard/drops/[id]",
   "/dashboard/drops/[id]/edit",

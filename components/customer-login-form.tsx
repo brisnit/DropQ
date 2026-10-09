@@ -36,6 +36,18 @@ export function CustomerLoginForm({
   /** When set, the copy leads with the vendor who sent them here. */
   vendorName?: string | null;
 }) {
+  /**
+   * Whether this sign-in is someone JOINING rather than returning.
+   *
+   * The old line — "if you've ordered through DropQ with that address" — is
+   * true for the messages inbox and false for someone signing in to suggest a
+   * market on DropMeet, who has usually never ordered anything. Telling them
+   * their link depends on a purchase they never made is how a working flow
+   * still reads as broken. Mirrors SIGNUP_DESTINATIONS in
+   * lib/actions/customer-auth.ts, which is what actually decides.
+   */
+  const joining = next === "/dropmeet/add" || next.startsWith("/dropmeet/add?");
+
   const [state, formAction] = useActionState<MagicLinkState, FormData>(requestMagicLinkAction, {});
 
   if (state.sent) {
@@ -44,8 +56,9 @@ export function CustomerLoginForm({
         <div className="text-3xl">📬</div>
         <h2 className="font-display text-xl font-semibold mt-2">Check your email</h2>
         <p className="text-muted mt-2 text-sm">
-          If you&apos;ve ordered through DropQ with that address, a sign-in link is on its way. It
-          works once and expires in 30 minutes.
+          {joining
+            ? "A sign-in link is on its way. It works once and expires in 30 minutes."
+            : "If you've ordered through DropQ with that address, a sign-in link is on its way. It works once and expires in 30 minutes."}
         </p>
         {state.devLink && (
           <a

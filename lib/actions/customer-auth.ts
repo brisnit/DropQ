@@ -22,6 +22,16 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
  * stranger "no account with that email" would turn this form into an oracle for
  * whether someone shops with a given vendor.
  */
+/**
+ * Journeys where signing in is how someone JOINS, not how they return.
+ *
+ * Keep this list short and public-facing. Anything added here lets an
+ * unauthenticated form create a Customer row for an arbitrary address — bounded
+ * by the magic-link rate limits, but still a row, and Customer feeds the
+ * platform's customer counts.
+ */
+const SIGNUP_DESTINATIONS = ["/dropmeet/add"] as const;
+
 export async function requestMagicLinkAction(
   _prev: MagicLinkState,
   formData: FormData
@@ -41,7 +51,35 @@ export async function requestMagicLinkAction(
   const gate = await consume("magicLink", { email, ip });
   if (!gate.allowed) return { sent: true };
 
-  const customer = await prisma.customer.findUnique({ where: { email } });
+  let customer = await prisma.customer.findUnique({ where: { email } });
+
+  /**
+   * A first-time visitor gets an account made for them — but only on the
+   * journeys where that is the point.
+   *
+   * Everywhere else this action deliberately sends nothing to an unknown
+   * address: /messages is an inbox, and you cannot have messages before you
+   * have ordered. Silently doing nothing was right there.
+   *
+   * It was wrong for "add a place" on DropMeet. Anyone can suggest a market,
+   * most of them have never ordered anything, and they were shown "check your
+   * email" for an email that was never sent. The screen said one thing and the
+   * system did another, which is the worst of the available behaviours.
+   *
+   * Gated on the DESTINATION rather than a flag from the form, so the set of
+   * journeys that may create an account is written down in one place and
+   * cannot be widened by changing a hidden input. The response stays identical
+   * either way, so this reveals nothing about who already has an account.
+   */
+  if (!customer && SIGNUP_DESTINATIONS.some((d) => next === d || next.startsWith(d + "?"))) {
+    customer = await prisma.customer
+      .create({ data: { email } })
+      .catch(async () =>
+        // A racing request may have created it between the read and the write.
+        prisma.customer.findUnique({ where: { email } })
+      );
+  }
+
   if (!customer) return { sent: true };
 
   try {

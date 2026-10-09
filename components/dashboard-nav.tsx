@@ -13,6 +13,7 @@ const NAV: { href: string; label: string; exact?: boolean; anchor?: string }[] =
   { href: "/dashboard/orders", label: "Orders", anchor: "nav.orders" },
   { href: "/dashboard/messages", label: "Messages" },
   { href: "/dashboard/where-ill-be", label: "Where I'll Be" },
+  { href: "/dashboard/dropmeet", label: "DropMeet" },
   { href: "/dashboard/customers", label: "Customers" },
   { href: "/dashboard/analytics", label: "Analytics" },
   { href: "/dashboard/payments", label: "Payments", anchor: "nav.payments" },
