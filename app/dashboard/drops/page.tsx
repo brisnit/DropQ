@@ -160,7 +160,7 @@ export default async function DropsPage() {
                   <button
                     type="submit"
                     aria-label="Relaunch drop"
-                    title="Relaunch — copies this drop into a NEW draft. On the Free plan it counts as another of your 3 lifetime drops."
+                    title="Relaunch — copies this drop into a NEW draft. On the Free plan it counts as another of your 4 lifetime drops."
                     className="h-full px-3 rounded-card border border-line text-muted hover:text-ink hover:border-ink/30 transition grid place-items-center"
                   >
                     <span aria-hidden>🔁</span>

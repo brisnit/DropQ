@@ -18,7 +18,6 @@ const NAV: { href: string; label: string; exact?: boolean; anchor?: string }[] =
   { href: "/dashboard/payments", label: "Payments", anchor: "nav.payments" },
   { href: "/dashboard/billing", label: "Plan" },
   { href: "/dashboard/store", label: "Store" },
-  { href: "/dashboard/discoverability", label: "Discovery" },
 ];
 
 function isActive(pathname: string, href: string, exact?: boolean) {

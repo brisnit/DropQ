@@ -886,11 +886,11 @@ export const HELP_ARTICLES: HelpArticle[] = [
     slug: "plans-and-limits",
     title: "Plans and drop limits",
     question: "How many drops can I create?",
-    summary: "Free includes three drops for the lifetime of the account. Paid plans are unlimited.",
+    summary: "Free includes four drops for the lifetime of the account. Basic allows 24 a month; Partner and Pro are unlimited.",
     category: "account",
     keywords: ["plan", "limit", "free", "basic", "upgrade", "how many", "pricing"],
     body: [
-      p("The Free plan includes three drops in total — for the lifetime of your account, not per month. Paid plans remove the limit."),
+      p("The Free plan includes four drops in total — for the lifetime of your account, not per month. Basic allows 24 drops in a calendar month, resetting on the 1st. Partner and Pro have no limit."),
       p("Your Drops page shows how many you have left."),
     ],
     related: ["starter-drop-limit", "what-dropq-charges"],

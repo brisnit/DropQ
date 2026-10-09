@@ -12,7 +12,19 @@ export const PARTNER_INVITE_CODE =
 export const PARTNER_FREE_MONTHS = 12;
 
 /** Starter lifetime drop allowance. */
-export const STARTER_DROP_LIMIT = 3;
+export const STARTER_DROP_LIMIT = 4;
+
+/**
+ * Basic's cap: 24 drops per CALENDAR MONTH, resetting on the 1st.
+ *
+ * A different shape of limit from the free tier's, which is a lifetime count
+ * held on Seller.dropsCreated. This one is derived from Drop.createdAt rather
+ * than stored in a counter, for the reason the rest of this codebase prefers
+ * derived values: a stored monthly counter needs a reset job, and a reset job
+ * that misses a month silently locks a paying vendor out of their own product.
+ * Counting rows cannot drift.
+ */
+export const GROWTH_MONTHLY_DROP_LIMIT = 24;
 
 /** Paid ("Basic") subscription price (USD cents / month). */
 export const GROWTH_PRICE_CENTS = 800;
@@ -40,6 +52,14 @@ type SellerPlanFields = {
   partnerExpiresAt: Date | null;
   dropsCreated: number;
   growthBonusUntil?: Date | null;
+  /**
+   * Drops this vendor created in the current calendar month.
+   *
+   * Optional because most callers only need the free tier's lifetime count.
+   * A caller that omits it for a Basic vendor is told the limit is not
+   * reached — see dropsRemaining, where that choice is argued.
+   */
+  dropsThisMonth?: number;
 };
 
 /** Active referral reward: free Growth-level access through growthBonusUntil. */
@@ -66,16 +86,58 @@ export function isPartnerExpired(seller: {
   return !!seller.partnerExpiresAt && new Date(seller.partnerExpiresAt) < new Date();
 }
 
-/** Lifetime drop limit for a plan (Infinity = unlimited). */
+/** Lifetime drop limit for a plan (Infinity = no lifetime cap). */
 export function dropLimit(plan: Plan): number {
   return plan === "starter" ? STARTER_DROP_LIMIT : Infinity;
 }
 
-/** Drops still available to a seller (Infinity = unlimited). */
+/** Per-calendar-month limit for a plan (Infinity = unlimited). */
+export function monthlyDropLimit(plan: Plan): number {
+  return plan === "growth" ? GROWTH_MONTHLY_DROP_LIMIT : Infinity;
+}
+
+/**
+ * Drops still available to a seller (Infinity = unlimited).
+ *
+ * Free is capped for life, Basic per month, Partner and Pro not at all.
+ *
+ * ⚠️ A Basic vendor's monthly figure needs `dropsThisMonth`, which only a
+ * caller with database access can supply. When it is missing this returns
+ * Infinity rather than zero: the cost of wrongly allowing a 25th drop is one
+ * extra drop, and the cost of wrongly blocking is a paying vendor who cannot
+ * use the thing they pay for. Failing toward the customer is the right way
+ * round, and the enforcement path in lib/actions/dashboard.ts always passes it.
+ */
 export function dropsRemaining(seller: SellerPlanFields): number {
-  const limit = dropLimit(effectivePlan(seller));
-  if (limit === Infinity) return Infinity;
-  return Math.max(0, limit - seller.dropsCreated);
+  const plan = effectivePlan(seller);
+
+  const lifetime = dropLimit(plan);
+  if (lifetime !== Infinity) return Math.max(0, lifetime - seller.dropsCreated);
+
+  const monthly = monthlyDropLimit(plan);
+  if (monthly === Infinity) return Infinity;
+  if (seller.dropsThisMonth === undefined) return Infinity;
+  return Math.max(0, monthly - seller.dropsThisMonth);
+}
+
+/**
+ * The start of the current calendar month in a vendor's own timezone.
+ *
+ * "Resets on the 1st" has to mean the 1st where the vendor is standing. A
+ * UTC month boundary rolls over mid-afternoon for a vendor in California,
+ * which is the kind of detail nobody notices until it blocks a drop.
+ */
+export function monthStartFor(timezone: string | null | undefined, now = new Date()): Date {
+  const tz = timezone || "America/Los_Angeles";
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  }).formatToParts(now);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  // Midnight local on the 1st, expressed as the UTC instant it corresponds to.
+  const localNowAsUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  const offset = localNowAsUtc - Math.floor(now.getTime() / 1000) * 1000;
+  return new Date(Date.UTC(get("year"), get("month") - 1, 1) - offset);
 }
 
 export function canCreateDrop(seller: SellerPlanFields): boolean {
@@ -127,7 +189,7 @@ export const PRICING: PlanCard[] = [
     blurb: "Perfect for trying DropQ before committing.",
     cta: "Start free",
     features: [
-      "3 drops total (lifetime — deleting or relaunching doesn't refund one)",
+      "4 drops total (lifetime — deleting or relaunching doesn't refund one)",
       "Online ordering",
       "Pickup & delivery",
       "Customer list",
@@ -146,7 +208,7 @@ export const PRICING: PlanCard[] = [
     highlighted: true,
     cta: "Upgrade to Basic",
     features: [
-      "Unlimited drops",
+      "24 drops a month",
       "Online ordering",
       "Pickup & delivery",
       "Customer list",

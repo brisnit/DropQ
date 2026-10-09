@@ -44,6 +44,7 @@ import { prisma } from "@/lib/db";
  */
 export const ROUTE_PATTERNS = [
   "/",
+  "/about",
   "/admin",
   "/admin/[id]",
   "/admin/activation",
@@ -61,6 +62,7 @@ export const ROUTE_PATTERNS = [
   "/dashboard/drops",
   "/dashboard/drops/[id]",
   "/dashboard/drops/[id]/edit",
+  "/dashboard/drops/[id]/pickup-list",
   "/dashboard/drops/[id]/sale",
   "/dashboard/drops/new",
   "/dashboard/messages",
@@ -105,6 +107,7 @@ export const ROUTE_PATTERNS = [
   "/sms",
   "/terms",
   "/vendor-demo",
+  "/vendors",
   "/vendor/signup",
 ] as const;
 

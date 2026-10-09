@@ -6,29 +6,33 @@ const COLS = [
     title: "Product",
     links: [
       ["Drops", "/#drops"],
-      ["Online ordering", "/#features"],
-      ["Fulfillment", "/#features"],
-      ["Analytics", "/#features"],
+      // Online ordering, Fulfillment and Analytics were three labels pointing
+      // at one section — three ways to arrive in the same place, which reads
+      // as padding. One honest link instead.
+      ["Features", "/#features"],
+      // "Who it's for" was a whole column of five labels that all went to
+      // /signup, so none of them answered the question they asked. It is one
+      // link now, to the section on the home page that actually answers it.
+      ["Who it's for", "/#sell"],
       ["Pricing", "/#pricing"],
     ],
   },
   {
-    title: "Who it's for",
+    title: "Discover",
     links: [
-      ["Home bakers", "/signup"],
-      ["Cottage food", "/signup"],
-      ["Meal prep", "/signup"],
-      ["Market vendors", "/signup"],
-      ["Food creators", "/signup"],
+      ["Vendors", "/vendors"],
+      ["Find drops", "/discover"],
+      ["DropMeet", "/dropmeet"],
     ],
   },
   {
     title: "Company",
     links: [
       ["Success stories", "/#stories"],
-      ["Resources", "/#"],
+      // "Resources" went to "/#" — the top of whatever page you were already
+      // on. Help center is the real thing it was gesturing at.
       ["Help center", "/help"],
-      ["About", "/#"],
+      ["About", "/about"],
     ],
   },
 ];

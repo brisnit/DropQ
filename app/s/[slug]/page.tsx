@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StoreGallery } from "@/components/store-gallery";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { WaitlistForm } from "@/components/waitlist-form";
@@ -235,17 +236,7 @@ export default async function StorePage({
         {seller.gallery.length > 0 && (
           <section className="mt-10">
             <h2 className="font-semibold text-lg mb-4">Gallery</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {seller.gallery.map((img) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={img.id}
-                  src={img.url}
-                  alt=""
-                  className="w-full aspect-square object-cover rounded-card border border-line"
-                />
-              ))}
-            </div>
+            <StoreGallery images={seller.gallery.map((g) => ({ id: g.id, url: g.url }))} />
           </section>
         )}
 

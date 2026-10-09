@@ -43,6 +43,7 @@ const SUITES = [
   { name: "attribution", fixtures: true },
   { name: "checkout-minimum", fixtures: true },
   { name: "date-picker", fixtures: true },
+  { name: "directory", fixtures: true },
   { name: "drop-items" },
   { name: "guidance" },
   { name: "help" },
