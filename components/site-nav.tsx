@@ -2,23 +2,23 @@ import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { LinkButton } from "@/components/ui";
 import { getCurrentSeller } from "@/lib/auth";
-
-const LINKS = [
-  { href: "/dropmeet", label: "DropMeet" },
-  { href: "/discover", label: "Find Drops" },
-  { href: "/#how", label: "How It Works" },
-  { href: "/#features", label: "Features" },
-  { href: "/pricing", label: "Pricing" },
-];
+import { SiteNavMobile } from "@/components/site-nav-mobile";
+import { SITE_LINKS } from "@/lib/site-links";
 
 export async function SiteNav() {
   const seller = await getCurrentSeller();
   return (
     <header className="sticky top-0 z-40 border-b border-line/70 bg-cream/80 backdrop-blur-md">
       <nav className="max-w-6xl mx-auto px-4 sm:px-5 h-16 flex items-center justify-between gap-2 sm:gap-6">
-        <Logo />
+        {/* The menu button sits before the logo on a phone, where a thumb
+            reaches the left edge more easily than the middle, and it is the
+            only route to the rest of the site below md. */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <SiteNavMobile />
+          <Logo />
+        </div>
         <div className="hidden md:flex items-center gap-7 text-sm font-medium text-ink-soft">
-          {LINKS.map((l) => (
+          {SITE_LINKS.map((l) => (
             <Link key={l.href} href={l.href} className="hover:text-ink transition">
               {l.label}
             </Link>
