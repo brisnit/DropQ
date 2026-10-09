@@ -9,10 +9,14 @@
  *
  * Read-only: the public site needs no fixtures.
  */
-import { launch, url, screenshot, recorder } from "../support/browser.mjs";
+import prismaModule from "../../../app/generated/prisma/index.js";
+import { launch, url, screenshot, recorder, vendorContext } from "../support/browser.mjs";
 import { assertVerifyDatabase } from "../support/guard.mjs";
+import { seedFresh } from "../seed/vendor.mjs";
+import { readFileSync } from "node:fs";
 
-assertVerifyDatabase();
+const DB = assertVerifyDatabase();
+const TERMS = readFileSync("lib/terms.ts", "utf8").match(/TERMS_VERSION = "([^"]+)"/)[1];
 const r = recorder("site-nav-mobile");
 const browser = await launch();
 
@@ -135,6 +139,54 @@ r.section("present across the marketing site");
     r.ok(`${path} has the menu`, await menuButton(page).first().isVisible().catch(() => false));
   }
   await ctx.close();
+}
+
+/* ---- 5. The signed-in header, which is where it broke ----------------- */
+r.section("signed in: menu, logo and CTA share one line");
+{
+  // A signed-in visitor gets "Go to dashboard" instead of two auth links, and
+  // that label is wide. With the menu button added and the logo unable to
+  // yield, the three collided and the logo ran underneath the pill. Nothing
+  // covered this state, so nothing caught it.
+  const seller = await seedFresh(prismaModule, DB, TERMS);
+  for (const width of [430, 390, 375, 320]) {
+    const ctx = await vendorContext(browser, seller.id, "mobile");
+    const page = await ctx.newPage();
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto(url("/"), { waitUntil: "networkidle" });
+
+    const m = await page.evaluate(() => {
+      const header = document.querySelector("header");
+      const hb = header.getBoundingClientRect();
+      const controls = [...header.querySelectorAll("a, button")]
+        .filter((e) => e.getBoundingClientRect().width);
+      let overlap = null;
+      for (let i = 0; i < controls.length; i++) {
+        for (let j = i + 1; j < controls.length; j++) {
+          const a = controls[i].getBoundingClientRect();
+          const b = controls[j].getBoundingClientRect();
+          if (controls[i].contains(controls[j]) || controls[j].contains(controls[i])) continue;
+          const sameRow = a.top < b.bottom - 2 && b.top < a.bottom - 2;
+          if (sameRow && a.left < b.right - 1 && b.left < a.right - 1) {
+            overlap = `${label(controls[i])} over ${label(controls[j])}`;
+          }
+        }
+      }
+      function label(el) {
+        return (el.textContent || el.getAttribute("aria-label") || "?").trim().slice(0, 16);
+      }
+      return {
+        overlap,
+        rows: new Set(controls.map((c) => Math.round(c.getBoundingClientRect().top / 8))).size,
+        past: controls.filter((c) => c.getBoundingClientRect().right > hb.right + 1).map(label),
+      };
+    });
+
+    r.ok(`@${width}px nothing in the header overlaps`, m.overlap === null, m.overlap ?? "");
+    r.ok(`@${width}px the header stays on one line`, m.rows === 1, `${m.rows} rows`);
+    r.ok(`@${width}px nothing is pushed past the edge`, m.past.length === 0, m.past.join(", "));
+    await ctx.close();
+  }
 }
 
 const okAll = r.report();

@@ -38,7 +38,7 @@ export function Logo({
   return (
     <Link
       href={href}
-      className="inline-flex items-center min-h-11 py-2.5 -my-2.5 shrink-0"
+      className="inline-flex items-center min-h-11 py-2.5 -my-2.5 min-w-0"
       aria-label="DropQ"
     >
       <Image
@@ -51,7 +51,7 @@ export function Logo({
         // clean white silhouette instead of an invisible olive.
         // h-6 below sm: at 320px the logo and the header CTAs were competing
         // for the same ~280px and the CTA labels lost.
-        className={`h-6 sm:h-8 w-auto ${light ? "brightness-0 invert" : ""}`}
+        className={`h-6 sm:h-8 w-auto max-w-full object-contain ${light ? "brightness-0 invert" : ""}`}
       />
     </Link>
   );

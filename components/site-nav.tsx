@@ -29,7 +29,8 @@ export async function SiteNav() {
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {seller ? (
             <LinkButton href="/dashboard" size="sm" className="px-3.5 sm:px-4">
-              Go to dashboard
+              <span className="sm:hidden">Dashboard</span>
+              <span className="hidden sm:inline">Go to dashboard</span>
             </LinkButton>
           ) : (
             <>
