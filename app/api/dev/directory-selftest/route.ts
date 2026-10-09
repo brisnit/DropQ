@@ -121,6 +121,65 @@ export async function GET() {
   check("the discoverability page still exists, so no privacy control was lost",
     readFileSync("app/dashboard/discoverability/page.tsx", "utf8").includes("hideExactAddress"));
 
+  /* ------------- 5. Signing in to ADD A PLACE actually sends ------------ */
+  {
+    const { requestMagicLinkAction } = await import("@/lib/actions/customer-auth");
+    const ask = (email: string, next: string) => {
+      const fd = new FormData();
+      fd.set("email", email);
+      fd.set("next", next);
+      return requestMagicLinkAction({}, fd);
+    };
+
+    // The bug: a shopper suggesting a market has usually never ordered, so
+    // there was no Customer row, so nothing was sent — while the screen said
+    // "check your email". The screen and the system disagreed.
+    const newcomer = `newcomer-${rnd()}@example.com`;
+    const res = await ask(newcomer, "/dropmeet/add");
+    const made = await prisma.customer.findUnique({ where: { email: newcomer } });
+    check("a first-time address gets an account when adding a place", made !== null);
+    check("...and is told the link is on its way", res.sent === true);
+    check("...and a token exists for them to use",
+      made ? (await prisma.customerToken.count({ where: { customerId: made.id } })) > 0 : false);
+
+    // The allowlist is the boundary. Everywhere else must behave exactly as
+    // before: no account created for an address nobody has seen.
+    const stranger = `stranger-${rnd()}@example.com`;
+    const quiet = await ask(stranger, "/messages");
+    check("signing in to messages still creates no account",
+      (await prisma.customer.findUnique({ where: { email: stranger } })) === null);
+    check("...and still answers identically, revealing nothing", quiet.sent === true);
+
+    // A crafted destination must not widen the allowlist.
+    const crafted = `crafted-${rnd()}@example.com`;
+    await ask(crafted, "/dropmeet/add/../../admin");
+    check("a path that merely contains the destination does not qualify",
+      (await prisma.customer.findUnique({ where: { email: crafted } })) === null);
+
+    const src = readFileSync("lib/actions/customer-auth.ts", "utf8");
+    check("the destinations that may create an account are listed in one place",
+      /const SIGNUP_DESTINATIONS = \["\/dropmeet\/add"\]/.test(src));
+
+    // The confirmation line must not promise a purchase they never made.
+    const form = readFileSync("components/customer-login-form.tsx", "utf8");
+    check("the confirmation copy adapts to someone joining", /const joining =/.test(form));
+
+    await prisma.customerToken.deleteMany({ where: { customer: { email: { in: [newcomer] } } } });
+    await prisma.customer.deleteMany({ where: { email: { in: [newcomer, stranger, crafted] } } });
+  }
+
+  /* ------------- 6. DropMeet is reachable from the dashboard ------------ */
+  {
+    for (const nav of ["components/dashboard-nav.tsx", "components/mobile-nav.tsx"]) {
+      check(`${nav} offers DropMeet`,
+        /\/dashboard\/dropmeet/.test(readFileSync(nav, "utf8")));
+    }
+    const page = readFileSync("app/dashboard/dropmeet/page.tsx", "utf8");
+    check("the dashboard page requires a vendor", /requireSeller\(\)/.test(page));
+    check("...and skips the sign-in step, since they already are",
+      /<AddPlaceForm signedIn \/>/.test(page));
+  }
+
   /* ----------------------------- teardown ------------------------------- */
   const made = [published, closedOnly, draftOnly, privateOnly, noDrops, internal, disabled];
   await prisma.drop.deleteMany({ where: { sellerId: { in: made.map((s) => s.id) } } });
