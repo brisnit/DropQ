@@ -36,7 +36,11 @@ export function Logo({
   light?: boolean;
 }) {
   return (
-    <Link href={href} className="inline-flex items-center" aria-label="DropQ">
+    <Link
+      href={href}
+      className="inline-flex items-center min-h-11 py-2.5 -my-2.5 shrink-0"
+      aria-label="DropQ"
+    >
       <Image
         src="/brand/dropq-logo.png"
         alt="DropQ"

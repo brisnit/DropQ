@@ -46,11 +46,7 @@ export default function VendorDemoPage() {
     <main className="bg-cream text-ink">
       {/* ------------------------------------------------------- hero ---- */}
       <section className="px-5 pt-8 pb-12 sm:pt-14 max-w-5xl mx-auto">
-        {/* Padded to a 44px target: the shared Logo renders a 24px image, which
-            is fine in a desktop header and not fine on a page held one-handed. */}
-        <div className="[&_a]:min-h-11 [&_a]:py-2.5 [&_a]:-my-2.5">
-          <Logo href="/" />
-        </div>
+        <Logo href="/" />
 
         <div className="mt-10 sm:mt-14 lg:grid lg:grid-cols-2 lg:gap-12 lg:items-center">
           <div className="lg:max-w-xl">
