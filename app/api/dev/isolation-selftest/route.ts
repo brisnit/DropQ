@@ -36,6 +36,7 @@ const FIXTURE_ROUTES = [
   "attribution-selftest",
   "checkout-minimum-selftest",
   "date-picker-selftest",
+  "directory-selftest",
   "messaging-selftest",
   "rate-limit-selftest",
   "security-headers-selftest",

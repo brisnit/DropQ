@@ -98,7 +98,7 @@ export default async function BillingPage({
             <p className="text-muted text-sm mt-1">
               {plan === "starter" && `${remaining} of ${STARTER_DROP_LIMIT} lifetime drops remaining.`}
               {plan === "growth" &&
-                (bonusOnly ? "Basic features from a referral bonus." : "Unlimited drops · billed monthly.")}
+                (bonusOnly ? "Basic features from a referral bonus." : "24 drops a month · billed monthly.")}
               {plan === "partner" && "Early Partner — unlimited drops, free for your first year."}
             </p>
           </div>

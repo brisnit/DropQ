@@ -24,7 +24,7 @@ import { sendGatedSms } from "@/lib/sms-gate";
 import { formatPickupWindow, pickupLocation, pickupSummary, orderMailPickup } from "@/lib/pickup";
 import { dropMapsUrl } from "@/lib/maps";
 import { geocode } from "@/lib/geofence";
-import { canCreateDrop } from "@/lib/plans";
+import { canCreateDrop, monthStartFor } from "@/lib/plans";
 import { ORDER_STATUSES } from "@/lib/orders";
 import { resolveDropStatus } from "@/lib/payments";
 import { MIN_PRODUCT_PRICE_CENTS, belowProductMinimum } from "@/lib/checkout-session";
@@ -332,8 +332,14 @@ async function saveProductsToLibrary(sellerId: string, rows: LibRow[]) {
 export async function createDropAction(formData: FormData) {
   const seller = await requireSeller();
 
-  // Plan gate: Starter is capped at a lifetime number of drops.
-  if (!canCreateDrop(seller)) {
+  // Plan gate: Free is capped for the lifetime of the account, Basic per
+  // calendar month. The monthly figure is counted from the drops themselves
+  // rather than a stored tally, so it cannot drift and needs no reset job —
+  // see the note on GROWTH_MONTHLY_DROP_LIMIT.
+  const dropsThisMonth = await prisma.drop.count({
+    where: { sellerId: seller.id, createdAt: { gte: monthStartFor(seller.timezone) } },
+  });
+  if (!canCreateDrop({ ...seller, dropsThisMonth })) {
     redirect("/dashboard/billing?limit=1");
   }
 

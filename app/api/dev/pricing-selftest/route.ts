@@ -13,6 +13,9 @@ import {
   planLabel,
   dropLimit,
   canCreateDrop,
+  GROWTH_MONTHLY_DROP_LIMIT,
+  monthlyDropLimit,
+  monthStartFor,
   dropsRemaining,
 } from "@/lib/plans";
 
@@ -81,7 +84,9 @@ export async function GET(req: Request) {
 
   try {
     // ---- 1. The numbers -----------------------------------------------------
-    check("Free keeps a 3-drop allowance", STARTER_DROP_LIMIT === 3, String(STARTER_DROP_LIMIT));
+    check("Free gets a 4-drop lifetime allowance", STARTER_DROP_LIMIT === 4, String(STARTER_DROP_LIMIT));
+    check("Basic is capped at 24 drops a month",
+      GROWTH_MONTHLY_DROP_LIMIT === 24, String(GROWTH_MONTHLY_DROP_LIMIT));
     check("Basic is $8/mo", GROWTH_PRICE_CENTS === 800, `${GROWTH_PRICE_CENTS} cents`);
     check("Pro is $14/mo", PRO_PRICE_CENTS === 1400, `${PRO_PRICE_CENTS} cents`);
 
@@ -185,6 +190,39 @@ export async function GET(req: Request) {
     const fresh = asSeller("starter");
     check("a new Free seller can create drops",
       canCreateDrop(fresh) && dropsRemaining(fresh) === STARTER_DROP_LIMIT);
+
+    // ---- Basic's monthly cap -------------------------------------------
+    // A different shape of limit from Free's: counted per calendar month and
+    // derived from the drops themselves, so there is no counter to reset.
+    const basic = { plan: "growth", partnerExpiresAt: null, dropsCreated: 999 };
+    check("Basic ignores the lifetime count entirely",
+      dropsRemaining({ ...basic, dropsThisMonth: 0 }) === GROWTH_MONTHLY_DROP_LIMIT);
+    check("Basic has 1 left at 23 used",
+      dropsRemaining({ ...basic, dropsThisMonth: 23 }) === 1);
+    check("Basic is blocked at 24 used",
+      dropsRemaining({ ...basic, dropsThisMonth: 24 }) === 0 &&
+      !canCreateDrop({ ...basic, dropsThisMonth: 24 }));
+    check("Basic cannot go negative past the cap",
+      dropsRemaining({ ...basic, dropsThisMonth: 99 }) === 0);
+
+    // FAILS TOWARD THE CUSTOMER. Without the month's count a caller cannot
+    // know, and wrongly blocking a paying vendor is worse than wrongly
+    // allowing one extra drop.
+    check("a caller that omits the month's count does not block a paying vendor",
+      dropsRemaining(basic) === Infinity && canCreateDrop(basic));
+
+    check("Partner and Pro have no monthly cap",
+      monthlyDropLimit("partner") === Infinity && monthlyDropLimit("pro") === Infinity);
+    check("Free has no monthly cap — its limit is for life",
+      monthlyDropLimit("starter") === Infinity);
+
+    // The month must start where the VENDOR is, not where the server is.
+    const janFirstLA = monthStartFor("America/Los_Angeles", new Date("2026-01-15T12:00:00Z"));
+    check("the month resets on the 1st in the vendor's timezone",
+      janFirstLA.toISOString().startsWith("2026-01-01T08:00"), janFirstLA.toISOString());
+    const tokyo = monthStartFor("Asia/Tokyo", new Date("2026-01-15T12:00:00Z"));
+    check("...and a vendor in another timezone gets their own 1st",
+      tokyo.toISOString().startsWith("2025-12-31T15:00"), tokyo.toISOString());
     const used = { ...asSeller("starter"), dropsCreated: STARTER_DROP_LIMIT };
     check("a Free seller is blocked at the limit",
       !canCreateDrop(used) && dropsRemaining(used) === 0);

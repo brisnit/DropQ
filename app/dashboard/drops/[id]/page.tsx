@@ -235,7 +235,7 @@ export default async function DropDetailPage({
             <button
               type="submit"
               className="text-sm font-medium inline-flex items-center justify-center min-h-11 px-4 py-2.5 rounded-xl border border-line-strong bg-paper hover:border-ink/30 transition"
-              title="Copies this drop's items and pickup details into a NEW draft. On the Free plan it counts as another of your 3 lifetime drops."
+              title="Copies this drop's items and pickup details into a NEW draft. On the Free plan it counts as another of your 4 lifetime drops."
             >
               🔁 Relaunch
             </button>
@@ -475,7 +475,18 @@ export default async function DropDetailPage({
             <LiveOrders dropId={drop.id} initialOrders={liveOrders} />
           ) : (
             <>
-              <h2 className="font-semibold mb-3">Orders ({drop.orders.length})</h2>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h2 className="font-semibold">Orders ({drop.orders.length})</h2>
+                {/* The sheet a vendor prints and crosses off at the table. */}
+                {drop.orders.length > 0 && (
+                  <Link
+                    href={`/dashboard/drops/${drop.id}/pickup-list`}
+                    className="inline-flex items-center min-h-11 text-sm font-medium text-brand hover:underline"
+                  >
+                    Printable pickup list →
+                  </Link>
+                )}
+              </div>
               {drop.orders.length === 0 ? (
                 <div className="bg-paper border border-dashed border-line-strong rounded-card p-8 text-center text-muted">
                   No orders yet. Share your link to start selling.

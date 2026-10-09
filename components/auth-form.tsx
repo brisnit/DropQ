@@ -33,8 +33,8 @@ export function AuthForm({
   const [plan, setPlan] = useState<"starter" | "growth">(defaultPlan);
 
   const PLAN_OPTIONS = [
-    { v: "starter" as const, name: "Free", price: "Free", desc: "3 drops to start" },
-    { v: "growth" as const, name: "Basic", price: "$8/mo", desc: "Unlimited drops + analytics" },
+    { v: "starter" as const, name: "Free", price: "Free", desc: "4 drops to start" },
+    { v: "growth" as const, name: "Basic", price: "$8/mo", desc: "24 drops a month + analytics" },
   ];
 
   return (

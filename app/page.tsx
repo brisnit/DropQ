@@ -526,9 +526,9 @@ export default function Home() {
           </Reveal>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-12">
             {[
-              ["Free", "$0", "/mo", "Try DropQ", ["3 drops to start", "Online ordering", "Pickup & delivery", "Customer list", "QR codes", "2% transaction fee"], false, false],
-              ["Basic", "$8", "/mo", "Run Drops", ["Unlimited drops", "Customer signups (SMS + email)", "Sales analytics", "Repeat-customer tracking", "Shareable drop links", "2% transaction fee"], true, false],
-              ["Pro", "$14", "/mo", "Grow Customers", ["Everything in Basic", "Reduced 1.5% fee", "Advanced analytics", "Automated reminders", "Data exports"], false, true],
+              ["Free", "$0", "/mo", "Try DropQ", ["4 drops to start", "Online ordering", "Pickup & delivery", "Customer list", "QR codes", "2% transaction fee"], false, false],
+              ["Basic", "$8", "/mo", "Run Drops", ["24 drops a month", "Customer signups (SMS + email)", "Sales analytics", "Repeat-customer tracking", "Shareable drop links", "2% transaction fee"], true, false],
+              ["Pro", "$14", "/mo", "Grow Customers", ["Unlimited drops", "Everything in Basic", "Reduced 1.5% fee", "Advanced analytics", "Automated reminders", "Data exports"], false, true],
             ].map(([name, price, per, position, feats, featured, soon], i) => (
               <Reveal key={String(name)} delay={i * 90}>
               <div
