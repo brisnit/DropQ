@@ -91,7 +91,7 @@ export function SiteNavMobile() {
         aria-label={open ? "Close menu" : "Open menu"}
         aria-expanded={open}
         aria-controls={panelId}
-        className="inline-flex items-center justify-center w-11 h-11 -ml-1 rounded-lg text-ink-soft hover:bg-line/60 active:bg-line transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tertiary/60"
+        className="inline-flex items-center justify-center w-11 h-11 -mr-1 rounded-lg text-ink-soft hover:bg-line/60 active:bg-line transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tertiary/60"
       >
         {open ? (
           <span className="text-xl leading-none" aria-hidden>✕</span>
@@ -109,7 +109,7 @@ export function SiteNavMobile() {
         <div
             id={panelId}
             ref={panelRef}
-            className="absolute left-0 top-full mt-2 z-50 w-[min(19rem,calc(100vw-2rem))] max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain bg-paper border border-line rounded-2xl shadow-[var(--shadow-lift)] p-2"
+            className="absolute right-0 top-full mt-2 z-50 w-[min(19rem,calc(100vw-2rem))] max-h-[calc(100dvh-6rem)] overflow-y-auto overscroll-contain bg-paper border border-line rounded-2xl shadow-[var(--shadow-lift)] p-2"
           >
             {SITE_LINKS.map((l, i) => {
               const active =
