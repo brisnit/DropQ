@@ -140,6 +140,48 @@ export function analyticsWhere(audience: ReportingAudience): Prisma.AnalyticsEve
  * Kept in step with the Prisma filters by the self-test, which asserts that a
  * hand-built row set filtered in memory matches what the query would return.
  */
+/* ------------------- accounts vs purchasing customers -------------------- */
+
+/**
+ * A REGISTERED ACCOUNT is not a CUSTOMER.
+ *
+ * A Customer row means someone gave us an email address. It does not mean
+ * they bought anything — and since DropMeet lets a stranger sign in to
+ * suggest a market, rows now exist for people who have never seen a
+ * storefront. Counting those as customers would inflate every sales figure
+ * they appear in, and the inflation would grow with a feature that has
+ * nothing to do with sales.
+ *
+ * So the two are named separately and derived separately:
+ *
+ *   registered account  — a Customer row exists
+ *   purchasing customer — that person has at least one PAID order
+ *
+ * Every customer figure the product shows today is already derived from paid
+ * orders rather than from this table, which is why DropMeet cannot distort
+ * them. `purchasingCustomerWhere` exists so that stays deliberate: a future
+ * count reaches for it instead of `prisma.customer.count()`, and a self-test
+ * fails if any surface starts counting raw account rows as customers.
+ */
+export function purchasingCustomerWhere(
+  audience: ReportingAudience = "business"
+): Prisma.CustomerWhereInput {
+  return {
+    ...customerWhere(audience),
+    orders: { some: { paymentStatus: "paid" } },
+  };
+}
+
+/** Accounts that exist but have never bought — DropMeet signups live here. */
+export function registeredOnlyWhere(
+  audience: ReportingAudience = "business"
+): Prisma.CustomerWhereInput {
+  return {
+    ...customerWhere(audience),
+    orders: { none: { paymentStatus: "paid" } },
+  };
+}
+
 export function isBusinessSeller(s: { internalKind: string | null }): boolean {
   return !isInternalKind(s.internalKind);
 }

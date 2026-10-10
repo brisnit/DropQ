@@ -1,5 +1,6 @@
 import "server-only";
 import { generateAccessibleCtaColor } from "@/lib/color";
+import { fixtureRefusal } from "@/lib/fixture-guard";
 
 const RESEND_URL = "https://api.resend.com/emails";
 
@@ -41,6 +42,36 @@ async function dropqLogoBase64(): Promise<string | null> {
 export async function sendEmail({ to, subject, html }: Mail): Promise<SendResult> {
   const key = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM || "DropQ <onboarding@resend.dev>";
+
+  /**
+   * NEVER SEND REAL MAIL FROM A TEST RUN.
+   *
+   * This repository's .env holds a live Resend key, and the browser harness
+   * inherits the whole environment — so a test that exercised a sign-in flow
+   * genuinely attempted to send to a fixture address. It bounced, because the
+   * address was invented. The next one might not be: fixtures have carried
+   * real-looking addresses before, and "a test emailed a customer" is not a
+   * thing that should be possible by accident.
+   *
+   * The signal is the DATABASE. If this process is pointed at the throwaway
+   * harness cluster then it is a test, whatever else is set, and mail is
+   * logged instead of sent. That covers every entry point — the browser
+   * suite, a self-test route, a scratch script — rather than one harness
+   * that has to remember.
+   *
+   * ALLOW_TEST_EMAIL=1 opts back in, for the rare case of deliberately
+   * checking real delivery.
+   */
+  if (fixtureRefusal() === null && process.env.ALLOW_TEST_EMAIL !== "1") {
+    const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    console.log(
+      `\n──────── 📧 EMAIL (test database — not sent) ────────\n` +
+        `To:      ${to}\nSubject: ${subject}\n${text}\n` +
+        `Set ALLOW_TEST_EMAIL=1 to send for real from a test run.\n` +
+        `────────────────────────────────────────────────────\n`
+    );
+    return { ok: false, skipped: true, error: "test database — email suppressed" };
+  }
 
   if (!key) {
     const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();

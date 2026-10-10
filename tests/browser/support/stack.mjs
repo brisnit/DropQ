@@ -34,6 +34,11 @@ export async function startStack({ fresh = false, verbose = false, appUrl = APP_
     // Non-empty on purpose: an empty key makes isVendorSellable() allow
     // everything, which would hide the Stripe gate the docs need to show.
     STRIPE_SECRET_KEY: "sk_test_browser_harness",
+    // The repo's .env carries a LIVE Resend key and this spreads process.env,
+    // so a test could and did attempt to send real mail. lib/email.ts also
+    // refuses whenever it sees the harness database; this makes sure the key
+    // never reaches the app in the first place. ALLOW_TEST_EMAIL=1 opts in.
+    ...(process.env.ALLOW_TEST_EMAIL === "1" ? {} : { RESEND_API_KEY: "" }),
     APP_URL: appUrl,
     // Per-spec overrides. The analytics spec uses this to run one app with
     // ANALYTICS_MODE=on and a second with VERCEL_ENV=preview, which is the only
