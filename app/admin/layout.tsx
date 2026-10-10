@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { Logo } from "@/components/logo";
 import { logoutAction } from "@/lib/actions/auth";
+import { AdminNav } from "@/components/admin-nav";
 
 export const metadata = { title: "DropQ Admin" };
 
@@ -17,12 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               Admin
             </span>
           </div>
-          <nav className="order-last sm:order-none w-full sm:w-auto min-w-0 -mx-1 sm:mx-0 flex items-center gap-1 text-sm overflow-x-auto">
-            <Link href="/admin" className="px-3 py-1.5 rounded-lg text-cream/80 hover:text-cream hover:bg-white/10 whitespace-nowrap">Vendors</Link>
-            <Link href="/admin/activation" className="px-3 py-1.5 rounded-lg text-cream/80 hover:text-cream hover:bg-white/10 whitespace-nowrap">Activation</Link>
-            <Link href="/admin/sales-reps" className="px-3 py-1.5 rounded-lg text-cream/80 hover:text-cream hover:bg-white/10 whitespace-nowrap">Sales Reps</Link>
-            <Link href="/admin/commissions" className="px-3 py-1.5 rounded-lg text-cream/80 hover:text-cream hover:bg-white/10 whitespace-nowrap">Commissions</Link>
-          </nav>
+          <AdminNav />
           {/* Admin had no way to sign out without going back to the vendor
               dashboard first. */}
           <div className="flex items-center gap-3 shrink-0">

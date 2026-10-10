@@ -308,6 +308,20 @@ export async function GET() {
     check("the list shows what is attached before you open a place",
       /appearances: true/.test(list));
 
+    // The places list is only useful if an admin can find it. Before this,
+    // /admin/dropmeet had no entry in the admin nav at all and was reachable
+    // only by typing the URL.
+    const nav = readFileSync("components/admin-nav.tsx", "utf8");
+    check("the admin nav has a way into DropMeet places",
+      /href: "\/admin\/dropmeet\/places", label: "Manage Places"/.test(nav));
+    check("...and marks whichever page you are on",
+      /aria-current=\{active \? "page" : undefined\}/.test(nav));
+    check("...with /admin matched exactly so it is not current everywhere",
+      /href: "\/admin", label: "Vendors", exact: true/.test(nav));
+    const adminLayout = readFileSync("app/admin/layout.tsx", "utf8");
+    check("the layout renders that nav rather than its own copy",
+      /<AdminNav \/>/.test(adminLayout) && !/href="\/admin\/activation"/.test(adminLayout));
+
     /* ---- 9b. A vendor's published plans are not the admin's to erase ---- */
     //
     // Typing the name proves the admin meant THIS place. It proves nothing
