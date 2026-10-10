@@ -325,10 +325,25 @@ export async function GET() {
 
     check("deleting a place is refused outright when appearances are attached",
       /if \(impact\.appearances > 0\)[\s\S]{0,120}redirect\([\s\S]{0,120}blocked_appearances/.test(code));
-    check("...and the refusal comes before any delete call",
-      code.indexOf("blocked_appearances") < code.indexOf("prisma.location.delete"));
+    // Enforcement is not allowed to live in the action at all: a bare delete
+    // there would be a delete whose guard can be out of date by the time it
+    // runs. The action may only ask the locked guard to do it.
+    check("the action never deletes a place or market itself",
+      !/prisma\.location\.delete/.test(code) && !/prisma\.market\.delete/.test(code));
+    check("...it goes through the locked guard instead",
+      /deleteLocationIfUnused\(id\)/.test(code) && /deleteMarketIfUnused\(id\)/.test(code));
     check("deleting a market is refused the same way",
-      /marketId: id[\s\S]{0,200}blocked_appearances/.test(code));
+      /deleteMarketIfUnused[\s\S]{0,160}blocked_appearances/.test(code));
+
+    // The guard itself: locks taken BEFORE the count, or the count can be
+    // stale by the time the delete cascades.
+    const guard = bare(readFileSync("lib/dropmeet/delete-guard.ts", "utf8"));
+    check("the guard locks the place and its markets before counting",
+      /FROM "Location"[\s\S]{0,80}FOR UPDATE[\s\S]{0,400}FROM "Market"[\s\S]{0,120}FOR UPDATE[\s\S]{0,400}vendorAppearance\.count/.test(guard));
+    check("...and counts and deletes in one transaction",
+      /\$transaction\(async \(tx\)[\s\S]{0,1200}tx\.location\.delete/.test(guard));
+    check("the guard is not a server action",
+      !/^"use server"/m.test(readFileSync("lib/dropmeet/delete-guard.ts", "utf8")));
 
     // A market cascades when its place goes, taking its appearances with it.
     // Counting only location-linked appearances would report zero for a place
@@ -377,6 +392,132 @@ export async function GET() {
       /status: "pending",\s*approvedAt: null/.test(unpublishBody) &&
       !/\.delete\(/.test(unpublishBody) &&
       !/deleteMany/.test(unpublishBody));
+  }
+
+  /* ---- 9d. The gap between the count and the delete ------------------- */
+  //
+  // Source-reading cannot prove this one. The old sequence — count, refuse if
+  // non-zero, delete — looks correct and loses data: an appearance committed
+  // after the count is erased by the cascade. Measured against a real
+  // Postgres, that sequence erased 11 of 120 committed appearances.
+  //
+  // So this runs the real guard against real concurrency: start the delete
+  // and a competing appearance insert at the same moment, sweep the delay
+  // across the window, and require that no COMMITTED appearance ever
+  // disappears. Either the insert lands first and the delete is refused, or
+  // the delete wins and the insert is rejected by the foreign key. There is no
+  // third outcome, and "the appearance was erased" is a hard failure.
+  {
+    const { deleteLocationIfUnused, deleteMarketIfUnused } =
+      await import("@/lib/dropmeet/delete-guard");
+
+    const region = await prisma.region.upsert({
+      where: { slug: "san-diego-county" },
+      update: {},
+      create: {
+        name: "San Diego County", slug: "san-diego-county",
+        defaultCenterLatitude: 32.72, defaultCenterLongitude: -117.16,
+      },
+    });
+    const racer = await prisma.seller.create({
+      data: {
+        email: `race-${rnd()}@dropq-selftest.invalid`, passwordHash: "x",
+        storeName: `Race ${rnd()}`, slug: `race-${rnd()}`, category: "food",
+        internalKind: "harness",
+      },
+    });
+
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const ITERATIONS = 24;
+
+    /**
+     * @param viaMarket attach the appearance to the place's market instead of
+     *   the place, and delete the market rather than the place when `target`
+     *   says so. The two paths cascade differently and both must hold.
+     */
+    async function hammer(viaMarket: boolean, target: "location" | "market") {
+      let erased = 0, blocked = 0, insertRejected = 0, deletedClean = 0;
+
+      for (let i = 0; i < ITERATIONS; i++) {
+        const loc = await prisma.location.create({
+          data: {
+            regionId: region.id, name: `Race ${rnd()}`, slug: `race-${rnd()}`,
+            latitude: 32.72, longitude: -117.16, city: "San Diego", state: "CA",
+            status: "approved",
+          },
+        });
+        const market = viaMarket
+          ? await prisma.market.create({
+              data: {
+                regionId: region.id, locationId: loc.id, name: `RM ${rnd()}`,
+                slug: `rm-${rnd()}`, status: "approved", marketType: "farmers",
+              },
+            })
+          : null;
+
+        let outcome: string | null = null;
+        let appearanceId: string | null = null;
+        await Promise.all([
+          (async () => {
+            outcome =
+              target === "market" && market
+                ? await deleteMarketIfUnused(market.id)
+                : await deleteLocationIfUnused(loc.id);
+          })(),
+          (async () => {
+            await sleep((i % 12) * 0.5); // sweep the window
+            try {
+              const a = await prisma.vendorAppearance.create({
+                data: {
+                  ...(market ? { marketId: market.id } : { locationId: loc.id }),
+                  sellerId: racer.id,
+                  startDateTime: new Date(Date.now() + 864e5),
+                  endDateTime: new Date(Date.now() + 9e7),
+                  status: "scheduled",
+                },
+              });
+              appearanceId = a.id;
+            } catch {
+              insertRejected++;
+            }
+          })(),
+        ]);
+
+        if (appearanceId) {
+          const alive = await prisma.vendorAppearance.count({ where: { id: appearanceId } });
+          if (alive === 0) erased++;
+          else if (outcome === "blocked") blocked++;
+        } else if (outcome === "deleted") deletedClean++;
+
+        await prisma.location.deleteMany({ where: { id: loc.id } });
+      }
+      return { erased, blocked, insertRejected, deletedClean };
+    }
+
+    const cases: [string, boolean, "location" | "market"][] = [
+      ["deleting a place, appearance at the place", false, "location"],
+      ["deleting a place, appearance at its market", true, "location"],
+      ["deleting a market, appearance at that market", true, "market"],
+    ];
+
+    for (const [label, viaMarket, target] of cases) {
+      const r = await hammer(viaMarket, target);
+      check(
+        `no committed appearance is erased — ${label}`,
+        r.erased === 0,
+        JSON.stringify(r)
+      );
+      // Non-vacuity: if nothing was ever rejected or refused, the two never
+      // actually overlapped and the check above proved nothing.
+      check(
+        `...and the race was genuinely exercised — ${label}`,
+        r.insertRejected + r.blocked > 0,
+        JSON.stringify(r)
+      );
+    }
+
+    await prisma.vendorAppearance.deleteMany({ where: { sellerId: racer.id } });
+    await prisma.seller.delete({ where: { id: racer.id } });
   }
 
   /* ----------------------------- teardown ------------------------------- */

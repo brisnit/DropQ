@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { deleteLocationIfUnused, deleteMarketIfUnused } from "@/lib/dropmeet/delete-guard";
 import { requireSeller, getCurrentSeller, requireAdmin, getCurrentAdmin } from "@/lib/auth";
 import { getCurrentCustomer, requireCustomer } from "@/lib/customer-auth";
 import { geocode } from "@/lib/geofence";
@@ -644,6 +645,12 @@ export async function deleteLocationAction(formData: FormData): Promise<void> {
   // Typing the name proves the admin meant THIS place. It proves nothing
   // about the vendors. So this is a refusal, not a warning: unpublish instead,
   // which hides the place and keeps every appearance intact.
+  //
+  // This count is for DISCLOSURE — it decides what the page said and lets us
+  // bail out early. It is NOT the enforcement: a count taken here cannot see
+  // an appearance committed a millisecond later, and that one would be erased
+  // by the cascade. deleteLocationIfUnused re-checks under a row lock held
+  // across the delete, which is the check that actually holds.
   if (impact.appearances > 0) {
     redirect(`/admin/dropmeet/locations/${id}?delete=blocked_appearances`);
   }
@@ -655,7 +662,11 @@ export async function deleteLocationAction(formData: FormData): Promise<void> {
     redirect(`/admin/dropmeet/locations/${id}?delete=needs_ack`);
   }
 
-  await prisma.location.delete({ where: { id } });
+  const outcome = await deleteLocationIfUnused(id);
+  if (outcome === "blocked") {
+    redirect(`/admin/dropmeet/locations/${id}?delete=blocked_appearances`);
+  }
+  if (outcome === "missing") redirect("/admin/dropmeet/places?deleted=missing");
 
   revalidatePath("/admin/dropmeet");
   revalidatePath("/admin/dropmeet/places");
@@ -677,13 +688,13 @@ export async function deleteMarketAction(formData: FormData): Promise<void> {
 
   // The same refusal as deleteLocationAction, for the same reason: a market
   // cascades to the appearances held at it. Guarding only the place would have
-  // moved the hole to this button rather than closed it.
-  const appearances = await prisma.vendorAppearance.count({ where: { marketId: id } });
-  if (appearances > 0) {
+  // moved the hole to this button rather than closed it. And as there, the
+  // check that counts is the one inside the locked transaction.
+  const outcome = await deleteMarketIfUnused(id);
+  if (outcome === "blocked") {
     redirect(`/admin/dropmeet/places?delete=blocked_appearances`);
   }
-
-  await prisma.market.delete({ where: { id } });
+  if (outcome === "missing") redirect("/admin/dropmeet/places?deleted=missing");
   revalidatePath("/admin/dropmeet");
   revalidatePath("/admin/dropmeet/places");
   revalidatePath("/dropmeet");
