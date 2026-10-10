@@ -276,6 +276,109 @@ export async function GET() {
       sent.skipped === true && sent.ok === false, JSON.stringify(sent));
   }
 
+  /* ---- 9. Admin control of the DropMeet space ------------------------- */
+  {
+    const src = readFileSync("lib/actions/dropmeet.ts", "utf8");
+
+    check("admins can take a place off the map without destroying it",
+      /export async function unpublishLocationAction/.test(src));
+    check("admins can delete a place", /export async function deleteLocationAction/.test(src));
+    check("...and a market", /export async function deleteMarketAction/.test(src));
+
+    // Delete cascades to markets, events, vendor appearances, follows and
+    // claims. An appearance is a vendor's published plan to be somewhere, so
+    // the admin is shown the count before they decide, and the two guards
+    // below stop a stray click doing it.
+    check("deleting requires the name typed back", /confirmName/.test(src));
+    check("...and an explicit acknowledgement when anything is attached",
+      /acknowledgeImpact/.test(src));
+    check("the impact is counted before the decision",
+      /export async function locationImpact/.test(src));
+    check("every destructive action requires an admin",
+      (src.match(/export async function (delete|unpublish)\w+Action[\s\S]{0,160}?requireAdmin\(\)/g) ?? []).length === 3);
+
+    const detail = readFileSync("app/admin/dropmeet/locations/[id]/page.tsx", "utf8");
+    check("the delete panel names what else will go", /vendor appearance/.test(detail));
+    check("...and steers toward unpublishing when something is attached",
+      /Unpublishing is almost certainly/.test(detail));
+
+    const list = readFileSync("app/admin/dropmeet/places/page.tsx", "utf8");
+    check("approved places are browsable, not just the pending queue",
+      /"approved"/.test(list) && /requireAdmin\(\)/.test(list));
+    check("the list shows what is attached before you open a place",
+      /appearances: true/.test(list));
+
+    /* ---- 9b. A vendor's published plans are not the admin's to erase ---- */
+    //
+    // Typing the name proves the admin meant THIS place. It proves nothing
+    // about the vendors who have told customers they will be there. So an
+    // attached appearance is a refusal, not a warning — these checks hold that
+    // line, in the action and in the page that fronts it.
+    //
+    // Comments are stripped first: every phrase below appears in the prose
+    // explaining these rules, and a scan of raw source would convict the file
+    // on its own documentation.
+    const bare = (t: string) =>
+      t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    const code = bare(src);
+    const panel = bare(detail);
+
+    check("deleting a place is refused outright when appearances are attached",
+      /if \(impact\.appearances > 0\)[\s\S]{0,120}redirect\([\s\S]{0,120}blocked_appearances/.test(code));
+    check("...and the refusal comes before any delete call",
+      code.indexOf("blocked_appearances") < code.indexOf("prisma.location.delete"));
+    check("deleting a market is refused the same way",
+      /marketId: id[\s\S]{0,200}blocked_appearances/.test(code));
+
+    // A market cascades when its place goes, taking its appearances with it.
+    // Counting only location-linked appearances would report zero for a place
+    // whose weekly market has ten vendors on it, and then delete all ten.
+    check("appearances reached through a market are counted too",
+      /market: \{ locationId: id \}/.test(code) &&
+      /directAppearances \+ marketAppearances/.test(code));
+
+    check("the blocked panel offers unpublishing instead of a dead button",
+      /impact\.appearances > 0 \?/.test(panel) &&
+      /Permanent deletion isn&apos;t available/.test(panel));
+    check("...and says deletion unlocks once the vendors cancel",
+      /cancel their appearances first/.test(panel));
+
+    /* ---- 9c. Unpublishing has to carry down to markets and events ------- */
+    //
+    // A market's status and its location's status are separate columns, so a
+    // query that checks only the market keeps serving a market at a venue we
+    // have decided not to show: hidden on the map, still live at its own URL.
+    const q = bare(readFileSync("lib/dropmeet/query.ts", "utf8"));
+    check("a market is public only if its place is public",
+      /MARKET_IS_PUBLIC = \{ status: "approved", location: \{ status: "approved" \} \}/.test(q));
+    check("...including at its own URL, not just on the map",
+      /publicMarket[\s\S]{0,200}\.\.\.MARKET_IS_PUBLIC/.test(q));
+    check("an event at an unpublished place is hidden, but a standalone one is not",
+      /locationId: null \}, \{ location: \{ status: "approved" \}/.test(q));
+    check("a vendor's public profile does not advertise an unpublished venue",
+      /market: MARKET_IS_PUBLIC/.test(q));
+    const api = bare(readFileSync("app/api/dropmeet/places/route.ts", "utf8"));
+    check("place search applies the same rule",
+      /location: \{ status: "approved" \}/.test(api) &&
+      /locationId: null \}, \{ location: \{ status: "approved" \}/.test(api));
+
+    // The other half of the promise: unpublishing hides a place from the
+    // public without touching the records, and a vendor keeps seeing their own
+    // appearance. That page must therefore scope by seller and nothing else.
+    const mine = bare(readFileSync("app/dashboard/where-ill-be/page.tsx", "utf8"));
+    check("a vendor still sees their appearance after the place is unpublished",
+      /where: \{ sellerId: seller\.id, status: \{ not: "cancelled" \} \}/.test(mine));
+    // Scoped to the function BODY. An earlier version of this check scanned
+    // 400 characters past the declaration and failed on `deleteLocationAction`
+    // simply being the next function in the file.
+    const unpublishBody =
+      code.match(/export async function unpublishLocationAction[\s\S]*?\n\}/)?.[0] ?? "";
+    check("unpublishing takes it off the map by status, not by deleting",
+      /status: "pending",\s*approvedAt: null/.test(unpublishBody) &&
+      !/\.delete\(/.test(unpublishBody) &&
+      !/deleteMany/.test(unpublishBody));
+  }
+
   /* ----------------------------- teardown ------------------------------- */
   const made = [published, closedOnly, draftOnly, privateOnly, noDrops, internal, disabled];
   await prisma.drop.deleteMany({ where: { sellerId: { in: made.map((s) => s.id) } } });

@@ -52,6 +52,7 @@ export const ROUTE_PATTERNS = [
   "/admin/dropmeet",
   "/admin/dropmeet/locations/[id]",
   "/admin/dropmeet/new",
+  "/admin/dropmeet/places",
   "/admin/sales-reps",
   "/admin/sales-reps/[id]",
   "/dashboard",

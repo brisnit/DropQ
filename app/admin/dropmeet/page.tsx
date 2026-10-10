@@ -97,7 +97,10 @@ export default async function DropMeetAdminPage() {
       />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-7">
-        <Tile label="Pending places" value={pendingLocations.length} />
+        {/* The review queues below are for new submissions; everything already
+          approved lives on the all-places page, which is the only route to
+          editing, unpublishing or deleting one. */}
+      <Tile label="Pending places" value={pendingLocations.length} />
         <Tile label="Pending markets" value={pendingMarkets.length} />
         <Tile label="Claims" value={claims.length} />
         <Tile label="Import candidates" value={candidates} />
@@ -110,7 +113,12 @@ export default async function DropMeetAdminPage() {
       )}
 
       {/* ── Pending locations ────────────────────────────────────────────── */}
-      <h2 className="font-display text-lg font-semibold mb-3">Pending places</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h2 className="font-display text-lg font-semibold">Pending places</h2>
+        <Link href="/admin/dropmeet/places" className="text-sm font-medium text-brand hover:underline">
+          Manage all places →
+        </Link>
+      </div>
       {pendingLocations.length === 0 ? (
         <Empty>Nothing waiting. New community submissions land here.</Empty>
       ) : (

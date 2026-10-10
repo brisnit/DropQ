@@ -48,6 +48,35 @@ function publicScope(regionId: string) {
   return { regionId, status: "approved" } as const;
 }
 
+/**
+ * A market is public only if its PLACE is public too.
+ *
+ * ── WHY THIS IS NOT JUST `status: "approved"` ─────────────────────────────
+ *
+ * A market's status and its location's status are separate columns. When an
+ * admin unpublishes a place, the markets held there keep their own "approved"
+ * — so a query that checks only the market would go on serving a market at a
+ * venue we have decided not to show. Unpublishing has to carry down, or it
+ * only half works: hidden on the map, still live at its own URL.
+ */
+const MARKET_IS_PUBLIC = { status: "approved", location: { status: "approved" } } as const;
+
+/**
+ * The same rule for events, which may legitimately have no place at all.
+ *
+ * `Event.locationId` is optional — a standalone event carries its own
+ * coordinates and is nobody's tenant. So the test is "no venue, or a public
+ * venue", never "has a public venue", which would hide every standalone event.
+ *
+ * Expressed as `AND` rather than `OR` so it can be spread into a query that
+ * already uses `OR` for its text search without one clobbering the other.
+ */
+function eventVenueIsPublic() {
+  return {
+    AND: [{ OR: [{ locationId: null }, { location: { status: "approved" } }] }],
+  };
+}
+
 function boundsWhere(bounds: Bounds | null | undefined) {
   if (!bounds) return {};
   return {
@@ -208,7 +237,7 @@ export async function dropMeetFeed(opts: FeedOptions = {}): Promise<{
                 ],
               }
             : {}),
-          location: { status: "approved", ...geo },
+          location: { ...MARKET_IS_PUBLIC.location, ...geo },
         },
         take: limit,
         include: {
@@ -241,6 +270,7 @@ export async function dropMeetFeed(opts: FeedOptions = {}): Promise<{
         where: {
           ...publicScope(region.id),
           ...geo,
+          ...eventVenueIsPublic(),
           ...(q ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { description: { contains: q, mode: "insensitive" } }] } : {}),
           startDateTime: { gte: win.from, lte: win.to },
         },
@@ -433,7 +463,7 @@ export async function publicMarket(slug: string) {
   const region = await activeRegion();
   if (!region) return null;
   return prisma.market.findFirst({
-    where: { slug, status: "approved", regionId: region.id },
+    where: { slug, ...MARKET_IS_PUBLIC, regionId: region.id },
     include: {
       location: true,
       schedules: { where: { active: true }, orderBy: { dayOfWeek: "asc" } },
@@ -465,7 +495,7 @@ export async function publicEvent(slug: string) {
   const region = await activeRegion();
   if (!region) return null;
   return prisma.event.findFirst({
-    where: { slug, status: "approved", regionId: region.id },
+    where: { slug, status: "approved", regionId: region.id, ...eventVenueIsPublic() },
     include: { location: true, market: { select: { slug: true, name: true } } },
   });
 }
@@ -477,11 +507,12 @@ export async function vendorUpcomingAppearances(sellerId: string, take = 8) {
       sellerId,
       status: { in: ["scheduled", "confirmed"] },
       startDateTime: { gte: new Date() },
-      // Only surface appearances at places that are actually public.
+      // Only surface appearances at places that are actually public — and for
+      // a market or event, that includes the place it is held at.
       OR: [
-        { market: { status: "approved" } },
+        { market: MARKET_IS_PUBLIC },
         { location: { status: "approved" } },
-        { event: { status: "approved" } },
+        { event: { status: "approved", ...eventVenueIsPublic() } },
       ],
     },
     orderBy: { startDateTime: "asc" },

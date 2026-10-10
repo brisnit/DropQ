@@ -24,7 +24,14 @@ export async function GET(request: Request) {
 
   const [markets, locations, events] = await Promise.all([
     prisma.market.findMany({
-      where: { regionId: region.id, status: "approved", name: like },
+      // The place must be public too — unpublishing a venue has to take the
+      // markets held there out of search, not just off the map.
+      where: {
+        regionId: region.id,
+        status: "approved",
+        name: like,
+        location: { status: "approved" },
+      },
       take: 8,
       include: {
         location: { select: { city: true, address: true } },
@@ -41,6 +48,8 @@ export async function GET(request: Request) {
         status: "approved",
         name: like,
         startDateTime: { gte: new Date() },
+        // No venue, or a public venue. A standalone event has no location.
+        OR: [{ locationId: null }, { location: { status: "approved" } }],
       },
       take: 6,
       orderBy: { startDateTime: "asc" },

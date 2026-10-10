@@ -537,6 +537,159 @@ export async function rejectLocationAction(formData: FormData): Promise<void> {
   revalidatePath("/dropmeet");
 }
 
+/**
+ * What a delete would destroy.
+ *
+ * ── THE BLAST RADIUS IS WIDER THAN THE FOREIGN KEY ───────────────────────
+ *
+ * Deleting a Location cascades to its markets, and a market cascades to the
+ * vendor appearances held at it. So the appearances a delete would erase are
+ * NOT just the ones pointing at this location — they are those PLUS every
+ * appearance at any market here. Counting only the direct ones reports "0
+ * appearances" for a place whose weekly market has ten vendors signed up to
+ * it, and then deletes all ten.
+ *
+ * `appearances` is therefore the real total, and the two halves are reported
+ * separately so the admin can see where they come from.
+ *
+ * Events are the exception: `Event.locationId` is SetNull, so an event here
+ * SURVIVES the delete and keeps its own coordinates. It loses its venue
+ * rather than its existence.
+ */
+export async function locationImpact(id: string): Promise<{
+  markets: number;
+  events: number;
+  appearances: number;
+  directAppearances: number;
+  marketAppearances: number;
+  follows: number;
+  claims: number;
+  total: number;
+}> {
+  await requireAdmin();
+  const [markets, events, directAppearances, marketAppearances, follows, claims] =
+    await Promise.all([
+      prisma.market.count({ where: { locationId: id } }),
+      prisma.event.count({ where: { locationId: id } }),
+      prisma.vendorAppearance.count({ where: { locationId: id } }),
+      prisma.vendorAppearance.count({ where: { market: { locationId: id } } }),
+      prisma.locationFollow.count({ where: { locationId: id } }),
+      prisma.claimRequest.count({ where: { locationId: id } }),
+    ]);
+  const appearances = directAppearances + marketAppearances;
+  return {
+    markets, events, appearances, directAppearances, marketAppearances, follows, claims,
+    total: markets + events + appearances + follows + claims,
+  };
+}
+
+/**
+ * Take an approved place back off the public map without destroying it.
+ *
+ * The reversible option, and the one an admin should reach for first. A place
+ * that turned out to be wrong, closed, or a duplicate stops being public
+ * immediately; its markets, events and vendor appearances survive, so putting
+ * it back is one click rather than a re-submission.
+ */
+export async function unpublishLocationAction(formData: FormData): Promise<void> {
+  const admin = await requireAdmin();
+  const id = str(formData, "id");
+  await prisma.location.update({
+    where: { id },
+    data: {
+      status: "pending",
+      approvedAt: null,
+      approvedByAdminId: admin.id,
+      reviewNotes: optional(formData, "reason") ?? "Unpublished by an admin.",
+    },
+  });
+  revalidatePath("/admin/dropmeet");
+  revalidatePath("/dropmeet");
+}
+
+/**
+ * Delete a place for good.
+ *
+ * ⚠️ IRREVERSIBLE AND WIDER THAN IT LOOKS. The cascade takes every market,
+ * event, vendor appearance, follow and claim attached to it. Rejecting or
+ * unpublishing is almost always the right action instead; this exists for
+ * spam and for test rows that should never have been created.
+ *
+ * Two guards. The admin must type the place's name to confirm, which makes it
+ * impossible to delete the wrong row by clicking the wrong button. And when
+ * anything is attached, the request must carry `acknowledgeImpact`, which the
+ * form only sets once the admin has been shown the counts.
+ */
+export async function deleteLocationAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = str(formData, "id");
+  const typed = str(formData, "confirmName").trim();
+
+  const loc = await prisma.location.findUnique({ where: { id }, select: { name: true } });
+  if (!loc) redirect("/admin/dropmeet/places?deleted=missing");
+
+  if (typed !== loc.name.trim()) {
+    redirect(`/admin/dropmeet/locations/${id}?delete=name_mismatch`);
+  }
+
+  const impact = await locationImpact(id);
+
+  // ── THE ONE THING AN ADMIN MAY NOT DO ──────────────────────────────────
+  //
+  // A vendor appearance is a seller's published commitment to be somewhere on
+  // a date. It is theirs, not ours. Deleting the place deletes that plan with
+  // no notice to the vendor and no way to recover it, and no amount of
+  // confirming by the admin makes that the admin's call to make.
+  //
+  // Typing the name proves the admin meant THIS place. It proves nothing
+  // about the vendors. So this is a refusal, not a warning: unpublish instead,
+  // which hides the place and keeps every appearance intact.
+  if (impact.appearances > 0) {
+    redirect(`/admin/dropmeet/locations/${id}?delete=blocked_appearances`);
+  }
+
+  // Everything else — follows, claims, an empty market, an event that will
+  // simply lose its venue — stays deletable behind the typed name and an
+  // acknowledgement, so unused and duplicate places can still be cleaned up.
+  if (impact.total > 0 && formData.get("acknowledgeImpact") !== "1") {
+    redirect(`/admin/dropmeet/locations/${id}?delete=needs_ack`);
+  }
+
+  await prisma.location.delete({ where: { id } });
+
+  revalidatePath("/admin/dropmeet");
+  revalidatePath("/admin/dropmeet/places");
+  revalidatePath("/dropmeet");
+  redirect("/admin/dropmeet/places?deleted=1");
+}
+
+/** The same, for a market. Markets carry appearances too. */
+export async function deleteMarketAction(formData: FormData): Promise<void> {
+  await requireAdmin();
+  const id = str(formData, "id");
+  const typed = str(formData, "confirmName").trim();
+
+  const market = await prisma.market.findUnique({ where: { id }, select: { name: true } });
+  if (!market) redirect("/admin/dropmeet/places?deleted=missing");
+  if (typed !== market.name.trim()) {
+    redirect(`/admin/dropmeet/places?delete=name_mismatch`);
+  }
+
+  // The same refusal as deleteLocationAction, for the same reason: a market
+  // cascades to the appearances held at it. Guarding only the place would have
+  // moved the hole to this button rather than closed it.
+  const appearances = await prisma.vendorAppearance.count({ where: { marketId: id } });
+  if (appearances > 0) {
+    redirect(`/admin/dropmeet/places?delete=blocked_appearances`);
+  }
+
+  await prisma.market.delete({ where: { id } });
+  revalidatePath("/admin/dropmeet");
+  revalidatePath("/admin/dropmeet/places");
+  revalidatePath("/dropmeet");
+  redirect("/admin/dropmeet/places?deleted=1");
+}
+
 /** Admins may correct a submission before approving it. */
 export async function editLocationAction(
   _prev: SimpleState,
