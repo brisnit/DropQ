@@ -180,6 +180,102 @@ export async function GET() {
       /<AddPlaceForm signedIn \/>/.test(page));
   }
 
+  /* ---- 7. A registered account is not a purchasing customer ----------- */
+  {
+    const { purchasingCustomerWhere, registeredOnlyWhere } = await import("@/lib/reporting");
+
+    const buyerSeller = await mk();
+    const buyer = await prisma.customer.create({ data: { email: `buyer-${rnd()}@example.com` } });
+    const lurker = await prisma.customer.create({ data: { email: `lurker-${rnd()}@example.com` } });
+    const drop = await withDrop(buyerSeller.id, "live");
+    await prisma.order.create({
+      data: {
+        dropId: drop.id, sellerId: buyerSeller.id, customerId: buyer.id,
+        buyerName: "B", buyerEmail: buyer.email, totalCents: 1400, feeCents: 28,
+        status: "paid", paymentStatus: "paid", source: "online",
+      },
+    });
+
+    const purchasing = await prisma.customer.findMany({
+      where: purchasingCustomerWhere(), select: { id: true },
+    });
+    const registeredOnly = await prisma.customer.findMany({
+      where: registeredOnlyWhere(), select: { id: true },
+    });
+    const pIds = new Set(purchasing.map((c) => c.id));
+    const rIds = new Set(registeredOnly.map((c) => c.id));
+
+    check("someone who paid counts as a purchasing customer", pIds.has(buyer.id));
+    check("an account that never bought does NOT", !pIds.has(lurker.id));
+    check("...and is counted as a registered account instead", rIds.has(lurker.id));
+    check("the two sets never overlap", !rIds.has(buyer.id));
+
+    // The point of the whole exercise: a DropMeet signup must not land in a
+    // sales figure.
+    const fd = new FormData();
+    fd.set("email", `market-${rnd()}@example.com`);
+    fd.set("next", "/dropmeet/add");
+    const { requestMagicLinkAction } = await import("@/lib/actions/customer-auth");
+    await requestMagicLinkAction({}, fd);
+    const after = await prisma.customer.count({ where: purchasingCustomerWhere() });
+    check("a DropMeet signup adds nobody to the purchasing-customer count",
+      after === purchasing.length, `${purchasing.length} → ${after}`);
+
+    // And it must stay that way: no product surface may count raw account rows
+    // as customers. The Twilio STOP handler reads them to apply an opt-out,
+    // which is not a metric.
+    const { readdirSync, statSync } = await import("node:fs");
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const e of readdirSync(dir)) {
+        const full = `${dir}/${e}`;
+        if (statSync(full).isDirectory()) {
+          if (!["node_modules", "generated"].includes(e) && !full.includes("/dev/")) walk(full);
+          continue;
+        }
+        if (!/\.tsx?$/.test(e)) continue;
+        // Comments stripped: lib/reporting.ts documents at length that
+        // prisma.customer.count() is the thing NOT to reach for, and a naive
+        // scan convicts it on its own warning.
+        const body = readFileSync(full, "utf8")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+          .replace(/\/\/.*$/gm, "");
+        if (/prisma\.customer\.count\(/.test(body) && !full.includes("twilio")) offenders.push(full);
+      }
+    };
+    walk("app"); walk("lib");
+    check("no product surface counts raw account rows as customers",
+      offenders.length === 0, offenders.join(", "));
+
+    await prisma.order.deleteMany({ where: { sellerId: buyerSeller.id } });
+    await prisma.drop.deleteMany({ where: { sellerId: buyerSeller.id } });
+    await prisma.seller.delete({ where: { id: buyerSeller.id } });
+    await prisma.customerToken.deleteMany({ where: { customerId: { in: [buyer.id, lurker.id] } } });
+    await prisma.customer.deleteMany({
+      where: { OR: [{ id: { in: [buyer.id, lurker.id] } }, { email: { startsWith: "market-" } }] },
+    });
+  }
+
+  /* ---- 8. Tests never send real email --------------------------------- */
+  {
+    const mail = readFileSync("lib/email.ts", "utf8");
+    check("sendEmail refuses to send when pointed at the harness database",
+      /fixtureRefusal\(\) === null && process\.env\.ALLOW_TEST_EMAIL !== "1"/.test(mail));
+    check("...and says how to opt in deliberately", /ALLOW_TEST_EMAIL=1/.test(mail));
+    const stack = readFileSync("tests/browser/support/stack.mjs", "utf8");
+    check("the harness also withholds the live key",
+      /ALLOW_TEST_EMAIL[\s\S]{0,80}RESEND_API_KEY: ""/.test(stack));
+
+    // Proof, not just source-reading: this suite runs against the harness
+    // database, so a send attempted right now must be suppressed.
+    const { sendEmail } = await import("@/lib/email");
+    const sent = await sendEmail({
+      to: "nobody@dropq-selftest.invalid", subject: "selftest", html: "<p>selftest</p>",
+    });
+    check("a send from this test run is suppressed",
+      sent.skipped === true && sent.ok === false, JSON.stringify(sent));
+  }
+
   /* ----------------------------- teardown ------------------------------- */
   const made = [published, closedOnly, draftOnly, privateOnly, noDrops, internal, disabled];
   await prisma.drop.deleteMany({ where: { sellerId: { in: made.map((s) => s.id) } } });
