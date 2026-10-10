@@ -12,6 +12,8 @@ import { getCurrentSeller } from "@/lib/auth";
 import { vendorPalette } from "@/lib/color";
 import { DiscoveryLink } from "@/components/discovery-link";
 import { OriginTracker } from "@/components/origin-tracker";
+import { BackToBrowse } from "@/components/back-to-browse";
+import { originPassThrough } from "@/lib/browse-origin";
 
 // Absolute URL for link-preview images (blob URLs are already absolute).
 function absUrl(u?: string | null): string | null {
@@ -61,10 +63,17 @@ export async function generateMetadata({
 
 export default async function StorePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ from?: string; f?: string }>;
 }) {
   const { slug } = await params;
+  const { from, f } = await searchParams;
+  // Carried onto this store's drop links so the browse origin survives the
+  // extra hop: Find Drops -> store -> drop -> back still lands on Find Drops
+  // with the filter intact, rather than guessing.
+  const browseQuery = originPassThrough({ from, f });
   const seller = await prisma.seller.findUnique({
     where: { slug },
     include: {
@@ -118,6 +127,14 @@ export default async function StorePage({
           <Link href="/signup" className="underline font-medium">Start your own free →</Link>
         </div>
       )}
+      {/* The way back into DropQ, above the banner — a link sitting ON the
+          banner would have to stay readable against any photo a vendor
+          uploads, which it cannot. */}
+      <div className="border-b border-line bg-cream">
+        <div className="max-w-3xl mx-auto px-5 flex items-center">
+          <BackToBrowse searchParams={{ from, f }} />
+        </div>
+      </div>
       {/* Banner */}
       <div className="relative h-28 sm:h-36 overflow-hidden" style={{ backgroundColor: accent }}>
         {seller.headerImageUrl && (
@@ -195,7 +212,7 @@ export default async function StorePage({
               return (
                 <Link
                   key={d.id}
-                  href={`/s/${seller.slug}/${d.id}`}
+                  href={`/s/${seller.slug}/${d.id}${browseQuery}`}
                   className="block bg-paper border border-line rounded-card p-6 hover:shadow-[var(--shadow-lift)] transition group"
                 >
                   <div className="flex items-start justify-between gap-3">

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { browseOriginQuery, DISCOVER_FILTER_IDS } from "@/lib/browse-origin";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DiscoveryItem } from "@/lib/discover";
 import { DiscoveryCard } from "@/components/discovery-card";
@@ -53,6 +54,14 @@ export function DiscoverClient() {
   // Restore persisted location + saved items on mount.
   useEffect(() => {
     track("discovery_viewed");
+    // A back link from a storefront or drop arrives as ?f=<filter>. Read it
+    // here rather than with useSearchParams: this page is prerendered, and
+    // useSearchParams would client-render the tree up to the nearest Suspense
+    // boundary. The filter is only ever an initial value, so reading it at the
+    // same moment the stored location is read keeps the two consistent and
+    // costs nothing.
+    const f = new URLSearchParams(window.location.search).get("f");
+    if (f && (DISCOVER_FILTER_IDS as readonly string[]).includes(f)) setFilter(f);
     const stored = loadLoc();
     if (stored) setLoc(stored);
     else setEditingLoc(true);
@@ -254,7 +263,13 @@ export function DiscoverClient() {
         ) : (
           <>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {shown.map((it) => <DiscoveryCard key={`${it.kind}-${it.id}`} item={it} />)}
+              {shown.map((it) => (
+                <DiscoveryCard
+                  key={`${it.kind}-${it.id}`}
+                  item={it}
+                  originQuery={browseOriginQuery("discover", filter)}
+                />
+              ))}
             </div>
             {filter === "saved" && (
               <p className="text-center text-xs text-muted mt-6">

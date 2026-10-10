@@ -27,7 +27,18 @@ function fmtDate(iso: string): string {
   });
 }
 
-export function DiscoveryCard({ item }: { item: DiscoveryItem }) {
+export function DiscoveryCard({
+  item,
+  originQuery = "",
+}: {
+  item: DiscoveryItem;
+  /**
+   * Query string recording that this card was opened from Find Drops, and
+   * under which filter, so the page it opens can offer the way back. See
+   * lib/browse-origin.ts.
+   */
+  originQuery?: string;
+}) {
   const [saved, setSaved] = useState(() => isSaved(item.id));
   const [calOpen, setCalOpen] = useState(false);
   const cta = vendorPalette(item.accent).vendor_cta_color;
@@ -139,7 +150,7 @@ export function DiscoveryCard({ item }: { item: DiscoveryItem }) {
         {/* Actions */}
         <div className="mt-auto pt-2 flex items-center gap-2">
           <Link
-            href={item.href}
+            href={`${item.href}${originQuery}`}
             onClick={() => track("discovery_card_opened", { id: item.id, kind: item.kind, href: item.href })}
             className="flex-1 text-center text-sm font-semibold rounded-xl py-2.5 text-white transition"
             style={{ backgroundColor: cta }}

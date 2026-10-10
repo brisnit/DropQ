@@ -6,6 +6,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { Reveal } from "@/components/reveal";
 import { LinkButton } from "@/components/ui";
 import { INTERNAL_KINDS } from "@/lib/reporting";
+import { browseOriginQuery } from "@/lib/browse-origin";
 
 export const metadata: Metadata = {
   title: "Vendors on DropQ",
@@ -111,7 +112,7 @@ export default async function VendorsPage() {
                   <Reveal key={v.id} delay={Math.min(i, 8) * 50}>
                     <li className="h-full">
                       <Link
-                        href={`/s/${v.slug}`}
+                        href={`/s/${v.slug}${browseOriginQuery("vendors")}`}
                         className="group h-full flex flex-col bg-paper border border-line rounded-card p-5 hover:border-ink/25 hover:shadow-[var(--shadow-soft)] transition"
                       >
                         <div className="flex items-center gap-3 min-w-0">

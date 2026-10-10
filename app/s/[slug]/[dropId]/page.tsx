@@ -10,6 +10,7 @@ import { computeDropPhase, isOrderingOpen } from "@/lib/drop-status";
 import { formatPickupWindow, pickupLocation } from "@/lib/pickup";
 import { vendorPalette } from "@/lib/color";
 import { OriginTracker } from "@/components/origin-tracker";
+import { BackToBrowse } from "@/components/back-to-browse";
 
 // Absolute URL for link-preview images (blob URLs are already absolute).
 function absUrl(u?: string | null): string | null {
@@ -71,10 +72,10 @@ export default async function DropOrderPage({
   searchParams,
 }: {
   params: Promise<{ slug: string; dropId: string }>;
-  searchParams: Promise<{ canceled?: string }>;
+  searchParams: Promise<{ canceled?: string; from?: string; f?: string }>;
 }) {
   const { slug, dropId } = await params;
-  const { canceled } = await searchParams;
+  const { canceled, from, f } = await searchParams;
   const drop = await prisma.drop.findUnique({
     where: { id: dropId },
     include: {
@@ -164,6 +165,11 @@ export default async function DropOrderPage({
       </div>
 
       <div className="max-w-4xl mx-auto px-5 py-8">
+        {/* The way back into DropQ. The sticky bar above leads to this
+            vendor's store; this leads to wherever the visitor was browsing. */}
+        <div className="mb-3 -mt-2">
+          <BackToBrowse searchParams={{ from, f }} />
+        </div>
         {canceled && (
           <div className="mb-5 rounded-xl bg-grey-tint text-[#3f434b] px-4 py-3 text-sm">
             Checkout canceled — your cart is still here whenever you're ready.

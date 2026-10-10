@@ -408,6 +408,95 @@ export async function GET() {
       !/deleteMany/.test(unpublishBody));
   }
 
+  /* ---- 10. A way back out of a storefront or a drop ------------------- */
+  //
+  // These pages are reached from a shared link, a QR code on a table, the
+  // directory or Find Drops, and offered no way back into DropQ. The browser's
+  // own back button is not a substitute: a visit that began on Instagram would
+  // leave the site.
+  {
+    const {
+      resolveBackLink, browseOriginQuery, originPassThrough,
+      BROWSE_ORIGINS, DISCOVER_FILTER_IDS,
+    } = await import("@/lib/browse-origin");
+
+    const strip = (t: string) =>
+      t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+
+    // There is ALWAYS a way back. "No origin recorded" is the common case —
+    // most visitors arrive from outside — so the fallback is the main path.
+    const cold = resolveBackLink({});
+    check("a page opened cold still offers a way back",
+      cold.href === "/discover" && cold.label === "Find Drops" && cold.isFallback);
+
+    const fromDiscover = resolveBackLink({ from: "discover", f: "food" });
+    check("a recorded origin is honoured, with its filter",
+      fromDiscover.href === "/discover?f=food" && !fromDiscover.isFallback);
+    check("the default filter is not written into the link",
+      resolveBackLink({ from: "discover", f: "all" }).href === "/discover");
+    check("an unknown filter degrades to the unfiltered page",
+      resolveBackLink({ from: "discover", f: "nonsense" }).href === "/discover");
+    check("arriving from the directory says so",
+      resolveBackLink({ from: "vendors" }).label === "Vendors");
+
+    // The origin is a KEY into a fixed table, never a URL. If this regresses,
+    // anyone who can send a link can point a DropQ page's back button at their
+    // own site, which is a phishing primitive.
+    const allowed = Object.values(BROWSE_ORIGINS).map((o) => o.path);
+    const hostile = [
+      "https://evil.example", "//evil.example", "/\\evil.example",
+      "javascript:alert(1)", "http://evil.example/discover",
+      "/discover@evil.example", "", "   ",
+    ];
+    const escapes = hostile.filter((h) => {
+      const r = resolveBackLink({ from: h });
+      return !allowed.some((a) => r.href === a || r.href.startsWith(a + "?"));
+    });
+    check("no crafted origin can point the back link off DropQ",
+      escapes.length === 0, JSON.stringify(escapes));
+    check("...and a crafted origin is not echoed into an outgoing link",
+      hostile.every((h) => originPassThrough({ from: h }) === ""));
+    check("a real origin does survive one hop, store to drop",
+      originPassThrough({ from: "discover", f: "food" }) === "?from=discover&f=food");
+    check("an array-valued param cannot smuggle a second value",
+      resolveBackLink({ from: ["discover", "evil"], f: ["food", "x"] }).href ===
+        "/discover?f=food");
+
+    // Promised in lib/browse-origin.ts: the filter list is duplicated because
+    // the real table lives in a client bundle, so the duplicate has to be
+    // held to it.
+    const clientSrc = readFileSync("components/discover-client.tsx", "utf8");
+    const clientIds = [...clientSrc.matchAll(/\{ id: "([a-z]+)"/g)].map((m) => m[1]);
+    check("the back link knows every filter Find Drops offers",
+      clientIds.length > 0 &&
+        clientIds.join(",") === [...DISCOVER_FILTER_IDS].join(","),
+      JSON.stringify({ client: clientIds, lib: [...DISCOVER_FILTER_IDS] }));
+
+    // Never history. A real href, in the server-rendered HTML.
+    const comp = strip(readFileSync("components/back-to-browse.tsx", "utf8"));
+    check("the back link is an href, not the browser's history",
+      !/router\.back|history\.back|useRouter/.test(comp) && /<Link/.test(comp));
+    check("...and is not a client component, so it is in the first HTML",
+      !/^"use client"/m.test(readFileSync("components/back-to-browse.tsx", "utf8")));
+    check("...with a 44px tap target", /min-h-11/.test(comp));
+
+    for (const page of ["app/s/[slug]/page.tsx", "app/s/[slug]/[dropId]/page.tsx"]) {
+      const src = strip(readFileSync(page, "utf8"));
+      check(`${page.includes("dropId") ? "a drop" : "a storefront"} renders the back link`,
+        /<BackToBrowse/.test(src) && /searchParams/.test(src));
+    }
+    check("Find Drops records where a card was opened from",
+      /originQuery=\{browseOriginQuery\("discover", filter\)\}/.test(
+        strip(readFileSync("components/discover-client.tsx", "utf8"))
+      ));
+    check("...and Find Drops restores that filter on the way back",
+      /DISCOVER_FILTER_IDS[\s\S]{0,60}includes\(f\)[\s\S]{0,20}setFilter\(f\)/.test(
+        strip(readFileSync("components/discover-client.tsx", "utf8"))
+      ));
+    check("browseOriginQuery omits a filter the page would ignore",
+      browseOriginQuery("vendors", "food") === "?from=vendors");
+  }
+
   /* ---- 9d. The gap between the count and the delete ------------------- */
   //
   // Source-reading cannot prove this one. The old sequence — count, refuse if
